@@ -715,15 +715,18 @@ export class StageView {
       if (foot) points[2] = this.w2s(foot.x, foot.y);
       stroke(points, body, Math.max(2, size * 0.035));
     });
-    const center = project(figure.pelvis[0], 0);
-    ctx.save();
-    ctx.translate(center.x, center.y); ctx.rotate(mirror * angle);
-    ctx.beginPath();
-    const tutu = cos && cos.style === 'tutu';
-    ctx.ellipse(0, 0, size * (tutu ? 0.18 : 0.07), size * (tutu ? 0.18 : 0.045), 0, 0, Math.PI * 2);
-    ctx.fillStyle = cos ? cos.skirt : body; ctx.fill();
-    ctx.strokeStyle = '#080c13'; ctx.lineWidth = 1.5; ctx.stroke();
-    ctx.restore();
+    // In dedicated Top-down, leave the limbs unobscured by the filled costume icon.
+    if (state.ui.fill !== 'plan') {
+      const center = project(figure.pelvis[0], 0);
+      ctx.save();
+      ctx.translate(center.x, center.y); ctx.rotate(mirror * angle);
+      ctx.beginPath();
+      const tutu = cos && cos.style === 'tutu';
+      ctx.ellipse(0, 0, size * (tutu ? 0.18 : 0.07), size * (tutu ? 0.18 : 0.045), 0, 0, Math.PI * 2);
+      ctx.fillStyle = cos ? cos.skirt : body; ctx.fill();
+      ctx.strokeStyle = '#080c13'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.restore();
+    }
     // Arms use the shared pose joints, flattened vertically rather than drawn upright.
     figure.arms.forEach(arm => {
       stroke(arm.map(j => project(j[0], 0)), body, Math.max(2.5, size * 0.03));
