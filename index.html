@@ -139,7 +139,7 @@
       <div id="slideGallery" class="slide-gallery" aria-label="Projector image gallery"></div>
       <div class="field"><label for="slideChoice">Next slide</label><select id="slideChoice"><option value="">Choose image</option></select></div>
       <div class="field"><label for="slideFade">Crossfade (s)</label><input id="slideFade" type="number" min="0" max="120" step="0.1" value="1" /></div>
-      <div class="btn-row"><button id="btnSlideCue">+ Cue at playhead</button><button id="btnSlideOff">Projector off</button></div>
+      <div class="btn-row"><button id="btnSlideCue" title="Turn on the selected image at the playhead">Projector on / Show slide</button><button id="btnSlideOff">Projector off</button></div>
       <div id="slideCueList" class="list"></div>
       <p class="hint">A slide stays until the next slide, video or off cue. Set crossfade to <b>0</b> for an instant change. Screen fly cues remain separate. Images stay in this browser; show JSON carries references only.</p>
     </section>
@@ -237,7 +237,7 @@
 {"imports": {
   "./src/app.js": "./src/app.js?v=slides9",
   "./src/model.js": "./src/model.js?v=slides9",
-  "./src/timeline.js": "./src/timeline.js?v=slides9",
+  "./src/timeline.js": "./src/timeline.js?v=slides-on10",
   "./src/house.js": "./src/house.js?v=slides9",
   "./src/slides.js": "./src/slides.js?v=slides9",
   "./src/video.js": "./src/video.js?v=video-sync7"

@@ -1464,7 +1464,24 @@ export class Timeline {
           this.app.rebuild();
         },
       });
-      items.push({ label: 'Show chosen image', note: fmtShort(at), run: () => this.app.addSlideCueAt(at) });
+      const images = show.images || [];
+      for (const image of images) {
+        items.push({
+          label: 'Projector on · ' + image.name,
+          note: fmtShort(at),
+          run: () => {
+            commit();
+            const fadeInput = document.getElementById('slideFade');
+            const fade = Math.max(0, Math.min(120000, Math.round((Number(fadeInput?.value) || 0) * 1000)));
+            const cue = addSlideCue(show, at, image.id, fade);
+            state.ui.slideImageId = image.id;
+            state.ui.slideCueId = cue.id;
+            state.ui.selectedTrack = 'slides';
+            this.app.rebuild();
+          },
+        });
+      }
+      if (!images.length) items.push({ label: 'Load gallery images first', run: () => this.app.editSlideCue() });
     } else if (tr.kind === 'video' && tr.video) {
       const clip = tr.video;
       items.push({ label: 'Edit video', run: () => this.app.editVideo(clip.id) });
