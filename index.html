@@ -209,6 +209,7 @@
 </section>
 
 <!-- The only chrome a run-through keeps: play, restart, the clock, and a way out. -->
+<button id="watchExit" hidden style="position:fixed;top:12px;right:12px;z-index:1000" title="Back to editing (Esc)">← Back to editor</button>
 <div id="watchBar" class="watch-bar" hidden>
   <button id="wPlay" class="primary" title="Play / pause (Space)">▶</button>
   <button id="wRestart" title="Back to the top of the show">↺</button>
@@ -235,7 +236,7 @@
 
 <script type="importmap">
 {"imports": {
-  "./src/app.js": "./src/app.js?v=slides9",
+  "./src/app.js": "./src/app.js?v=watch-exit11",
   "./src/model.js": "./src/model.js?v=slides9",
   "./src/timeline.js": "./src/timeline.js?v=slides-on10",
   "./src/house.js": "./src/house.js?v=slides9",

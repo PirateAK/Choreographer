@@ -2696,6 +2696,7 @@ function setWatch(on) {
   document.body.classList.toggle('watch', want);
   const bar = $('watchBar');
   if (bar) bar.hidden = !want;
+  $('watchExit').hidden = !want;
 
   if (want) {
     // Nothing is half-finished when the audience arrives.
@@ -4027,6 +4028,7 @@ function boot() {
   });
   $('wFull').addEventListener('click', toggleFullscreen);
   $('wExit').addEventListener('click', () => setWatch(false));
+  $('watchExit').addEventListener('click', () => setWatch(false));
 
   // transport
   $('btnPlay').addEventListener('click', togglePlay);
