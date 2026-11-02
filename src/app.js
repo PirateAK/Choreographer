@@ -2699,6 +2699,8 @@ function setWatch(on) {
   $('watchExit').hidden = !want;
 
   if (want) {
+    state.ui.beforeWatchFill = state.ui.fill;
+    state.ui.fill = 'house';
     // Nothing is half-finished when the audience arrives.
     state.ui.placingStations = false;
     state.ui.stationIdx = null;
@@ -2712,6 +2714,7 @@ function setWatch(on) {
     pause();
     play();
   } else {
+    state.ui.fill = state.ui.beforeWatchFill ?? null;
     pause();
     if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
   }
@@ -3232,13 +3235,21 @@ function render() {
   video.sync(videoClips, state.ui.playhead, state.ui.playing && !state.ui.activePause);
   const layers = slideLayersAt(state.show, state.ui.playhead);
   slides.sync(state.show.images, layers);
+  const screens = state.show.scenery.filter((s) => s.screen);
+  const downScreen = screens.find((s) => sceneryStateAt(s, state.ui.playhead).fly > 0.05);
+  const currentImage = state.show.images.find((im) => im.id === projection.imageId);
+  let projectionMessage = !screens.length ? 'No projection screen added' : !downScreen ? 'Screen is flown out at this time' : projection.kind === 'off' && !layers.length ? 'Projector off · no active image cue' : projection.kind === 'video' ? 'Video cue is active' : !currentImage && projection.kind === 'slide' ? 'Slide cue refers to a missing gallery image' : currentImage && slides.status.get(currentImage.key) === false ? 'Image file missing in this browser' : layers.length ? 'Projecting ' + (currentImage?.name || 'slide transition') : 'Crossfade starting · advance the playhead';
+  if (downScreen) {
+    const covered = state.show.scenery.find((s) => s.id !== downScreen.id && s.kind !== 'prop' && clothDepth(s) <= clothDepth(downScreen) && (s.kind === 'drop' ? sceneryStateAt(s, state.ui.playhead).fly > 0.95 : s.kind === 'curtain' ? sceneryStateAt(s, state.ui.playhead).open < 0.05 : false));
+    if (covered) projectionMessage += ' · Screen may be covered by ' + covered.name;
+  }
+  $('projectionStatus').textContent = projectionMessage + (state.ui.fill !== 'house' ? ' · Open House view to see projection' : '');
   if (state.ui.fill === 'house') {
     const wrap = $('house-wrap');
     if (app.house.width !== wrap.clientWidth || app.house.height !== wrap.clientHeight) app.house.resize(wrap.clientWidth, wrap.clientHeight);
     const picture = projection.kind === 'video' ? video.activeElement(videoClips, state.ui.playhead) : slides.frame(state.show.images, layers);
     app.house.draw(state.show, state.ui.playhead, picture);
-    const screenDown = state.show.scenery.some((s) => s.screen && sceneryStateAt(s, state.ui.playhead).fly > 0.05);
-    $('houseStatus').textContent = !screenDown ? 'HOUSE · Screen is flown out' : projection.kind === 'off' && !layers.length ? 'HOUSE · Projector off' : picture ? 'HOUSE · ' + (projection.kind === 'video' ? 'Video' : 'Slides') : 'HOUSE · Media loading or missing';
+    $('houseStatus').textContent = 'HOUSE · ' + projectionMessage;
   }
   app.timeline.draw();
   app.company.draw();
