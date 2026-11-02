@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Choreographer — plan</title>
+<style>
+  :root {
+    --ink: #1b1e23;
+    --dim: #5f6672;
+    --rule: #d9d5cd;
+    --paper: #ffffff;
+    --accent: #8a6a1f;
+  }
+  * { box-sizing: border-box; }
+  html { background: #e7e4de; }
+  body {
+    margin: 0;
+    background: #e7e4de;
+    color: var(--ink);
+    font: 12.5px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ---------- screen-only bar ---------- */
+  .bar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 18px;
+    background: #11161f;
+    color: #c9d4e3;
+    border-bottom: 1px solid #202a39;
+  }
+  .bar .brand {
+    font-size: 11px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: none;
+    font-weight: 600;
+    padding: 0;
+    border: 0;
+  }
+  .bar #docName { font-size: 12px; color: #8d9aab; }
+  .bar .spacer { flex: 1; }
+  .bar .moment { display: flex; align-items: center; gap: 7px; font-size: 11px; color: #8d9aab; }
+  .bar input, .bar select {
+    font: inherit;
+    font-size: 12px;
+    padding: 4px 7px;
+    border-radius: 5px;
+    border: 1px solid #2b3646;
+    background: #1b2431;
+    color: #c9d4e3;
+  }
+  .bar input { width: 70px; text-align: right; font-variant-numeric: tabular-nums; }
+  .bar input:focus, .bar select:focus { outline: 1px solid var(--accent); outline-offset: 1px; }
+  .bar select { max-width: 340px; }
+  .bar button {
+    font: inherit;
+    padding: 5px 12px;
+    border-radius: 5px;
+    border: 1px solid #2b3646;
+    background: #1b2431;
+    color: #c9d4e3;
+    cursor: pointer;
+  }
+  .bar button:hover { background: #222d3d; }
+  .bar button.primary { background: var(--accent); border-color: #a4822c; color: #14171c; font-weight: 600; }
+  .bar a {
+    color: #8d9aab;
+    text-decoration: none;
+    font-size: 12px;
+    border-bottom: 1px dotted #4a5568;
+  }
+  .bar a:hover { color: #c9d4e3; }
+
+  /* ---------- sheets ---------- */
+  main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 18px;
+  }
+  .sheet {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 14mm 13mm;
+    background: var(--paper);
+    box-shadow: 0 2px 16px rgba(20, 24, 30, .16);
+  }
+  .sheet + .sheet { margin-top: 0; }
+
+  /* ---------- title block ---------- */
+  .doc-head {
+    display: flex;
+    gap: 22px;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--ink);
+  }
+  h1 { font-size: 23px; line-height: 1.15; margin: 0; letter-spacing: -.01em; }
+  .sub { margin: 4px 0 0; color: var(--dim); font-size: 11.5px; }
+  .facts {
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 2px 18px;
+    margin: 0;
+    font-size: 10.5px;
+  }
+  .facts div { display: flex; gap: 6px; }
+  .facts dt { color: var(--dim); }
+  .facts dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+  h2 {
+    font-size: 11px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 20px 0 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--rule);
+  }
+  h3 { font-size: 12px; margin: 14px 0 6px; display: flex; align-items: center; gap: 7px; }
+  h3 .tag { font-weight: 400; color: var(--dim); font-size: 10.5px; }
+  /* A role beside a performer's name on a path sheet: quieter than the name, louder than
+     the tag, and set apart so a double or an understudy is read at a glance. */
+  h3 .role {
+    font-weight: 400; font-style: italic; color: #4b4438; font-size: 11px;
+    padding-left: 7px; border-left: 1px solid var(--rule);
+  }
+
+  .plan { margin: 0; border: 1px solid var(--rule); padding: 4px; background: #fff; }
+  .plan svg { display: block; width: 100%; height: auto; }
+
+  .legend {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    margin: 8px 0 0;
+    padding: 0;
+    font-size: 10.5px;
+    color: var(--dim);
+  }
+  .legend li { display: flex; align-items: center; gap: 6px; }
+  .sw { width: 14px; height: 9px; display: inline-block; border: 1px solid #8d8a82; }
+  .sw.start { width: 9px; height: 9px; border-radius: 50%; background: #fff; border: 2px solid #8a6a1f; }
+  .sw.cloth { background: #f0ebdf; border-color: #6f6757; }
+  .sw.prop { background: #fbf6e6; border-color: #8a7a4a; }
+  .sw.leg { background: #dcd8d0; }
+  .sw.cl { width: 14px; height: 0; border: 0; border-top: 1px dashed #c6c2b9; }
+  /* A contact point is a cross, so the legend shows a cross rather than a swatch. */
+  .sw.foot { width: 11px; height: 11px; border: 0; background:
+    linear-gradient(#5a5346, #5a5346) center/11px 2px no-repeat,
+    linear-gradient(#5a5346, #5a5346) center/2px 11px no-repeat; }
+  .sw.tag { width: 10px; height: 10px; border-radius: 2px; background: #fff; border: 1px solid #23262b; }
+  .sw.circle { width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 1px solid #23262b; }
+  .swatch { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+
+  .note { color: var(--dim); font-size: 10.5px; margin: 8px 0 0; }
+  .empty { color: var(--dim); font-size: 11px; margin: 6px 0; }
+
+  .split { display: grid; grid-template-columns: 1.35fr 1fr; gap: 20px; align-items: start; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+  thead { display: table-header-group; }
+  th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--dim);
+    border-bottom: 1px solid var(--rule);
+    padding: 4px 6px 3px;
+  }
+  td { padding: 3.5px 6px; border-bottom: 1px solid #f2efeb; vertical-align: top; }
+  td.num, th.num { font-variant-numeric: tabular-nums; }
+  td.num { white-space: nowrap; }
+  /* Scenes read as subordinate rows under their act. */
+  tr.sub td { color: var(--dim); padding-left: 22px; }
+  tr.sub td:first-child::before { content: '· '; color: var(--rule); }
+  tr.sub td.num { color: var(--dim); }
+  table.stations { margin-top: 8px; }
+  /* The casting sheet is read by role, so the role column carries the weight and a
+     performer with no role in an act is a dash rather than a blank. */
+  table.cast { margin-top: 6px; }
+  table.cast td:first-child { font-weight: 600; }
+  table.cast td span.dim { color: #a49f93; font-weight: 400; }
+
+  /* The call sheet groups its rows by scene, so the scene line is a silent row of its own
+     rather than a heading that would break the table. */
+  table.call { margin-bottom: 12px; }
+  tr.sub td.callsec {
+    color: var(--dim); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase;
+    padding: 8px 6px 3px; border-bottom: 1px solid var(--rule);
+  }
+  tr.sub td.callsec::before { content: ''; }
+  /* How many are wanted in this stretch, pushed to the far edge of the line so the eye
+     finds the same column on every group. */
+  tr.sub td.callsec .callcount {
+    float: right; text-transform: none; letter-spacing: 0; font-size: 10px; color: #4b4438;
+    font-variant-numeric: tabular-nums;
+  }
+  table.call td span.dim { color: #a49f93; }
+  /* The changes under the company line: a strip of rows, tighter than the call itself,
+     because it is a log rather than a list to work through. */
+  table.call.changes { margin: 0 0 12px; font-size: 10px; }
+  table.call.changes th { padding: 2px 6px; font-size: 9px; }
+  table.call.changes td { padding: 2px 6px; border-bottom: 1px solid #f6f3ee; }
+  table.call.changes td span.dim { color: #a49f93; font-size: 9px; margin-left: 1px; }
+  /* The time and the running total are the narrow ends; the names get the room. */
+  table.call.changes th:first-child, table.call.changes td:first-child { width: 58px; }
+  table.call.changes th:last-child, table.call.changes td:last-child { width: 70px; }
+  table.call td.tick, table.call th.tick { width: 20px; padding-right: 2px; }
+  /* The company line: a running count over the act, ruled like the plan above it so the
+     page still reads as a drawing with numbers rather than a chart pasted in. */
+  .runline { margin: 0 0 8px; border: 1px solid var(--rule); padding: 3px 4px; background: #fff; }
+  .runline svg { display: block; width: 100%; height: auto; }
+  /* The call sheet's rows are read off as people arrive, so a ticked row stays easy to
+     scan: the box is the first thing in the row rather than something to hunt for. */
+  table.call tbody tr:not(.sub) td { padding-top: 4.5px; padding-bottom: 4.5px; }
+  table.cue { font-size: 11px; }
+  table.cue td { padding: 5px 6px; }
+  table.cue tbody tr:nth-child(even) { background: #fbfaf7; }
+
+  /* The clearance list is ticked off by hand, so it prints with room for a pen. */
+  table.strike td.tick, table.strike th.tick { width: 20px; padding-right: 2px; }
+  .tick-box { display: inline-block; width: 10px; height: 10px; border: 1px solid #8d8a82; }
+  .signoff { display: flex; gap: 30px; margin: 16px 0 0; font-size: 9.5px; color: var(--dim); break-inside: avoid; }
+  .signoff div { flex: 1; }
+  .signoff .line { display: block; height: 20px; border-bottom: 1px solid #8d8a82; margin-bottom: 3px; }
+
+  .path-block { margin-bottom: 16px; }
+  .path-block h3 { justify-content: flex-start; }
+
+  .back { color: var(--accent); }
+
+  /* ---------- paper ---------- */
+  @page {
+    size: A4 portrait;
+    margin: 14mm 13mm;
+  }
+  @media print {
+    html, body { background: #fff; }
+    .bar { display: none; }
+    main { display: block; padding: 0; }
+    .sheet {
+      width: auto;
+      min-height: 0;
+      padding: 0;
+      box-shadow: none;
+      break-after: page;
+    }
+    .sheet:last-child { break-after: auto; }
+    .path-block, .split section, table.cue tr { break-inside: avoid; }
+    h2 { break-after: avoid; }
+    .plan { break-inside: avoid; }
+    .legend { break-inside: avoid; }
+    a { color: inherit; text-decoration: none; }
+  }
+</style>
+</head>
+<body>
+<div class="bar">
+  <span class="brand">Choreographer</span>
+  <span id="docName"></span>
+  <span class="spacer"></span>
+  <label class="moment" for="momentTime">Elevation at
+    <input id="momentTime" type="text" inputmode="decimal" spellcheck="false" autocomplete="off" value="0:00.0" title="Show time for the elevation, e.g. 0:08.0 (Enter to apply)" />
+  </label>
+  <select id="momentSel" title="Pick a cue to show the elevation at"></select>
+  <button id="btnPrint" class="primary" title="Open the browser's print dialog (Ctrl+P)">Print</button>
+  <a href="index.html">Back to the planner</a>
+</div>
+<main id="doc"></main>
+<script type="module" src="src/print.js"></script>
+</body>
+</html>
