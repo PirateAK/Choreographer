@@ -747,6 +747,10 @@ function cueRows(show) {
     rows.push({ at: c.at, item: c.name, kind: 'Video', action: `projector starts at source ${((c.trimIn || 0) / 1000).toFixed(1)} s · ${c.muted ? 'muted' : Math.round((c.level ?? 1) * 100) + '% sound'}`, dur: 0, len: (span / 1000).toFixed(1) + ' s' });
     rows.push({ at: c.at + span, item: c.name, kind: 'Video', action: 'projector stops', dur: 0 });
   }
+  for (const cue of show.slideCues || []) {
+    const image = (show.images || []).find((im) => im.id === cue.imageId);
+    rows.push({ at: cue.at, item: image?.name || (cue.imageId ? 'Missing image' : 'Projector'), kind: 'Slide', action: cue.imageId ? 'replace projection with slide' : 'projector off', dur: cue.fade || 0 });
+  }
   // The voice is a cue like any other: someone in the booth starts the line, and
   // how long it runs tells them what it plays over.
   for (const c of show.narration || []) {

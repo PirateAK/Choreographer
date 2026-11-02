@@ -31,7 +31,9 @@ import { music, dropStored } from './music.js';
 import { narration } from './narration.js';
 import { HouseView } from './house.js';
 import { VideoEngine } from './video.js';
-import { addVideo, removeVideo, videoSpan, videoAt } from './model.js';
+import { addVideo, removeVideo, videoSpan, videoAt, addImage, addSlideCue, removeSlideCue, projectionAt, slideLayersAt } from './model.js';
+import { SlideEngine } from './slides.js';
+const slides = new SlideEngine();
 const video = new VideoEngine();
 let pendingVideoAt = 0;
 let pendingVideoId = null;
@@ -64,6 +66,22 @@ const app = {
   elevation: null,
   timeline: null,
   house: null,
+  editSlideCue(id) {
+    state.ui.slideCueId = id || null;
+    renderSlides();
+    const section = $('slideSection');
+    section.classList.remove('folded');
+    section.scrollIntoView({ block: 'nearest' });
+  },
+  addSlideCueAt(at) {
+    const imageId = $('slideChoice').value || null;
+    if (!imageId) { state.ui.hint = 'Choose a gallery image before adding a slide cue'; return; }
+    commit();
+    const cue = addSlideCue(state.show, at, imageId, slideFade());
+    state.ui.slideCueId = cue.id;
+    app.timeline.revealTrack('slides');
+    app.rebuild();
+  },
   editVideo(id) {
     state.ui.videoId = id;
     state.ui.dirtyPanels = true;
@@ -813,6 +831,29 @@ function renderVideos() {
   </div>`).join('') || '<p class="hint">Put the playhead at the video’s start, then attach a file.</p>';
 }
 
+function slideFade() { return Math.max(0, Math.min(120000, Math.round((Number($('slideFade').value) || 0) * 1000))); }
+function slideOptions(selected, off = true) {
+  const images = state.show.images || [];
+  return (off ? '<option value="">Projector off</option>' : '<option value="">Choose image</option>') +
+    (selected && !images.some((im) => im.id === selected) ? `<option value="${esc(selected)}" selected>Missing image reference</option>` : '') +
+    images.map((im) => `<option value="${esc(im.id)}"${im.id === selected ? ' selected' : ''}>${esc(im.name)}</option>`).join('');
+}
+function renderSlides() {
+  const images = state.show.images || [];
+  const selected = state.ui.slideImageId || $('slideChoice').value;
+  $('slideCount').textContent = images.length;
+  $('slideChoice').innerHTML = slideOptions(selected, false);
+  $('slideGallery').innerHTML = images.map((im) => {
+    const url = slides.objectUrls.get(im.key);
+    return `<button class="slide-thumb" data-image="${esc(im.id)}" aria-pressed="${selected === im.id}" title="Choose ${esc(im.name)}">${url ? `<img src="${esc(url)}" alt="${esc(im.name)}" />` : '<span class="missing-image">Image missing</span>'}<span>${esc(im.name)}</span></button>`;
+  }).join('');
+  $('slideCueList').innerHTML = [...(state.show.slideCues || [])].sort((a,b) => a.at - b.at).map((cue) => `<div class="item${state.ui.slideCueId === cue.id ? ' slide-focus' : ''}" data-slide-cue="${esc(cue.id)}">
+    <div class="row"><span class="tag">${fmtTime(cue.at)}</span><button data-sa="seek">go</button><button data-sa="remove" class="del" title="Remove slide cue">×</button></div>
+    <div class="row"><select data-sf="imageId" aria-label="Cue image">${slideOptions(cue.imageId)}</select></div>
+    <div class="row"><label>At <input data-sf="at" type="number" aria-label="Slide start seconds" min="0" step="0.1" value="${cue.at/1000}" /></label><label>Fade <input data-sf="fade" type="number" aria-label="Slide crossfade seconds" min="0" max="120" step="0.1" value="${cue.fade/1000}" /></label></div>
+  </div>`).join('');
+}
+
 function rebuildPanels() {
   $('showName').value = state.show.name;
   $('stWidth').value = state.show.stage.width;
@@ -868,6 +909,7 @@ function rebuildPanels() {
   renderMusic();
   renderNarration();
   renderVideos();
+  renderSlides();
 
   $('actsList').innerHTML = acts
     .map((a, i) => {
@@ -3184,15 +3226,18 @@ function render() {
     app.stage.draw();
     app.elevation.draw();
   }
-  video.sync(state.show.videos, state.ui.playhead, state.ui.playing && !state.ui.activePause);
+  const projection = projectionAt(state.show, state.ui.playhead);
+  const videoClips = projection.kind === 'video' ? [projection.clip] : [];
+  video.sync(videoClips, state.ui.playhead, state.ui.playing && !state.ui.activePause);
+  const layers = slideLayersAt(state.show, state.ui.playhead);
+  slides.sync(state.show.images, layers);
   if (state.ui.fill === 'house') {
     const wrap = $('house-wrap');
     if (app.house.width !== wrap.clientWidth || app.house.height !== wrap.clientHeight) app.house.resize(wrap.clientWidth, wrap.clientHeight);
-    const picture = video.activeElement(state.show.videos, state.ui.playhead);
+    const picture = projection.kind === 'video' ? video.activeElement(videoClips, state.ui.playhead) : slides.frame(state.show.images, layers);
     app.house.draw(state.show, state.ui.playhead, picture);
-    const clip = videoAt(state.show, state.ui.playhead);
     const screenDown = state.show.scenery.some((s) => s.screen && sceneryStateAt(s, state.ui.playhead).fly > 0.05);
-    $('houseStatus').textContent = !screenDown ? 'HOUSE · Screen is flown out' : !clip ? 'HOUSE · No video cued at this time' : picture?.readyState >= 2 ? 'HOUSE · Video ready' : 'HOUSE · Loading video';
+    $('houseStatus').textContent = !screenDown ? 'HOUSE · Screen is flown out' : projection.kind === 'off' && !layers.length ? 'HOUSE · Projector off' : picture ? 'HOUSE · ' + (projection.kind === 'video' ? 'Video' : 'Slides') : 'HOUSE · Media loading or missing';
   }
   app.timeline.draw();
   app.company.draw();
@@ -3295,6 +3340,62 @@ function boot() {
   video.probe(state.show.videos).then(() => { state.ui.dirtyPanels = true; });
   app.timeline = new Timeline($('timeline'), app);
     app.company = new CompanyLine($('companyLine'));
+
+  slides.probe(state.show.images).then(() => { state.ui.dirtyPanels = true; });
+  $('btnSlides').addEventListener('click', () => $('fileSlides').click());
+  $('fileSlides').addEventListener('change', async (e) => {
+    const files = [...e.target.files];
+    e.target.value = '';
+    if (!files.length) return;
+    const targetShow = state.show;
+    $('slideStatus').textContent = 'Loading gallery images…';
+    const loaded = [], errors = [];
+    for (const file of files) {
+      try { loaded.push(await slides.attachFile(file)); }
+      catch (error) { errors.push(file.name + ': ' + error.message); }
+    }
+    if (state.show !== targetShow) return;
+    if (loaded.length) {
+      commit();
+      for (const media of loaded) state.ui.slideImageId = addImage(state.show, media).id;
+      app.timeline.revealTrack('slides');
+      app.rebuild();
+    }
+    $('slideStatus').textContent = `${loaded.length} image${loaded.length === 1 ? '' : 's'} loaded` + (errors.length ? ' · ' + errors.join('; ') : ' · choose an image, then add its cue.');
+  });
+  $('slideGallery').addEventListener('click', (e) => {
+    const button = e.target.closest('[data-image]');
+    if (!button) return;
+    state.ui.slideImageId = button.dataset.image;
+    renderSlides();
+  });
+  $('slideChoice').addEventListener('change', (e) => { state.ui.slideImageId = e.target.value; renderSlides(); });
+  $('btnSlideCue').addEventListener('click', () => app.addSlideCueAt(state.ui.playhead));
+  $('btnSlideOff').addEventListener('click', () => {
+    commit();
+    state.ui.slideCueId = addSlideCue(state.show, state.ui.playhead, null, slideFade()).id;
+    app.timeline.revealTrack('slides');
+    app.rebuild();
+  });
+  $('slideCueList').addEventListener('change', (e) => {
+    const cue = state.show.slideCues.find((c) => c.id === e.target.closest('[data-slide-cue]')?.dataset.slideCue);
+    const f = e.target.dataset.sf;
+    if (!cue || !f) return;
+    const n = Number(e.target.value);
+    if (f !== 'imageId' && !Number.isFinite(n)) return;
+    commit();
+    if (f === 'imageId') cue.imageId = e.target.value || null;
+    if (f === 'at') cue.at = Math.max(0, Math.round(n * 1000));
+    if (f === 'fade') cue.fade = Math.max(0, Math.min(120000, Math.round(n * 1000)));
+    app.rebuild();
+  });
+  $('slideCueList').addEventListener('click', (e) => {
+    const cue = state.show.slideCues.find((c) => c.id === e.target.closest('[data-slide-cue]')?.dataset.slideCue);
+    const action = e.target.closest('[data-sa]')?.dataset.sa;
+    if (!cue || !action) return;
+    if (action === 'seek') state.ui.playhead = cue.at;
+    if (action === 'remove') { commit(); removeSlideCue(state.show, cue.id); app.rebuild(); }
+  });
 
   // Projector files and cues stay separate from the screen's fly cues.
   $('btnHouse').addEventListener('click', () => setFill('house'));
@@ -3466,6 +3567,7 @@ function boot() {
         narration.probe(state.show.narration).then(() => { state.ui.dirtyPanels = true; });
         video.stop();
         video.probe(state.show.videos).then(() => { state.ui.dirtyPanels = true; });
+        slides.probe(state.show.images).then(() => { state.ui.dirtyPanels = true; });
         app.rebuild();
         // A silent success reads as "nothing happened" when the file was large, and a
         // silent failure is worse: say which file came in, or that none did.
@@ -3503,6 +3605,7 @@ function boot() {
     commit();
     show.cast.forEach((d) => { d.keys = [wingsKey(show, d.number)]; });
     show.markers = [];
+    show.slideCues = [];
     (show.scenery || []).forEach((s) => {
       if (s.kind !== 'prop' && Array.isArray(s.cues)) s.cues = [];
     });
@@ -3529,6 +3632,7 @@ function boot() {
       show.cast.some((d) => d.keys.length > 1) ||
       (show.scenery || []).some((s) => s.kind !== 'prop' && Array.isArray(s.cues) && s.cues.length) ||
       (show.lights || []).some((l) => Array.isArray(l.cues) && l.cues.length) ||
+      (show.slideCues || []).length > 0 ||
       (show.videos || []).some((c) => c.at !== 0) ||
       (show.musicTracks || []).some((t) => (Array.isArray(t.cues) && t.cues.length) || t.start !== 0);
     // An empty stage has nothing to confirm, and a dialog over it would only be noise.
@@ -3539,8 +3643,8 @@ function boot() {
     const ok = window.confirm(
       'Clear the stage for a new show?\n\n' +
       'KEPT: dancers and their names, costumes, props and where they stand, the cloth ' +
-      'and the lanterns, music, voice pieces, video files and trims, stage size and every setting. Video starts return to zero.\n\n' +
-      'CLEARED: every path, hold and pause, and the cues on the cloth, lights and music.\n\n' +
+      'and the lanterns, music, voice pieces, video files and trims, image gallery, stage size and every setting. Video starts return to zero.\n\n' +
+      'CLEARED: every path, hold and pause, slide cues, and the cues on the cloth, lights and music.\n\n' +
       'Undo (Ctrl+Z) brings it all back.'
     );
     if (!ok) return;

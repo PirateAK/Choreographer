@@ -236,9 +236,14 @@ export class HouseView {
     if (item.kind === 'drop' && item.screen === true) {
       ctx.fillStyle = '#d9d9d4';
       ctx.fillRect(x0, py - ph, pw, ph);
-      if (video && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
-        const fit = Math.min(pw / video.videoWidth, ph / video.videoHeight);
-        const dw = video.videoWidth * fit, dh = video.videoHeight * fit;
+      const sw = video && (video.videoWidth || video.width);
+      const sh = video && (video.videoHeight || video.height);
+      const ready = video && (video.readyState == null || video.readyState >= 2);
+      if (ready && sw > 0 && sh > 0) {
+        const fit = Math.min(pw / sw, ph / sh);
+        const dw = sw * fit, dh = sh * fit;
+        ctx.fillStyle = '#000';
+        ctx.fillRect(x0, py - ph, pw, ph);
         ctx.save();
         ctx.beginPath(); ctx.rect(x0, py - ph, pw, ph); ctx.clip();
         ctx.drawImage(video, px - dw / 2, py - ph + (ph - dh) / 2, dw, dh);

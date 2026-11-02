@@ -1104,9 +1104,10 @@ export function createShow() {
     // entry point and length live here — the audio itself is far too big for a
     // show file, so the bytes sit in the browser's own store under `key`.
     musicTracks: [],
-    // Video clips reference bytes stored separately under their key. The show file
-    // holds only timing, trims and playback settings.
+    // Video and image bytes live in media storage; show metadata keeps only keys.
     videos: [],
+    images: [],
+    slideCues: [],
     // How long a new cue takes when it is placed rather than drawn, in milliseconds:
     // a curtain move, a music fade, a hold and a pause. They belong to the show
     // because a company reopens a show and expects it to fly and fade the way it was
@@ -1136,6 +1137,17 @@ export function normalise(show) {
     { curtain: true, music: true, lights: true, narration: true },
     (show && show.trackVis) || {}
   );
+  const finiteModel = (value, fallback) => {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  };
+  const uniqueId = (value, prefix, used) => {
+    let id = typeof value === 'string' && value ? value : uid(prefix);
+    if (used.has(id)) id = uid(prefix);
+    while (used.has(id)) id = uid(prefix);
+    used.add(id);
+    return id;
+  };
   out.videos = (Array.isArray(show && show.videos) ? show.videos : [])
     .filter((clip) => clip && typeof clip === 'object' && clip.key)
     .map((clip) => {
@@ -1158,6 +1170,27 @@ export function normalise(show) {
         level: Math.max(0, Math.min(1, finite(clip.level, 1))),
       };
     })
+    .sort((a, b) => a.at - b.at);
+  // Image media is metadata-only: binary data stays in the media store.
+  const usedImageIds = new Set();
+  out.images = (Array.isArray(show && show.images) ? show.images : [])
+    .filter((image) => image && typeof image === 'object' && image.key)
+    .map((image) => ({
+      id: uniqueId(image.id, 'img', usedImageIds),
+      key: String(image.key),
+      name: String(image.name == null ? 'Image' : image.name) || 'Image',
+      width: Math.max(0, finiteModel(image.width, 0)),
+      height: Math.max(0, finiteModel(image.height, 0)),
+    }));
+  const usedCueIds = new Set();
+  out.slideCues = (Array.isArray(show && show.slideCues) ? show.slideCues : [])
+    .filter((cue) => cue && typeof cue === 'object')
+    .map((cue) => ({
+      id: uniqueId(cue.id, 'slide', usedCueIds),
+      at: Math.max(0, Math.round(finiteModel(cue.at, 0))),
+      imageId: cue.imageId == null ? null : String(cue.imageId),
+      fade: Math.max(0, Math.min(120000, Math.round(finiteModel(cue.fade, 1000)))),
+    }))
     .sort((a, b) => a.at - b.at);
   // A show from before narration has an empty list, which is exactly right: a
   // show with no voice plays as it always did.
@@ -2003,6 +2036,74 @@ export function videoSpan(clip) {
   const start = Number.isFinite(trimIn) ? Math.max(0, Math.min(length, trimIn)) : 0;
   const end = Number.isFinite(trimOut) ? Math.max(start, Math.min(length, trimOut)) : length;
   return Math.max(0, end - start);
+}
+
+
+export function addImage(show, media) {
+  if (!show || !media || !media.key) return null;
+  const image = { id: uid('img'), key: String(media.key), name: String(media.name || 'Image'), width: Math.max(0, Number.isFinite(Number(media.width)) ? Number(media.width) : 0), height: Math.max(0, Number.isFinite(Number(media.height)) ? Number(media.height) : 0) };
+  (Array.isArray(show.images) ? show.images : (show.images = [])).push(image);
+  return image;
+}
+function boundedFade(value, fallback = 1000) {
+  const number = Number(value);
+  return Math.max(0, Math.min(120000, Math.round(Number.isFinite(number) ? number : fallback)));
+}
+export function addSlideCue(show, at, imageId, fade = 1000) {
+  if (!show) return null;
+  const number = Number(at);
+  const cue = { id: uid('slide'), at: Math.max(0, Math.round(Number.isFinite(number) ? number : 0)), imageId: imageId == null ? null : String(imageId), fade: boundedFade(fade) };
+  if (!Array.isArray(show.slideCues)) show.slideCues = [];
+  show.slideCues.push(cue);
+  show.slideCues.sort((a, b) => a.at - b.at);
+  return cue;
+}
+export function removeSlideCue(show, id) {
+  if (show && Array.isArray(show.slideCues)) show.slideCues = show.slideCues.filter((cue) => cue.id !== id);
+}
+function projectionEvents(show) {
+  const events = [];
+  (show && show.videos || []).forEach((clip, index) => {
+    const at = Number(clip && clip.at), span = videoSpan(clip);
+    if (clip && typeof clip.key === 'string' && clip.key && Number.isFinite(at) && span > 0) events.push({ kind: 'video', clip, at, index, priority: 0 });
+  });
+  (show && show.slideCues || []).forEach((cue, index) => {
+    const at = Number(cue && cue.at);
+    if (cue && typeof cue === 'object' && Number.isFinite(at)) events.push({ kind: 'slide', cue, at, index, priority: 1 });
+  });
+  return events.sort((a, b) => a.at - b.at || a.priority - b.priority || a.index - b.index);
+}
+export function projectionAt(show, ct) {
+  const time = Number(ct);
+  if (!Number.isFinite(time)) return { kind: 'off', at: -Infinity };
+  let latest = null;
+  for (const event of projectionEvents(show)) { if (event.at > time) break; latest = event; }
+  if (!latest) return { kind: 'off', at: -Infinity };
+  if (latest.kind === 'slide') return latest.cue.imageId == null
+    ? { kind: 'off', at: latest.at, cue: latest.cue }
+    : { kind: 'slide', cue: latest.cue, at: latest.at, imageId: latest.cue.imageId };
+  return time < latest.at + videoSpan(latest.clip) ? { kind: 'video', clip: latest.clip, at: latest.at } : { kind: 'off', at: latest.at };
+}
+function mixSlideLayers(from, to, fraction) {
+  const weights = new Map();
+  for (const layer of from) weights.set(layer.imageId, (weights.get(layer.imageId) || 0) + layer.alpha * (1 - fraction));
+  for (const layer of to) weights.set(layer.imageId, (weights.get(layer.imageId) || 0) + layer.alpha * fraction);
+  return [...weights].filter(([, alpha]) => alpha > 1e-12).map(([imageId, alpha]) => ({ imageId, alpha }));
+}
+export function slideLayersAt(show, ct) {
+  const time = Number(ct);
+  if (!Number.isFinite(time)) return [];
+  let layers = [], transition = null;
+  const valueAt = (sample) => transition ? mixSlideLayers(transition.from, transition.to, Math.max(0, Math.min(1, (sample - transition.at) / transition.duration))) : layers;
+  for (const event of projectionEvents(show)) {
+    if (event.at > time) break;
+    if (event.kind === 'video') { layers = []; transition = null; continue; }
+    const from = valueAt(event.at), to = event.cue.imageId == null ? [] : [{ imageId: event.cue.imageId, alpha: 1 }];
+    const duration = boundedFade(event.cue.fade);
+    if (!duration) { layers = to; transition = null; }
+    else { layers = from; transition = { from, to, at: event.at, duration }; }
+  }
+  return valueAt(time).sort((a, b) => String(a.imageId).localeCompare(String(b.imageId)));
 }
 
 // Video is a single visual layer: where clips overlap, the most recently started
@@ -3042,6 +3143,10 @@ function lastContent(show) {
     for (const c of s.cues || []) end = Math.max(end, c.at + (c.dur || 0));
   }
   for (const clip of show.videos || []) end = Math.max(end, clip.at + videoSpan(clip));
+  for (const cue of show.slideCues || []) {
+    const at = Number(cue && cue.at);
+    if (Number.isFinite(at)) end = Math.max(end, at + boundedFade(cue.fade));
+  }
   return end;
 }
 

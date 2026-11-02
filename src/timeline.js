@@ -4,6 +4,7 @@ import {
   holdsFor, sortedPauses, posAtLocal, commit, persist, uid,
   objectShown, toggleVisibility, propOnTimer, carrierOf, removeSceneryCue,
   addSceneryCue, sceneryStateAt, addMusicCue, musicLevelAt, removeMusicCue, updateMusicCue,
+  addSlideCue, removeSlideCue,
   actRanges, sceneRanges, endContent, moveSceneTo, updateCue, setMusicStart, musicSpan,
   videoSpan, removeVideo,
   setNarrationAt, removeNarration, endMarker, setEnd, removeEnd,
@@ -175,6 +176,18 @@ export class Timeline {
         visible: show.trackVis.video !== false,
         video: clip,
         selected: state.ui.selectedTrack === clip.id,
+      });
+    }
+    // Slide changes share one row: each marker changes the projector's image, and
+    // the band leading into it shows how long that change takes.
+    if ((show.images || []).length || (show.slideCues || []).length) {
+      list.push({
+        id: 'slides',
+        label: 'Slide projector',
+        kind: 'slides',
+        color: '#f4a7c1',
+        visible: true,
+        selected: state.ui.selectedTrack === 'slides',
       });
     }
     // Every lantern owns a row, the way every curtain owns one: the row *is* its
@@ -860,6 +873,33 @@ export class Timeline {
       return;
     }
 
+    if (tr.kind === 'slides') {
+      const images = new Map((show.images || []).map((image) => [image.id, image]));
+      ctx.font = '9px "Segoe UI", system-ui, sans-serif';
+      for (const cue of show.slideCues || []) {
+        const x0 = this.xOfDisplay(displayOfContent(show, cue.at));
+        const x1 = this.xOfDisplay(displayOfContent(show, cue.at + Math.max(0, Number(cue.fade) || 0)));
+        const bandW = Math.max(2, x1 - x0);
+        const selected = state.ui.slideCueId === cue.id;
+        const off = cue.imageId == null;
+        ctx.fillStyle = off ? (selected ? 'rgba(255,107,107,.3)' : 'rgba(255,107,107,.17)')
+          : (selected ? 'rgba(244,167,193,.34)' : 'rgba(244,167,193,.2)');
+        ctx.fillRect(x0, mid - 8, bandW, 16);
+        ctx.strokeStyle = selected ? THEME.accent : off ? 'rgba(255,107,107,.75)' : 'rgba(244,167,193,.75)';
+        ctx.strokeRect(x0 + 0.5, mid - 7.5, Math.max(1, bandW - 1), 15);
+        // The cue moment stays visible even for a cut; the opposite edge is the
+        // fade handle, which can be pulled independently.
+        ctx.fillStyle = selected ? THEME.accent : 'rgba(255,235,244,.9)';
+        ctx.fillRect(Math.round(x0) - 1, mid - 10, 2, 20);
+        ctx.fillRect(Math.round(x1) - 2, mid - 10, 3, 20);
+        const image = cue.imageId == null ? null : images.get(cue.imageId);
+        const label = off ? 'PROJECTOR OFF' : image ? image.name : 'Missing image';
+        ctx.fillStyle = 'rgba(255,240,246,.92)';
+        ctx.fillText(label, x0 + 4, mid + 3, Math.max(20, this.canvas.clientWidth - x0 - 8));
+      }
+      return;
+    }
+
     if (tr.kind === 'narration') {
       this.drawNarrationTrack(tr, y);
       return;
@@ -1208,6 +1248,14 @@ export class Timeline {
     const i = this.rowIndexAt(y);
     if (i == null) return;
     const tr = this.tracks()[i];
+    if (tr.kind === 'slides') {
+      state.ui.selectedTrack = 'slides';
+      const cue = this.slideCueAt(x);
+      if (cue) state.ui.slideCueId = cue.cue.id;
+      const items = this.menuItems(tr, x, y, at);
+      if (items.length) this.openMenu(e.clientX, e.clientY, 'Slide projector · ' + fmtShort(at), items);
+      return;
+    }
     const hold = this.holdAt(tr, x);
     if (hold) {
       this.openMenu(
@@ -1379,7 +1427,45 @@ export class Timeline {
       state.ui.collision = null;
     };
 
-    if (tr.kind === 'video' && tr.video) {
+    if (tr.kind === 'slides') {
+      const hit = this.slideCueAt(x);
+      if (hit) {
+        items.push({
+          label: 'Edit slide cue',
+          note: fmtShort(hit.cue.at),
+          run: () => {
+            state.ui.slideCueId = hit.cue.id;
+            state.ui.selectedTrack = 'slides';
+            this.app.editSlideCue(hit.cue.id);
+          },
+        });
+        items.push({ sep: true });
+        items.push({
+          label: 'Remove slide cue',
+          danger: true,
+          run: () => {
+            commit();
+            removeSlideCue(show, hit.cue.id);
+            if (state.ui.slideCueId === hit.cue.id) state.ui.slideCueId = null;
+            persist();
+            this.app.rebuild();
+          },
+        });
+        items.push({ sep: true });
+      }
+      items.push({
+        label: 'Projector off',
+        note: fmtShort(at),
+        run: () => {
+          commit();
+          const cue = addSlideCue(show, at, null, FADE_DEFAULT_MS);
+          state.ui.selectedTrack = 'slides';
+          state.ui.slideCueId = cue.id;
+          this.app.rebuild();
+        },
+      });
+      items.push({ label: 'Show chosen image', note: fmtShort(at), run: () => this.app.addSlideCueAt(at) });
+    } else if (tr.kind === 'video' && tr.video) {
       const clip = tr.video;
       items.push({ label: 'Edit video', run: () => this.app.editVideo(clip.id) });
       items.push({ sep: true });
@@ -1800,6 +1886,21 @@ export class Timeline {
     return null;
   }
 
+  // A projector cue has a moment handle and a fade-end handle; the band between
+  // them is also selectable so a click can open its editor without guessing.
+  slideCueAt(x) {
+    for (const cue of state.show.slideCues || []) {
+      const x0 = this.xOfDisplay(displayOfContent(state.show, cue.at));
+      const fade = Math.max(0, Number(cue.fade) || 0);
+      const x1 = this.xOfDisplay(displayOfContent(state.show, cue.at + fade));
+      if (x < x0 - 5 || x > x1 + 5) continue;
+      if (Math.abs(x - x1) <= 5) return { cue, zone: 'end', x0, x1 };
+      if (Math.abs(x - x0) <= 5) return { cue, zone: 'start', x0, x1 };
+      return { cue, zone: 'body', x0, x1 };
+    }
+    return null;
+  }
+
   // Which cue of this row is under x, and whether the pointer is on one of its
   // ends (retime) or on the band itself (slide it).
   cueAt(tr, x) {
@@ -1842,7 +1943,13 @@ export class Timeline {
   cueCursor(x, y) {
     const i = this.rowIndexAt(y);
     if (i == null) return '';
-    const hit = this.cueAt(this.tracks()[i], x);
+    const tr = this.tracks()[i];
+    if (tr.kind === 'slides') {
+      const hit = this.slideCueAt(x);
+      if (!hit) return '';
+      return hit.zone === 'end' ? 'ew-resize' : 'grab';
+    }
+    const hit = this.cueAt(tr, x);
     if (!hit) return '';
     return hit.zone === 'body' ? 'grab' : 'ew-resize';
   }
@@ -1952,6 +2059,10 @@ export class Timeline {
         return;
       }
       state.ui.selectedTrack = tr.id;
+      if (tr.kind === 'slides') {
+        this.app.editSlideCue();
+        return;
+      }
       if (tr.kind === 'video') {
         this.app.editVideo(tr.video.id);
         return;
@@ -2012,6 +2123,27 @@ export class Timeline {
     // row usually is, since its track covers the whole stage of the clock.
     if (e.shiftKey) {
       this.beginMarkerDrag('pause', null, x);
+      return;
+    }
+    if (tr.kind === 'slides') {
+      const hit = this.slideCueAt(x);
+      if (hit) {
+        commit();
+        state.ui.slideCueId = hit.cue.id;
+        state.ui.selectedTrack = 'slides';
+        this.app.editSlideCue(hit.cue.id);
+        this.drag = {
+          type: hit.zone === 'end' ? 'slideCueEnd' : 'slideCue',
+          cue: hit.cue,
+          grab: x - hit.x0,
+          dirty: true,
+        };
+        return;
+      }
+      state.ui.slideCueId = null;
+      state.ui.dirtyPanels = true;
+      this.drag = { type: 'scrub' };
+      this.scrubTo(x);
       return;
     }
     if (tr.kind === 'video') {
@@ -2192,6 +2324,7 @@ export class Timeline {
         const cue = y > RULER_H ? this.cueCursor(x, y) : '';
         const video = y > RULER_H ? this.videoHit(x, y) : null;
         if (onRuler && state.ui.phraseArmed) this.canvas.style.cursor = 'copy';
+        else if (y < RULER_H && x < GUTTER && this.rowIndexAt(y) != null) this.canvas.style.cursor = 'pointer';
         else if (y < 15 && this.sceneHandleAt(x)) this.canvas.style.cursor = 'ew-resize';
         else if (y > RULER_H && this.endAt(x)) this.canvas.style.cursor = 'ew-resize';
         else if (cue) this.canvas.style.cursor = cue;
@@ -2286,6 +2419,18 @@ export class Timeline {
       } else {
         const at = Math.max(0, Math.min(t, move.endAt));
         updateMusicCue(m, move.cue.id, { at, dur: move.endAt - at });
+      }
+    } else if (this.drag.type === 'slideCue' || this.drag.type === 'slideCueEnd') {
+      const cue = this.drag.cue;
+      if (!this.drag.dirty) {
+        commit();
+        this.drag.dirty = true;
+      }
+      const t = Math.max(0, Math.round(this.contentAtX(x) / 100) * 100);
+      if (this.drag.type === 'slideCue') {
+        cue.at = Math.max(0, Math.round(this.contentAtX(x - this.drag.grab) / 100) * 100);
+      } else {
+        cue.fade = Math.max(0, Math.min(120000, t - cue.at));
       }
     } else if (this.drag.type === 'scene') {
       const moved = moveSceneTo(show, this.drag.scene.id, Math.max(0, this.contentAtX(x)));
@@ -2398,6 +2543,20 @@ export class Timeline {
     const i = this.rowIndexAt(y);
     if (i == null) return;
     const tr = this.tracks()[i];
+    if (tr.kind === 'slides') {
+      const hit = this.slideCueAt(x);
+      if (hit) {
+        state.ui.slideCueId = hit.cue.id;
+        state.ui.selectedTrack = 'slides';
+        this.app.editSlideCue(hit.cue.id);
+      } else {
+        state.ui.slideCueId = null;
+        state.ui.selectedTrack = 'slides';
+        const at = Math.max(0, Math.round(this.contentAtX(x) / 100) * 100);
+        this.app.addSlideCueAt(at);
+      }
+      return;
+    }
     if (tr.kind === 'video') {
       this.app.editVideo(tr.video.id);
       return;

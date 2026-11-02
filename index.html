@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Choreographer</title>
-<link rel="stylesheet" href="styles.css?v=house-layout6" />
+<link rel="stylesheet" href="styles.css?v=slides9" />
 </head>
 <body>
 <header>
@@ -23,6 +23,7 @@
   <input id="fileMusic" type="file" accept="audio/*" hidden />
   <input id="fileNarration" type="file" accept="audio/*" hidden />
   <input id="fileVideo" type="file" accept="video/*" hidden />
+  <input id="fileSlides" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" multiple hidden />
   <span id="saved" class="saved">saved</span>
 </header>
 
@@ -131,6 +132,17 @@
       <div id="videoRow" class="list"></div>
       <p class="hint">Add a <b>Screen</b> under curtains and drops, then cue its fly-in/out independently. Each video has its own timeline band: drag to move it, drag its ends to trim. Times below are in seconds. Files stay in this browser; saved show files contain cues only.</p>
     </section>
+    <section id="slideSection">
+      <h2>Slide projector <span id="slideCount" class="count">0</span></h2>
+      <div class="btn-row"><button id="btnSlides">+ Gallery images</button></div>
+      <p id="slideStatus" class="hint" role="status">Preload images, then cue them at the playhead.</p>
+      <div id="slideGallery" class="slide-gallery" aria-label="Projector image gallery"></div>
+      <div class="field"><label for="slideChoice">Next slide</label><select id="slideChoice"><option value="">Choose image</option></select></div>
+      <div class="field"><label for="slideFade">Crossfade (s)</label><input id="slideFade" type="number" min="0" max="120" step="0.1" value="1" /></div>
+      <div class="btn-row"><button id="btnSlideCue">+ Cue at playhead</button><button id="btnSlideOff">Projector off</button></div>
+      <div id="slideCueList" class="list"></div>
+      <p class="hint">A slide stays until the next slide, video or off cue. Set crossfade to <b>0</b> for an instant change. Screen fly cues remain separate. Images stay in this browser; show JSON carries references only.</p>
+    </section>
     <section class="cast-section">
       <h2>Performers <span id="castCount" class="count">0</span></h2>
       <div class="btn-row"><button id="btnAddDancer">+ Dancer</button></div>
@@ -223,10 +235,11 @@
 
 <script type="importmap">
 {"imports": {
-  "./src/app.js": "./src/app.js?v=screen-depth8",
-  "./src/model.js": "./src/model.js?v=screen4",
-  "./src/timeline.js": "./src/timeline.js?v=screen4",
-  "./src/house.js": "./src/house.js?v=screen-depth8",
+  "./src/app.js": "./src/app.js?v=slides9",
+  "./src/model.js": "./src/model.js?v=slides9",
+  "./src/timeline.js": "./src/timeline.js?v=slides9",
+  "./src/house.js": "./src/house.js?v=slides9",
+  "./src/slides.js": "./src/slides.js?v=slides9",
   "./src/video.js": "./src/video.js?v=video-sync7"
 }}
 </script>
