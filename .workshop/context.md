@@ -1,0 +1,18 @@
+# Choreographer
+- Imported Freebuff project; zero-dependency vanilla HTML/CSS/JS ES modules with Node static server. Preserve no-build/no-runtime-dependencies architecture and existing theatre-planner design.
+- Run using ./start.sh, APP_PORT and conditional devguard. Git was not initialized in imported directory; recommend version control before further large work.
+- Saved Show JSON files in root are disposable test data, not important user content.
+- Fourth-position footSkate exemption: destination two-foot plant transfers contacts; real single-foot skate warnings remain tested.
+- Projector workflow: main curtain retains existing independent cues. Screen is scenery kind drop with screen:true, independently flyable through existing scenery timeline cues. Video has its own independent timeline band, not automated scene transitions.
+- show.videos metadata {id,key,name,at,length,trimIn,trimOut,muted,level}, ms. length is original source duration; videoSpan gives selected duration. Most recently started overlapping active clip wins.
+- Video bytes are in shared browser IndexedDB audiostore under video- prefix, never JSON/localStorage. Keep bytes after cue removal/replacement to preserve undo and other saved-show references; media garbage collection requires explicit workflow.
+- Video follows music/show master playhead and pauses with show/active pause. House view is dedicated audience-facing canvas (src/house.js), selected via state.ui.fill='house'. Video displayed only on hanging projection screens.
+- src/pose.js blendSpecs may return shared specs at endpoints; clone returned spec before modifying properties.
+- Tests: node test-video.mjs, node test-phrase-plants.mjs, node test-overlap.mjs; module syntax via node --input-type=module --check < file. Browser smoke tests can use temporary npm Playwright with /usr/local/bin/chromium, without adding project dependencies.
+- Git is now initialized; current branch feature/slide-projector. Preserve unrelated imported untracked files; do not push unless requested.
+- Slide projector implemented: browser-local image gallery, slide on/off cues and adjustable fades; latest slide/video replaces previous projection without resurrection. Watch opens House and restores prior editor layout.
+- Top-down uses fill='plan'; Paths/Stations/Costumes independent. Vertical drag Tilt view clamps 0–55 degrees; Reset overhead restores flat; tilt/costumes preferences persist. Latest app checkpoint 6b8615c.
+- User is building for daughter with 17 years of ballet study. Prioritize technique, reliable contacts and consistent proportions before adding moves or wireframe/textures. Supplied glossary is reference, with school-dependent definitions to verify.
+- User explicitly requested saved audit notes/roadmap and deferred implementation until returning. Resume from plans/2026-11-02_23-34-16_ballet-foundation/plan.md; read its guidelines.md and audit-notes.md. First scope: correct solved ankle/contact rendering, not broad model rewrite or automatic station movement. Do not begin until user returns.
+- Audit findings: overhead overwrites solved ankle with requested feetOnFloor contact (can stretch visible leg); House omits pins; view level handling differs; rise changes modeled leg length; arabesque lacks rear-depth component; arms lack depth. Validate each against source before corrections. Existing tests do not establish ballet correctness.
+- Also run node test-slides.mjs. Do not silently reposition choreography. Wireframe/wardrobe texture work is deferred until foundations are reviewed.
