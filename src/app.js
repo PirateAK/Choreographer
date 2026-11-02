@@ -2908,6 +2908,8 @@ function loadView() {
     const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || '{}');
     if (['plan', 'elevation', 'house'].includes(saved.fill)) state.ui.fill = saved.fill;
     if (saved.depth === false) state.ui.depth = false;
+    state.ui.showPaths = saved.showPaths !== false;
+    state.ui.showStations = saved.showStations !== false;
   } catch (e) {
     /* nothing saved, or storage blocked — the defaults are the room as built */
   }
@@ -2915,7 +2917,7 @@ function loadView() {
 
 function saveView() {
   try {
-    localStorage.setItem(VIEW_KEY, JSON.stringify({ fill: state.ui.fill, depth: state.ui.depth }));
+    localStorage.setItem(VIEW_KEY, JSON.stringify({ fill: state.ui.fill, depth: state.ui.depth, showPaths: state.ui.showPaths, showStations: state.ui.showStations }));
   } catch (e) {
     /* storage blocked — the view still works for this session */
   }
@@ -2938,7 +2940,12 @@ function paintView() {
     const on = filling === which;
     b.classList.toggle('on', on);
     b.setAttribute('aria-pressed', on ? 'true' : 'false');
-    b.textContent = on ? '⛶ Both' : '⛶ Fill';
+    b.textContent = on ? '⛶ Both' : which === 'plan' ? 'Top-down' : '⛶ Fill';
+  }
+  for (const [id, key] of [['btnPaths', 'showPaths'], ['btnStations', 'showStations']]) {
+    const on = state.ui[key] !== false;
+    $(id).classList.toggle('on', on);
+    $(id).setAttribute('aria-pressed', String(on));
   }
   const depth = $('btnDepth');
   if (depth) {
@@ -4025,7 +4032,16 @@ function boot() {
   $('btnFoldAll').addEventListener('click', foldAllSections);
 
   // one view at a time, and how the elevation reads distance
+  $('btnTopDown').addEventListener('click', () => setFill('plan'));
   $('btnFillPlan').addEventListener('click', () => setFill('plan'));
+  for (const [id, key] of [['btnPaths', 'showPaths'], ['btnStations', 'showStations']]) {
+    $(id).addEventListener('click', () => {
+      state.ui[key] = state.ui[key] === false;
+      paintView();
+      saveView();
+      app.stage.draw();
+    });
+  }
   $('btnFillElev').addEventListener('click', () => setFill('elevation'));
   $('btnDepth').addEventListener('click', () => setDepth(state.ui.depth === false));
   paintView();

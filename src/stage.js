@@ -485,9 +485,9 @@ export class StageView {
     const show = state.show;
     const ctx = this.ctx;
     const keys = dancer.keys;
-    if (keys.length < 2) return;
+    if (!keys.length) return;
     const lastLt = keys[keys.length - 1].t;
-    if (lastLt <= 0) return;
+    if (state.ui.showPaths !== false && keys.length >= 2 && lastLt > 0) {
 
     const step = Math.max(200, Math.min(600, Math.round(lastLt / 70)));
     const pts = [];
@@ -569,6 +569,9 @@ export class StageView {
       }
     }
 
+    }
+    // Station markers are independent of movement lines and hold rings.
+    if (state.ui.showStations === false) return;
     // keyframes
     keys.forEach((k, i) => {
       const sp = this.w2s(k.x, k.y);
@@ -610,7 +613,7 @@ export class StageView {
     const r = this.compact ? 3 : Math.max(4.5, Math.min(12, 0.26 * this.scale));
     const sp = this.w2s(p.x, p.y);
 
-    if (!this.compact) {
+    if (!this.compact && state.ui.showPaths !== false) {
       // short ghost trail behind the playhead
       const trail = [];
       for (let back = 700; back >= 0; back -= 70) {
@@ -818,6 +821,7 @@ export class StageView {
   }
 
   hitStation(px, py) {
+    if (state.ui.showStations === false) return null;
     let best = null;
     for (const d of this.pathBodies()) {
       if (!objectShown(d)) continue;
@@ -850,6 +854,7 @@ export class StageView {
   }
 
   hitPath(px, py) {
+    if (state.ui.showPaths === false) return null;
     let best = null;
     for (const d of this.pathBodies()) {
       if (!objectShown(d)) continue;

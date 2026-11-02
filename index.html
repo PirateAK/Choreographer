@@ -17,6 +17,7 @@
   <button id="btnSave" class="ghost" title="Save the whole show: writes the browser's copy first, then a JSON file you choose">Save</button>
   <button id="btnReload" class="ghost" title="Reload a show from a JSON file">Reload</button>
   <button id="btnClear" class="ghost" title="Clear the stage for a new show — keeps dancers, costumes, props, cloth, lanterns, music, voice and every setting. Undo brings it back">Clear</button>
+  <button id="btnTopDown" class="ghost" title="Open the overhead stage plan">Top-down</button>
   <button id="btnWatch" class="ghost watch-link" title="Watch the show: the stage alone, with its music, from the top">▶ Watch</button>
   <a id="btnPrint" class="ghost print-link" href="print.html" target="_blank" rel="noopener" title="Open the printable stage plot, paths and cue sheet in a new tab">Print plan</a>
   <input id="fileImport" type="file" accept="application/json" hidden />
@@ -106,7 +107,9 @@
     <div id="stage-wrap">
       <canvas id="stage"></canvas>
       <div class="view-tools">
-        <button id="btnFillPlan" class="view-btn" aria-pressed="false" title="Give the plan the whole centre: the elevation stands down until you ask for both again">⛶ Fill</button>
+        <button id="btnPaths" class="view-btn on" aria-pressed="true" title="Show or hide movement lines">Paths</button>
+        <button id="btnStations" class="view-btn on" aria-pressed="true" title="Show or hide station points">Stations</button>
+        <button id="btnFillPlan" class="view-btn" aria-pressed="false" title="Enlarge the overhead stage plan">Top-down</button>
       </div>
       <div id="pointStrip" class="point-strip" hidden></div>
       <div id="stageHint" class="stage-hint">Click a point to edit it · drag to move it · drag the line to bow it · right-click deletes it and everything after</div>
@@ -237,7 +240,8 @@
 
 <script type="importmap">
 {"imports": {
-  "./src/app.js": "./src/app.js?v=projection-status12",
+  "./src/app.js": "./src/app.js?v=overhead13",
+  "./src/stage.js": "./src/stage.js?v=overhead13",
   "./src/model.js": "./src/model.js?v=slides9",
   "./src/timeline.js": "./src/timeline.js?v=slides-on10",
   "./src/house.js": "./src/house.js?v=slides9",
