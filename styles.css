@@ -1,0 +1,705 @@
+/* House preview uses the same theatre palette as the existing planner. */
+body.fill-house #stage-wrap, body.fill-house #elevation-wrap { display: none; }
+#house-wrap { position: relative; min-height: 0; overflow: hidden; background: #090d14; }
+#house-wrap[hidden] { display: none; }
+#house { display: block; width: 100%; height: 100%; }
+.house-caption { position: absolute; bottom: 12px; left: 16px; color: #9aa9bd; font-size: 10px; letter-spacing: .18em; pointer-events: none; }
+#videoRow input[type="number"] { width: 76px; min-width: 0; }
+#videoRow label { display: flex; align-items: center; gap: 6px; color: var(--dim); }
+#videoRow .video-focus { border-color: var(--accent); }
+
+:root {
+  --bg: #0b0e14;
+  --panel: #11161f;
+  --panel2: #0d121a;
+  --line: #202a39;
+  --text: #c9d4e3;
+  --dim: #6f7f96;
+  --accent: #ffb703;
+  --danger: #ff4d6d;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.42 "Segoe UI", system-ui, -apple-system, sans-serif;
+  display: grid;
+  grid-template-rows: 46px minmax(0, 1fr) 300px;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ---------- header ---------- */
+header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+header h1 {
+  font-size: 13px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  margin: 0 10px 0 0;
+  color: var(--accent);
+  font-weight: 600;
+}
+.spacer { flex: 1; }
+.saved { color: var(--dim); font-size: 11px; min-width: 44px; text-align: right; }
+
+.show-name {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 5px;
+  padding: 5px 8px;
+  width: 260px;
+  font: inherit;
+}
+
+button {
+  background: #1b2431;
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 5px;
+  padding: 5px 9px;
+  font: inherit;
+  cursor: pointer;
+}
+button:hover { background: #24303f; border-color: #33435a; }
+button:disabled { color: #4a5568; border-color: #1c2534; background: transparent; cursor: default; }
+button:disabled:hover { background: transparent; border-color: #1c2534; }
+button.ghost { background: transparent; }
+button.primary { background: var(--accent); color: #1a1200; border-color: #d99c00; font-weight: 700; width: 34px; }
+button.primary:hover { background: #ffc72c; }
+
+/* "Print plan" is a link, not a button, so it opens a tab of its own and the
+   planner stays where it is. Dressed to match the buttons beside it. */
+header a.print-link {
+  display: inline-block;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 5px 9px;
+  color: var(--text);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+header a.print-link:hover { background: #24303f; border-color: #33435a; }
+
+/* ---------- main ---------- */
+main {
+  display: grid;
+  grid-template-columns: 268px minmax(0, 1fr) 296px;
+  min-height: 0;
+}
+.panel {
+  background: var(--panel);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+#left { border-right: 1px solid var(--line); }
+#right { border-left: 1px solid var(--line); }
+.panel section { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.panel h2 {
+  font-size: 10px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+.count { color: var(--accent); }
+
+/* Sections fold to their headings: the stage's own numbers are set once, and the room
+   they take is wanted by the lists underneath. The heading is the control, so it
+   carries the chevron at its right end. Both panes fold; the inspector has no heading
+   of its own, so it never does. */
+.panel > section > h2 {
+  cursor: pointer; user-select: none;
+  display: flex; align-items: baseline; gap: 6px;
+}
+.panel > section > h2::after {
+  content: '\25BE';
+  margin-left: auto;
+  font-size: 11px; letter-spacing: 0;
+  color: #6b7f99;
+}
+.panel > section > h2:hover { color: #c7d3e3; }
+.panel > section > h2:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+.panel > section.collapsed > h2::after { content: '\25B8'; }
+.panel > section.collapsed > h2 { margin-bottom: 0; }
+.panel > section.collapsed > :not(h2) { display: none; }
+.panel > section.collapsed { padding-bottom: 9px; }
+
+/* Fold all, at the head of the stage pane. It folds the pane it sits in; the lists on
+   the other side fold one at a time, because you are working in them rather than
+   setting them up. */
+.pane-tools {
+  display: flex; justify-content: flex-end;
+  padding: 7px 12px 6px;
+  border-bottom: 1px solid var(--line);
+}
+.pane-btn {
+  font: inherit; font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: #6b7f99; background: none; border: 0; cursor: pointer;
+  padding: 2px 3px; border-radius: 4px;
+}
+.pane-btn:hover { color: #c7d3e3; background: rgba(255,255,255,.05); }
+.pane-btn:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+
+.field { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
+.field label { color: var(--dim); font-size: 12px; }
+.field input {
+  width: 78px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font: inherit;
+}
+.btn-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+/* While a take is running the record button is the microphone's clock, so it
+   says so in the same red the app uses for anything that is live. */
+#btnRecord.recording {
+  background: rgba(255, 77, 109, 0.18);
+  border-color: rgba(255, 77, 109, 0.7);
+  color: #ffd7de;
+}
+
+.list { display: flex; flex-direction: column; gap: 6px; }
+.item {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 8px;
+}
+.item.sel { border-color: var(--accent); }
+.item .row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.item .row:last-child { margin-bottom: 0; }
+.item input[type="text"], .item select, .item input[type="number"] {
+  background: #0a0f16;
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 3px 5px;
+  font: inherit;
+  min-width: 0;
+  flex: 1;
+}
+.item input[type="color"] {
+  width: 26px; height: 22px; padding: 0;
+  border: 1px solid var(--line); background: none; border-radius: 4px; cursor: pointer;
+}
+.item .del {
+  border: none; background: transparent; color: var(--dim);
+  padding: 0 4px; font-size: 15px; line-height: 1;
+}
+.item .del:hover { color: var(--danger); background: transparent; }
+.item .tag.pick { cursor: pointer; background: none; border: 0; padding: 0; font-size: 11px; }
+.item .tag.pick:hover { color: var(--accent); }
+/* A junction between two phrases is passed through, not rested on: the number is ringed so a
+   path can be read for its stops at a glance. */
+.item .tag.pick.through {
+  color: var(--text); border: 1px solid var(--line); border-radius: 50%;
+  width: 17px; height: 17px; line-height: 15px; font-size: 10px; padding: 0;
+}
+.item .tag { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--dim); }
+.item .label { color: var(--text); font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A label that names a field beside it rather than filling the row: in a row with two
+   number fields, an elastic label squeezes both of them and clips its own words. */
+.item .label.fixed { flex: none; }
+.item .swatch { width: 13px; height: 13px; border-radius: 50%; flex: none; border: 1px solid rgba(255,255,255,.25); }
+/* Gels: a strip of the colours a designer asks for, before the wheel. */
+.item .gels { display: flex; align-items: center; gap: 3px; flex: 1; flex-wrap: wrap; }
+.item .gel {
+  width: 13px; height: 13px; padding: 0; border-radius: 3px; cursor: pointer;
+  border: 1px solid rgba(0,0,0,.55); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+}
+.item .gel:hover { transform: translateY(-1px); border-color: rgba(255,255,255,.6); }
+.item .gel.on { box-shadow: 0 0 0 2px var(--accent); border-color: #0a0d12; }
+.item .eye {
+  width: 20px; height: 18px; border: none; background: transparent;
+  color: var(--text); padding: 0; font-size: 12px; line-height: 1;
+}
+.item .eye.off { color: #3c4757; }
+.item .del:disabled { opacity: .22; cursor: default; }
+.item input[type="range"] { flex: 1; accent-color: var(--accent); }
+/* Dressing: a quiet second line under the name it belongs to, aligned with the name
+   and small enough that it never competes with the eye or the count. */
+.item .row.dress { margin-top: -1px; padding-left: 44px; }
+.item .row.dress .label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--dim); flex: none;
+}
+.item .row.dress select { font-size: 11px; padding: 1px 3px; }
+
+/* The role sits on the performer's own row, under their name: casting is a thing you
+   do to a dancer, and the act it belongs to is whichever act the playhead is in. */
+.item .row.role { margin-top: -1px; padding-left: 44px; }
+.item .row.role .label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--dim); flex: none;
+}
+.item .row.role input {
+  font-size: 11px; padding: 1px 3px; min-width: 0; flex: 1 1 auto; width: 100%;
+}
+.item .row.role input::placeholder { color: var(--dim); opacity: .8; font-style: italic; }
+
+/* A cast sheet is read by role, so the role column carries the weight and the
+   number is kept for the call. */
+table.cast td:first-child { font-weight: 600; }
+table.cast span.dim { color: #8a8578; }
+
+.hint { color: var(--dim); font-size: 11px; line-height: 1.45; margin: 8px 0 0; }
+
+/* Overlaps: a list of moments with one suggested fix each. The row is clickable — it takes the
+   playhead to the moment — and only the Fix button changes anything. */
+.overlap-section .item { cursor: pointer; }
+.overlap-section .item .row.fix { margin-top: 1px; gap: 6px; }
+.overlap-section .fix-what {
+  flex: 1 1 auto; min-width: 0; font-size: 10.5px; color: var(--dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.overlap-section .item:hover .fix-what { color: var(--text); }
+.overlap-section .tag.pick { flex: none; }
+
+/* Plan above, elevation below: the two theatre drawings, stacked as on paper.
+   The act strip sits above both, because switching act is switching the moment. */
+#center {
+  min-width: 0; min-height: 0; background: #080b10;
+  display: grid; grid-template-rows: 34px 27px minmax(0, 1fr) 186px;
+}
+
+.act-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0 8px;
+  background: #0b0f16;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+.act-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 11.5px;
+  color: #8d9aab;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.act-tab:hover { color: var(--text); background: #121926; }
+.act-tab .act-no {
+  font-size: 9px;
+  letter-spacing: .08em;
+  color: #5c6b80;
+  border: 1px solid #2b3646;
+  border-radius: 3px;
+  padding: 0 3px;
+  line-height: 15px;
+}
+.act-tab.on { color: var(--accent); border-bottom-color: var(--accent); }
+.act-tab.on .act-no { color: var(--accent); border-color: #6b5312; }
+.act-tab.add { color: #6f7f96; }
+.act-tab.add:hover { color: var(--accent); }
+
+/* Scenes belong to the lit act, so they sit under the act strip and read smaller. */
+.scene-tabs {
+  gap: 0;
+  background: #090d13;
+  border-bottom: 1px solid #141b26;
+}
+.scene-tab {
+  position: relative;
+  padding: 0 11px 0 9px;
+  font: inherit;
+  font-size: 10.5px;
+  color: #6f7f96;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.scene-tab::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #2b3646;
+  vertical-align: 1px;
+}
+.scene-tab:hover { color: var(--text); }
+.scene-tab.on { color: var(--accent); }
+.scene-tab.on::before { background: var(--accent); }
+.scene-tab.add { color: #56657c; }
+.scene-tab.add::before { display: none; }
+.scene-tab.add:hover { color: var(--accent); }
+
+.scene-row { padding-left: 16px; }
+.scene-row .tag { font-size: 9px; }
+#stage-wrap { position: relative; min-height: 0; }
+#stage { display: block; width: 100%; height: 100%; cursor: crosshair; }
+#elevation-wrap {
+  position: relative; min-height: 0;
+  border-top: 1px solid var(--line);
+  background: #080b10;
+}
+#elevation { display: block; width: 100%; height: 100%; }
+
+/* One view at a time, filling the centre. The hidden wrap is taken out of the grid
+   rather than given a zero row, so the one that is left simply gets the space. */
+body.fill-plan #elevation-wrap,
+body.fill-elev #stage-wrap { display: none; }
+
+.view-tools { position: absolute; top: 6px; right: 8px; z-index: 4; display: flex; gap: 4px; }
+.view-btn {
+  font: inherit; font-size: 10.5px; line-height: 1;
+  padding: 4px 8px; border-radius: 5px; cursor: pointer;
+  background: rgba(12,17,25,.82); color: #93a4ba; border: 1px solid #26313f;
+}
+.view-btn:hover { color: #dfe8f5; border-color: #33445a; }
+.view-btn.on { color: #f0d79a; border-color: #6b5620; background: rgba(58,44,14,.82); }
+
+/* Overlays the stage rather than taking a layout row, so selecting a point does
+   not resize the canvas and shift the plan under the cursor. */
+.point-strip {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 3;
+  display: flex; align-items: center; gap: 7px;
+  height: 38px; padding: 0 12px;
+  background: #0f141c; border-top: 1px solid var(--line);
+  /* One row of fields, more of them than a narrow pane can hold: it scrolls sideways
+     rather than hiding its own buttons at the far end. */
+  overflow-x: auto; overflow-y: hidden; white-space: nowrap;
+}
+.point-strip::-webkit-scrollbar { height: 5px; }
+.point-strip::-webkit-scrollbar-thumb { background: #253141; border-radius: 3px; }
+.point-strip::-webkit-scrollbar-track { background: transparent; }
+.point-strip[hidden] { display: none; }
+.ps-tag { font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+.ps-who { font-size: 12px; color: var(--text); }
+.ps-div { width: 1px; height: 18px; background: var(--line); margin: 0 2px; flex: none; }
+.point-strip select, .point-strip input {
+  background: #0a0f16; border: 1px solid var(--line); color: var(--text);
+  border-radius: 4px; padding: 4px 5px; font: inherit; font-size: 12px;
+}
+.point-strip select { width: 140px; }
+.point-strip .ps-dur { width: 58px; font-variant-numeric: tabular-nums; }
+/* The step is a short word, the turn a few degrees: two narrow controls rather than
+   two more full-size selects crowding the point being edited. */
+.point-strip select[data-f="step"] { width: 104px; }
+.point-strip .ps-turn { width: 56px; font-variant-numeric: tabular-nums; }
+.point-strip .ps-turnms { width: 52px; font-variant-numeric: tabular-nums; }
+.point-strip .ps-bend { width: 56px; font-variant-numeric: tabular-nums; }
+.point-strip .ps-lift { width: 52px; font-variant-numeric: tabular-nums; }
+.point-strip .ps-absorb { width: 52px; font-variant-numeric: tabular-nums; }
+/* "demi-pointe" is the longest word in the level list, and the strip has one line to give. */
+.point-strip select[data-f="level"] { width: 108px; }
+/* The plant reads as "auto — left", so it needs a shade more room than the level. */
+.point-strip select[data-f="plant"] { width: 132px; }
+/* A foot that cannot do what the point asks of it is a warning, not an error: the planner is
+   saying what it measured, and the choreographer may well want it anyway. */
+.point-strip .ps-slide { font-size: 11px; color: #e0b464; white-space: nowrap; flex: none; }
+/* The count shapes are phrases, not words: "slow out · quick in" has to fit. */
+.point-strip select[data-f="ease"] { width: 138px; }
+.point-strip .ps-unit { color: var(--dim); font-size: 11px; margin-left: -4px; }
+.point-strip .ps-through {
+  display: flex; align-items: center; gap: 4px; flex: none;
+  font-size: 11px; color: var(--accent); cursor: pointer;
+}
+.point-strip .ps-through input { width: auto; margin: 0; accent-color: var(--accent); }
+.point-strip .ps-grow { flex: 1; }
+.point-strip button { flex: none; }
+.point-strip .ps-warn { color: var(--danger); border-color: #4a2028; background: transparent; }
+.point-strip button:disabled { color: #46536a; border-color: #1c2534; background: transparent; cursor: default; }
+
+/* Cue list inside a scenery row: quieter than the row it sits in. */
+.cue-list {
+  margin: 4px 0 2px;
+  padding-left: 7px;
+  border-left: 2px solid #253041;
+}
+.cue-list .row { margin-top: 2px; }
+.cue-list .label { font-size: 11px; color: #9fb0c8; }
+.cue-list .live-row { margin-top: 3px; }
+.cue-list .live-row .label, .item .live-row .label { color: #6f7f96; }
+.live-row .tag.live { color: var(--text); border-color: #2b3a4f; background: rgba(255,255,255,.04); }
+
+/* A cue row is a handle: click it to open its own controls. */
+.cue-list .cue-row { cursor: pointer; border-radius: 4px; }
+.cue-list .cue-row:hover { background: rgba(255,255,255,.03); }
+.cue-list .cue-row.on {
+  background: rgba(255,183,3,.09);
+  box-shadow: inset 2px 0 0 var(--accent);
+  padding-left: 4px;
+}
+.cue-list .cue-row.on select { max-width: 92px; }
+/* A picked cue's controls sit on their own line under its time, so the select
+   and the seconds are readable instead of squeezed into 28 px slivers. */
+.cue-list .cue-edit { display: block; }
+.cue-list .cue-edit > .row { margin-top: 3px; }
+.cue-list .cue-edit input[type="number"] { min-width: 46px; }
+
+/* ---------- watch mode ---------- */
+/* A run-through is the stage and nothing else: no panels, no ruler, no tabs. */
+/* The header and transport are removed from the grid, not just zeroed: a
+   display:none child stops being a grid item, so the stage would slide into
+   its track. Block flow avoids counting anything. */
+body.watch {
+  display: block;
+}
+body.watch main {
+  height: 100%;
+}
+body.watch header,
+body.watch #bottom,
+body.watch #left,
+body.watch #right,
+body.watch #actTabs,
+body.watch #sceneTabs,
+body.watch .stage-hint,
+body.watch .point-strip,
+body.watch .view-tools {
+  display: none;
+}
+body.watch main { grid-template-columns: minmax(0, 1fr); }
+/* Only the stage and the elevation are left in flow, so they take the tracks:
+   the plan above, the house view below. */
+body.watch #center {
+  /* Equal rows: at one shared scale the plan needs 8 m of depth and the elevation
+     7.5 m of opening, so a row each is what makes both as large as they can be. */
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+}
+/* Watching one view on its own: the filled view gets the whole screen. */
+body.watch.fill-plan #center,
+body.watch.fill-house #center,
+body.watch.fill-elev #center {
+  grid-template-rows: minmax(0, 1fr);
+}
+body.watch #stage { cursor: default; }
+
+.watch-bar {
+  position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px; z-index: 60;
+  padding: 6px 12px 6px 8px; border-radius: 999px;
+  background: rgba(10,14,20,.9); border: 1px solid #26313f;
+  box-shadow: 0 8px 24px rgba(0,0,0,.45);
+  backdrop-filter: blur(6px);
+}
+.watch-bar[hidden] { display: none; }
+.watch-bar .watch-title {
+  color: #7f8ea6; font-size: 11px; max-width: 42vw;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.watch-bar .time { font-size: 12px; }
+.watch-link { color: var(--accent); border-color: #3a3020; }
+
+.stage-hint {
+  position: absolute; left: 50%; bottom: 50px; transform: translateX(-50%);
+  color: var(--dim); font-size: 11px; pointer-events: none;
+  background: rgba(8,11,16,.8); padding: 4px 10px; border-radius: 20px;
+  border: 1px solid var(--line);
+}
+
+.cast-section { flex: none; }
+/* The wardrobe sits between the cast and the props: you dress a performer you have
+   just chosen, from a costume you have just made. */
+.green-room { flex: none; }
+.props-section { flex: none; }
+/* Narration lives in the Performers pane: a voice is performed, and it keeps the
+   left pane from growing another section under the music. */
+.voice-section { flex: none; }
+.inspector { border-bottom: none; }
+
+/* ---------- bottom ---------- */
+#bottom {
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  display: grid;
+  grid-template-rows: 40px minmax(0, 1fr) 46px;
+  min-height: 0;
+}
+#transport {
+  display: flex; align-items: center; gap: 7px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+}
+.divider { width: 1px; height: 18px; background: var(--line); margin: 0 3px; }
+.time {
+  font-variant-numeric: tabular-nums;
+  font-family: Consolas, "SF Mono", monospace;
+  color: var(--accent);
+  min-width: 84px;
+  font-size: 12px;
+}
+.check { display: flex; align-items: center; gap: 4px; color: var(--dim); font-size: 11px; white-space: nowrap; }
+.check input { accent-color: var(--accent); }
+.collision { color: var(--danger); font-size: 11px; white-space: nowrap; overflow: hidden; }
+#timeline { display: block; width: 100%; height: 100%; }
+/* The crowd, under the tracks: a step line of how many performers are on the deck, on the
+   same clock and the same gutter as the tracks above it. */
+#companyLine {
+  display: block; width: 100%; height: 100%;
+  border-top: 1px solid var(--line);
+  background: #0b0e14;
+  cursor: default;
+}
+
+/* ---------- the track menu (right-click on a timeline row) ---------- */
+.track-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 216px;
+  max-width: 300px;
+  padding: 6px;
+  background: #0f151d;
+  border: 1px solid #26323f;
+  border-radius: 8px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.55);
+  font: 12px "Segoe UI", system-ui, sans-serif;
+  color: var(--text);
+}
+.track-menu .tm-head {
+  padding: 3px 8px 6px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.track-menu .tm-sep { height: 1px; margin: 5px 4px; background: #1d2634; }
+.track-menu .tm-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.track-menu .tm-item:hover,
+.track-menu .tm-item:focus-visible {
+  background: rgba(255, 183, 3, 0.14);
+  outline: none;
+}
+.track-menu .tm-note {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+.track-menu .tm-item.danger { color: #ffb3c0; }
+.track-menu .tm-item.danger:hover { background: rgba(255, 77, 109, 0.16); }
+/* A setting the entries above share, such as how long a cloth move takes. */
+.track-menu .tm-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 6px;
+  color: var(--dim);
+  font-size: 11px;
+  cursor: default;
+}
+.track-menu .tm-field input {
+  width: 56px;
+  margin-left: auto;
+  background: #0a0f16;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text);
+  font: inherit;
+  padding: 2px 5px;
+}
+.track-menu .tm-field input:focus {
+  outline: 1px solid var(--accent);
+  outline-offset: 0;
+}
+.track-menu .tm-field .tm-note { margin-left: 0; }
+
+/* ---------- the movement cheat sheet ---------- */
+/* A reference laid over the stage: the point being edited stays behind it, so a move can be
+   tried, looked at and changed without losing the place in the path. */
+.moves-sheet {
+  position: fixed; inset: 0; z-index: 40;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(4, 7, 11, 0.72);
+}
+.moves-sheet[hidden] { display: none; }
+.moves-panel {
+  display: flex; flex-direction: column;
+  width: min(1000px, calc(100vw - 48px));
+  max-height: calc(100vh - 64px);
+  background: #0d131b; border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+.moves-head {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 12px 16px 10px; border-bottom: 1px solid var(--line);
+}
+.moves-head h2 {
+  margin: 0; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--text); font-weight: 600;
+}
+.moves-where { font-size: 12px; color: var(--accent); }
+.moves-head button { margin-left: auto; }
+.moves-body { overflow-y: auto; padding: 2px 16px 10px; }
+.move-group h3 {
+  display: flex; align-items: baseline; gap: 8px;
+  margin: 12px 0 8px; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--dim); font-weight: 600;
+}
+.move-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(146px, 1fr)); gap: 8px; }
+.move {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 6px 8px; background: #0a0f16; border: 1px solid var(--line);
+  border-radius: 8px; color: var(--text); font: inherit; text-align: center; cursor: pointer;
+}
+.move:hover { background: #111823; border-color: #4a5d78; }
+.move.sel { border-color: var(--accent); box-shadow: inset 0 0 0 1px rgba(255, 183, 3, 0.3); }
+/* A phrase is the sheet's first business, so it gets a row of its own above the cells
+   rather than another cell to pick. */
+.phrase-block { border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+.phrase-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+.phrase-form label {
+  display: flex; flex-direction: column; gap: 3px;
+  font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim);
+}
+.phrase-form input { width: 62px; }
+/* The row ends in two buttons — put it after her path, or put it on the ruler — so only the
+   first of them takes the push to the right and the pair stays side by side. */
+.phrase-form button { margin-left: 0; }
+.phrase-form #btnPhrasePlace { margin-left: auto; }
+.phrase-where { margin: 8px 0 0; font-size: 11px; color: var(--accent); }
+.move canvas { display: block; width: 84px; height: 104px; }
+.move-name { font-size: 12px; color: var(--text); }
+.move-note { font-size: 10px; line-height: 1.35; color: var(--dim); }
+.moves-panel > .hint { margin: 0; padding: 0 16px 12px; }
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: #253141; border-radius: 5px; }
+::-webkit-scrollbar-track { background: transparent; }

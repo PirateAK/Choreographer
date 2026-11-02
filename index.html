@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Choreographer</title>
+<link rel="stylesheet" href="styles.css?v=house-layout6" />
+</head>
+<body>
+<header>
+  <h1>Choreographer</h1>
+  <input id="showName" class="show-name" value="Untitled show" aria-label="Show name" />
+  <div class="spacer"></div>
+  <button id="btnUndo" class="ghost" title="Undo (Ctrl+Z)">Undo</button>
+  <button id="btnRedo" class="ghost" title="Redo (Ctrl+Shift+Z)">Redo</button>
+  <button id="btnMoves" class="ghost" title="The movement cheat sheet: every position, step and level, drawn and moving — click one to put it on the point being edited">Moves</button>
+  <button id="btnSave" class="ghost" title="Save the whole show: writes the browser's copy first, then a JSON file you choose">Save</button>
+  <button id="btnReload" class="ghost" title="Reload a show from a JSON file">Reload</button>
+  <button id="btnClear" class="ghost" title="Clear the stage for a new show — keeps dancers, costumes, props, cloth, lanterns, music, voice and every setting. Undo brings it back">Clear</button>
+  <button id="btnWatch" class="ghost watch-link" title="Watch the show: the stage alone, with its music, from the top">▶ Watch</button>
+  <a id="btnPrint" class="ghost print-link" href="print.html" target="_blank" rel="noopener" title="Open the printable stage plot, paths and cue sheet in a new tab">Print plan</a>
+  <input id="fileImport" type="file" accept="application/json" hidden />
+  <input id="fileMusic" type="file" accept="audio/*" hidden />
+  <input id="fileNarration" type="file" accept="audio/*" hidden />
+  <input id="fileVideo" type="file" accept="video/*" hidden />
+  <span id="saved" class="saved">saved</span>
+</header>
+
+<main>
+  <aside id="left" class="panel">
+    <div class="pane-tools">
+      <button id="btnFoldAll" class="pane-btn" aria-pressed="false" title="Fold every section in this pane">Fold all</button>
+    </div>
+    <section>
+      <h2>Stage</h2>
+      <div class="field"><label>Width (m)</label><input id="stWidth" type="number" min="4" max="40" step="0.5" /></div>
+      <div class="field"><label>Depth (m)</label><input id="stDepth" type="number" min="3" max="30" step="0.5" /></div>
+      <div class="field"><label>Wing depth (m)</label><input id="stWings" type="number" min="1" max="20" step="0.5" /></div>
+      <div class="field"><label>Grid (m)</label><input id="stGrid" type="number" min="0.25" max="2" step="0.25" /></div>
+      <div class="field"><label>Opening (m)</label><input id="stOpening" type="number" min="2.5" max="20" step="0.5" title="Height of the proscenium arch, as the audience sees it" /></div>
+      <div class="field"><label>Dancer (m)</label><input id="stDancerH" type="number" min="1" max="2.4" step="0.05" title="Height a performer is drawn in the elevation" /></div>
+    </section>
+
+    <section>
+      <h2>Show settings</h2>
+      <div class="field"><label>Cloth cue (s)</label><input id="prefCue" type="number" min="0" max="120" step="0.5" title="How long a curtain or drop cue takes when it is placed" /></div>
+      <div class="field"><label>Music fade (s)</label><input id="prefFade" type="number" min="0" max="120" step="0.5" title="How long a music fade takes when it is placed" /></div>
+      <div class="field"><label>Light cue (s)</label><input id="prefLight" type="number" min="0" max="120" step="0.5" title="How long a light cue takes when it is placed" /></div>
+      <div class="field"><label>Hold (s)</label><input id="prefHold" type="number" min="0.1" max="120" step="0.5" title="How long a hold lasts when one is added" /></div>
+      <div class="field"><label>Pause (s)</label><input id="prefPause" type="number" min="0.1" max="120" step="0.5" title="How long a pause stops the show when one is added" /></div>
+      <div class="field"><label>End fade (s)</label><input id="prefEndFade" type="number" min="0" max="120" step="0.5" title="How long the music takes to come down before the show ends; 0 stops it dead" /></div>
+      <div class="field"><label>Tempo (bpm)</label><input id="prefTempo" type="number" min="20" max="300" step="1" title="The music's tempo. A count is one beat, and a phrase's counts are laid against it" /></div>
+      <div class="field"><label>Counts per bar</label><input id="prefBeats" type="number" min="1" max="16" step="1" title="How many counts make a bar: 4 in common time, 3 for a waltz" /></div>
+      <p class="hint">The length a cue is given when it is placed, before it is dragged into shape. These travel with the show, so a reopened file flies and fades the same way. <b>End fade</b> is how long the music takes to come down into an end marker; <b>0</b> stops it dead on the moment. <b>Tempo</b> and <b>counts per bar</b> are the music's clock: a phrase is placed by counts of it, and the bars are drawn under the tracks and counted from where the first track begins.</p>
+    </section>
+
+    <section>
+      <h2>Running order <span id="actCount" class="count">1</span></h2>
+      <div id="actsList" class="list"></div>
+      <p class="hint">Acts run end to end on one clock, so Act 2 begins where Act 1 finishes. Set how long each one runs; switching act moves the playhead, not the stage. Drag a scene's notch on the timeline band to move that boundary.</p>
+    </section>
+
+    <section>
+      <h2>Music <span id="musicState" class="count">none</span></h2>
+      <div id="musicRow" class="list"></div>
+      <div class="btn-row"><button id="btnMusic">+ Attach track</button></div>
+      <p class="hint">The tracks are the show's clock. <b>+ Track</b> adds one <b>where the playhead is</b> — put the playhead where the music should change, then attach the file. <b>plays</b> trims how much of the file sounds, and <b>end here</b> sets that from the playhead.</p>
+    </section>
+
+
+    <section>
+      <h2>Wing legs <span id="legCount" class="count">0</span></h2>
+      <div class="btn-row">
+        <button id="btnAddLeftLeg">+ Left leg</button>
+        <button id="btnAddRightLeg">+ Right leg</button>
+      </div>
+      <div id="legsList" class="list"></div>
+      <p class="hint">Legs stand in the wings and split each side into <b>front</b>, <b>middle</b> and <b>back</b>. Drag one on the stage, or type its depth.</p>
+    </section>
+
+    <section>
+      <h2>Lights <span id="lightCount" class="count">0</span></h2>
+      <div class="btn-row"><button id="btnAddLight">+ Light</button></div>
+      <div id="lightsList" class="list"></div>
+      <p class="hint">A light hangs over a spot on the floor, washes a pool of its own colour and is cued <b>up</b> and <b>out</b> from its own track. Drag its marker on the plan to place it; hold Alt to ignore the grid.</p>
+    </section>
+
+    <section>
+      <h2>Curtains, drops &amp; cards</h2>
+      <div class="btn-row">
+        <button id="btnAddCurtain">+ Curtain</button>
+        <button id="btnAddDrop">+ Drop</button>
+        <button id="btnAddScreen" disabled>+ Screen</button>
+        <button id="btnAddCard">+ Card</button>
+      </div>
+      <p id="screenStatus" class="hint" role="status">Screen controls loading…</p>
+      <div id="sceneryList" class="list"></div>
+      <p class="hint">Curtains and drops stack front to back. Drag one on the plan to place it; hold Alt to move it off the grid. A <b>card</b> is a board held up in front of the house — type what it says, then cue it on and off.</p>
+    </section>
+  </aside>
+
+  <section id="center">
+    <div id="actTabs" class="act-tabs" aria-label="Acts"></div>
+    <div id="sceneTabs" class="act-tabs scene-tabs" aria-label="Scenes in this act"></div>
+    <div id="stage-wrap">
+      <canvas id="stage"></canvas>
+      <div class="view-tools">
+        <button id="btnFillPlan" class="view-btn" aria-pressed="false" title="Give the plan the whole centre: the elevation stands down until you ask for both again">⛶ Fill</button>
+      </div>
+      <div id="pointStrip" class="point-strip" hidden></div>
+      <div id="stageHint" class="stage-hint">Click a point to edit it · drag to move it · drag the line to bow it · right-click deletes it and everything after</div>
+    </div>
+    <div id="elevation-wrap">
+      <canvas id="elevation"></canvas>
+      <div class="view-tools">
+        <button id="btnDepth" class="view-btn on" aria-pressed="true" title="Shrink figures the further upstage they stand, as the house sees them — turn it off when judging heights">Depth</button>
+        <button id="btnFillElev" class="view-btn" aria-pressed="false" title="Give the elevation the whole centre, for watching from the house">⛶ Fill</button>
+      </div>
+    </div>
+    <div id="house-wrap" hidden>
+      <canvas id="house" aria-label="Audience-facing House preview"></canvas>
+      <div class="view-tools"><button id="btnHouseBack" class="view-btn">Back to plan &amp; elevation</button></div>
+      <span id="houseStatus" class="house-caption" role="status">HOUSE · AUDIENCE VIEW</span>
+    </div>
+  </section>
+
+  <aside id="right" class="panel">
+    <section id="videoSection">
+      <h2>Projector video <span id="videoCount" class="count">none</span></h2>
+      <div class="btn-row"><button id="btnVideo">+ Video file</button><button id="btnHouse">House view</button></div>
+      <div id="videoRow" class="list"></div>
+      <p class="hint">Add a <b>Screen</b> under curtains and drops, then cue its fly-in/out independently. Each video has its own timeline band: drag to move it, drag its ends to trim. Times below are in seconds. Files stay in this browser; saved show files contain cues only.</p>
+    </section>
+    <section class="cast-section">
+      <h2>Performers <span id="castCount" class="count">0</span></h2>
+      <div class="btn-row"><button id="btnAddDancer">+ Dancer</button></div>
+      <div id="castList" class="list"></div>
+      <p class="hint">Ctrl-click an eye to keep more than one performer on stage.</p>
+    </section>
+
+    <section class="overlap-section">
+      <h2>Overlaps <span id="overlapCount" class="count">—</span></h2>
+      <div class="btn-row">
+        <button id="btnScanOverlaps" title="Look through the whole running order for two performers inside the clearance">Find overlaps</button>
+      </div>
+      <div id="overlapList" class="list"></div>
+      <p class="hint">Two bodies closer than 0.55 m — the same test the run-through stops on, but read across the whole show instead of only where the clock happens to run. A fix moves the least it can and re-checks the feet it might pull: it is a normal edit, so <b>Undo</b> puts the path back exactly as it was.</p>
+    </section>
+
+    <section class="green-room">
+      <h2>Green room <span id="costumeCount" class="count">0</span></h2>
+      <div class="btn-row"><button id="btnAddCostume">+ Costume</button></div>
+      <div id="costumeList" class="list"></div>
+      <p class="hint">A costume is colours and a cut — body, skirt, hair. Dress a performer with the picker on their row in <b>Performers</b>, and the plan, the elevation and the run-through all wear it.</p>
+    </section>
+
+    <section class="props-section">
+      <h2>Props <span id="propCount" class="count">0</span></h2>
+      <div class="btn-row"><button id="btnAddProp">+ Prop</button></div>
+      <div id="propsList" class="list"></div>
+      <p class="hint">Drag props on the stage; hold Alt to ignore grid snapping.</p>
+    </section>
+
+    <section class="voice-section">
+      <h2>Narration <span id="voiceCount" class="count">none</span></h2>
+      <div id="voiceRow" class="list"></div>
+      <div class="btn-row">
+        <button id="btnRecord" title="Record a voice piece with the microphone, starting at the playhead">◉ Record</button>
+        <button id="btnVoiceFile" title="Attach a voice recording from disk, at the playhead">+ Voice file</button>
+      </div>
+      <p class="hint" id="voiceHint">A line lands <b>where the playhead is</b> when you start recording, so put the playhead where the narrator speaks. Several pieces sit on one row, and a line plays whenever its moment comes round — in a run-through too.</p>
+    </section>
+
+    <section id="inspector" class="inspector"></section>
+  </aside>
+</main>
+
+<section id="bottom">
+  <div id="transport">
+    <button id="btnPlay" class="primary" title="Play / pause (Space)">▶</button>
+    <button id="btnStop" title="Return to start">■</button>
+    <span id="timeDisplay" class="time">00:00.000</span>
+    <span class="divider"></span>
+    <button id="btnKey" title="Add a keyframe at the playhead">+ Key</button>
+    <button id="btnPath" title="Place path stations: select a dancer, then click points on the stage in order">+ Stations</button>
+    <button id="btnHold" title="Hold the selected track for a moment">+ Hold</button>
+    <button id="btnPause" title="Pause the whole show">+ Pause</button>
+    <button id="btnEnd" title="End the show at the playhead — the clock stops here, and dragging the red line moves it">+ End</button>
+    <span class="divider"></span>
+    <button id="zoomOut" title="Zoom out">−</button>
+    <button id="zoomIn" title="Zoom in">+</button>
+    <label class="check"><input id="chkCollide" type="checkbox" checked /> Stop at collisions</label>
+    <span id="collisionMsg" class="collision"></span>
+  </div>
+  <canvas id="timeline"></canvas>
+  <canvas id="companyLine" title="How many performers are on the deck across this stretch of the timeline — the same count the printed call sheet draws per act"></canvas>
+</section>
+
+<!-- The only chrome a run-through keeps: play, restart, the clock, and a way out. -->
+<div id="watchBar" class="watch-bar" hidden>
+  <button id="wPlay" class="primary" title="Play / pause (Space)">▶</button>
+  <button id="wRestart" title="Back to the top of the show">↺</button>
+  <span id="wTime" class="time">00:00.000</span>
+  <span class="watch-title" id="wTitle"></span>
+  <span class="divider"></span>
+  <button id="wFull" title="Fill the screen">⛶</button>
+  <button id="wExit" title="Back to editing (Esc)">Back to editing</button>
+</div>
+
+<!-- The cheat sheet: a reference you can pick from, over the stage so the point being
+     edited stays behind it. -->
+<div id="movesSheet" class="moves-sheet" hidden>
+  <div class="moves-panel" role="dialog" aria-modal="true" aria-labelledby="movesTitle">
+    <header class="moves-head">
+      <h2 id="movesTitle">Movements</h2>
+      <span id="movesWhere" class="moves-where"></span>
+      <button id="btnMovesClose" class="ghost">Close</button>
+    </header>
+    <div id="movesBody" class="moves-body"></div>
+    <p class="hint">Click a move to put it on the point being edited, then close this and look at the elevation. A position and a step belong to a stage station; a level to how that station meets the floor. Or choose a <b>phrase</b> at the top and place the whole step at once.</p>
+  </div>
+</div>
+
+<script type="importmap">
+{"imports": {
+  "./src/app.js": "./src/app.js?v=screen-depth8",
+  "./src/model.js": "./src/model.js?v=screen4",
+  "./src/timeline.js": "./src/timeline.js?v=screen4",
+  "./src/house.js": "./src/house.js?v=screen-depth8",
+  "./src/video.js": "./src/video.js?v=video-sync7"
+}}
+</script>
+<script>
+// Report startup failures in the page rather than leaving an empty planner.
+window.addEventListener('error', function (event) {
+  var status = document.getElementById('screenStatus');
+  if (status) status.textContent = 'App error: ' + (event.message || 'A script could not load');
+});
+window.addEventListener('unhandledrejection', function (event) {
+  var status = document.getElementById('screenStatus');
+  if (status) status.textContent = 'App error: ' + (event.reason && event.reason.message || String(event.reason));
+});
+import('./src/app.js').catch(function (error) {
+  var status = document.getElementById('screenStatus');
+  if (status) status.textContent = 'App could not start: ' + error.message;
+});
+</script>
+</body>
+</html>
