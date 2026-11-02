@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Choreographer</title>
-<link rel="stylesheet" href="styles.css?v=slides9" />
+<link rel="stylesheet" href="styles.css?v=tilt16" />
 </head>
 <body>
 <header>
@@ -109,6 +109,9 @@
       <div class="view-tools">
         <button id="btnPaths" class="view-btn on" aria-pressed="true" title="Show or hide movement lines">Paths</button>
         <button id="btnStations" class="view-btn on" aria-pressed="true" title="Show or hide station points">Stations</button>
+        <button id="btnCostumes" class="view-btn" aria-pressed="false" title="Show or hide overhead costume shapes">Costumes</button>
+        <button id="btnTilt" class="view-btn" aria-pressed="false" title="Drag vertically on the stage to tilt the view; dancer editing is disabled while active">Tilt view</button>
+        <button id="btnResetOverhead" class="view-btn" title="Return to directly overhead and leave tilt mode">Reset overhead</button>
         <button id="btnFillPlan" class="view-btn" aria-pressed="false" title="Enlarge the overhead stage plan">Top-down</button>
       </div>
       <div id="pointStrip" class="point-strip" hidden></div>
@@ -240,8 +243,8 @@
 
 <script type="importmap">
 {"imports": {
-  "./src/app.js": "./src/app.js?v=overhead13",
-  "./src/stage.js": "./src/stage.js?v=overhead-clear15",
+  "./src/app.js": "./src/app.js?v=tilt16",
+  "./src/stage.js": "./src/stage.js?v=tilt16",
   "./src/pose.js": "./src/pose.js?v=overhead-avatars14",
   "./src/model.js": "./src/model.js?v=slides9",
   "./src/timeline.js": "./src/timeline.js?v=slides-on10",

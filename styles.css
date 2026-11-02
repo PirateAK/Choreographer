@@ -366,7 +366,7 @@ table.cast span.dim { color: #8a8578; }
 .scene-row { padding-left: 16px; }
 .scene-row .tag { font-size: 9px; }
 #stage-wrap { position: relative; min-height: 0; }
-#stage { display: block; width: 100%; height: 100%; cursor: crosshair; }
+#stage { display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
 #elevation-wrap {
   position: relative; min-height: 0;
   border-top: 1px solid var(--line);

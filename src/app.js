@@ -2910,6 +2910,8 @@ function loadView() {
     if (saved.depth === false) state.ui.depth = false;
     state.ui.showPaths = saved.showPaths !== false;
     state.ui.showStations = saved.showStations !== false;
+    state.ui.showCostumes = saved.showCostumes === true;
+    state.ui.planTilt = Math.max(0, Math.min(55, Number(saved.planTilt) || 0));
   } catch (e) {
     /* nothing saved, or storage blocked — the defaults are the room as built */
   }
@@ -2917,7 +2919,7 @@ function loadView() {
 
 function saveView() {
   try {
-    localStorage.setItem(VIEW_KEY, JSON.stringify({ fill: state.ui.fill, depth: state.ui.depth, showPaths: state.ui.showPaths, showStations: state.ui.showStations }));
+    localStorage.setItem(VIEW_KEY, JSON.stringify({ fill: state.ui.fill, depth: state.ui.depth, showPaths: state.ui.showPaths, showStations: state.ui.showStations, showCostumes: state.ui.showCostumes === true, planTilt: state.ui.planTilt || 0 }));
   } catch (e) {
     /* storage blocked — the view still works for this session */
   }
@@ -2947,6 +2949,11 @@ function paintView() {
     $(id).classList.toggle('on', on);
     $(id).setAttribute('aria-pressed', String(on));
   }
+  $('btnCostumes').classList.toggle('on', state.ui.showCostumes === true);
+  $('btnCostumes').setAttribute('aria-pressed', String(state.ui.showCostumes === true));
+  $('btnTilt').classList.toggle('on', !!state.ui.tiltMode);
+  $('btnTilt').setAttribute('aria-pressed', String(!!state.ui.tiltMode));
+  $('stage').style.cursor = state.ui.tiltMode ? 'ns-resize' : '';
   const depth = $('btnDepth');
   if (depth) {
     depth.classList.toggle('on', state.ui.depth !== false);
@@ -3145,7 +3152,9 @@ function updateTransport() {
   // Refusals explain themselves where the eye already is, over the stage.
   const sh = $('stageHint');
   if (sh) {
-    const text = state.ui.hint || (coachMark ? STAGE_HINT : '');
+    const text = state.ui.fill === 'plan' && state.ui.tiltMode
+      ? 'Tilt view: drag down to angle the stage, up for overhead (0–55°) · toggle Tilt view off to edit'
+      : state.ui.hint || (coachMark ? STAGE_HINT : '');
     if (sh.textContent !== text) sh.textContent = text;
     sh.hidden = !text;
   }
@@ -4042,6 +4051,20 @@ function boot() {
       app.stage.draw();
     });
   }
+  $('btnCostumes').addEventListener('click', () => {
+    state.ui.showCostumes = state.ui.showCostumes !== true;
+    paintView(); saveView(); app.stage.draw();
+  });
+  $('btnTilt').addEventListener('click', () => {
+    state.ui.tiltMode = !state.ui.tiltMode;
+    if (state.ui.fill !== 'plan') setFill('plan');
+    paintView();
+  });
+  $('btnResetOverhead').addEventListener('click', () => {
+    state.ui.planTilt = 0; state.ui.tiltMode = false;
+    paintView(); saveView(); app.stage.draw();
+  });
+  $('stage').addEventListener('viewtiltchange', saveView);
   $('btnFillElev').addEventListener('click', () => setFill('elevation'));
   $('btnDepth').addEventListener('click', () => setDepth(state.ui.depth === false));
   paintView();

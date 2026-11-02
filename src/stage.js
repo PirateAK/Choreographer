@@ -44,15 +44,22 @@ export class StageView {
     this.canvas.addEventListener('pointerdown', (e) => this.onDown(e));
     window.addEventListener('pointermove', (e) => this.onMove(e));
     window.addEventListener('pointerup', () => this.onUp());
+    window.addEventListener('pointercancel', () => this.onUp());
     this.canvas.addEventListener('contextmenu', (e) => this.onContext(e));
   }
 
-  w2s(x, y) {
-    return { x: this.ox + x * this.scale, y: this.oy - y * this.scale };
+  tiltAngle() {
+    return !this.compact && state.ui.fill === 'plan'
+      ? Math.max(0, Math.min(55, Number(state.ui.planTilt) || 0)) * Math.PI / 180 : 0;
+  }
+
+  w2s(x, y, height = 0) {
+    const tilt = this.tiltAngle();
+    return { x: this.ox + x * this.scale, y: this.oy - (y * Math.cos(tilt) + height * Math.sin(tilt)) * this.scale };
   }
 
   s2w(px, py) {
-    return { x: (px - this.ox) / this.scale, y: (this.oy - py) / this.scale };
+    return { x: (px - this.ox) / this.scale, y: (this.oy - py) / (this.scale * Math.cos(this.tiltAngle())) };
   }
 
   rect(x0, y0, x1, y1) {
@@ -95,7 +102,7 @@ export class StageView {
     const s = shared || Math.max(0.5, Math.min((w - pad * 2) / worldW, (h - pad * 2) / worldH));
     this.scale = s;
     this.ox = w / 2;
-    this.oy = h / 2 + (worldH / 2) * s;
+    this.oy = h / 2 + (worldH / 2) * s * Math.cos(this.tiltAngle());
 
     const halfW = st.width / 2;
 
@@ -692,9 +699,10 @@ export class StageView {
       return [side, { ...pin, x: across * c - house * s, z: across * s + house * c }];
     }));
     const figure = joints(spec, 1, 0, pins);
-    const project = (x, z) => this.w2s(
+    const project = (x, z, height = 0) => this.w2s(
       p.x + mirror * (x * c + z * s) * h,
-      p.y - (z * c - x * s) * h
+      p.y - (z * c - x * s) * h,
+      height * h
     );
     const cos = costumeOf(state.show, d);
     const body = cos ? cos.body : d.color;
@@ -710,35 +718,36 @@ export class StageView {
     // Actual fore/aft depth, ending at the same planted contacts as the foot markers.
     const feet = feetOnFloor(state.show, d, lt);
     figure.legs3.forEach((leg, i) => {
-      const points = leg.map(j => project(j[0], j[2]));
+      const points = leg.map(j => project(j[0], j[2], j[1]));
       const foot = feet[i === 0 ? 'left' : 'right'];
-      if (foot) points[2] = this.w2s(foot.x, foot.y);
+      if (foot) points[2] = this.w2s(foot.x, foot.y, foot.h);
       stroke(points, body, Math.max(2, size * 0.035));
     });
-    // In dedicated Top-down, leave the limbs unobscured by the filled costume icon.
-    if (state.ui.fill !== 'plan') {
-      const center = project(figure.pelvis[0], 0);
+    // Costume visibility is independent from paths and station markers.
+    if (state.ui.showCostumes === true) {
+      const center = project(figure.pelvis[0], 0, figure.pelvis[1]);
       ctx.save();
       ctx.translate(center.x, center.y); ctx.rotate(mirror * angle);
       ctx.beginPath();
       const tutu = cos && cos.style === 'tutu';
-      ctx.ellipse(0, 0, size * (tutu ? 0.18 : 0.07), size * (tutu ? 0.18 : 0.045), 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, size * (tutu ? 0.18 : 0.07), size * (tutu ? 0.18 : 0.045) * Math.cos(this.tiltAngle()), 0, 0, Math.PI * 2);
       ctx.fillStyle = cos ? cos.skirt : body; ctx.fill();
       ctx.strokeStyle = '#080c13'; ctx.lineWidth = 1.5; ctx.stroke();
       ctx.restore();
     }
     // Arms use the shared pose joints, flattened vertically rather than drawn upright.
+    stroke([project(figure.pelvis[0], 0, figure.pelvis[1]), project(figure.chest[0], 0, figure.chest[1])], body, Math.max(3, size * 0.055));
     figure.arms.forEach(arm => {
-      stroke(arm.map(j => project(j[0], 0)), body, Math.max(2.5, size * 0.03));
+      stroke(arm.map(j => project(j[0], 0, j[1])), body, Math.max(2.5, size * 0.03));
     });
-    stroke([project(-0.075, 0), project(0.075, 0)], body, Math.max(3, size * 0.055));
-    const head = project(figure.head[0], 0);
+    stroke([project(-0.075, 0, figure.chest[1]), project(0.075, 0, figure.chest[1])], body, Math.max(3, size * 0.055));
+    const head = project(figure.head[0], 0, figure.head[1]);
     const radius = Math.max(3, size * figure.headR);
     ctx.beginPath(); ctx.arc(head.x, head.y, radius, 0, Math.PI * 2);
     ctx.fillStyle = cos ? cos.hair : darker(body, 0.55); ctx.fill();
     ctx.strokeStyle = 'rgba(235,242,252,.8)'; ctx.lineWidth = 1; ctx.stroke();
     const headAngle = (Number(at.headTurn) || 0) * Math.PI / 180 - angle;
-    const nose = project(figure.head[0] + Math.sin(headAngle) * figure.headR * 1.4, Math.cos(headAngle) * figure.headR * 1.4);
+    const nose = project(figure.head[0] + Math.sin(headAngle) * figure.headR * 1.4, Math.cos(headAngle) * figure.headR * 1.4, figure.head[1]);
     stroke([head, nose], '#f1cfad', Math.max(2, size * 0.024));
     ctx.restore();
   }
@@ -882,7 +891,8 @@ export class StageView {
       const p = posOfContent(show, d, state.ui.playhead);
       if (!p) continue;
       const sp = this.w2s(p.x, p.y);
-      if (Math.hypot(sp.x - px, sp.y - py) < Math.max(11, 0.3 * this.scale)) return d;
+      const top = this.w2s(p.x, p.y, dancerHeight(show));
+      if (distToSegment(px, py, sp.x, sp.y, top.x, top.y) < Math.max(11, 0.3 * this.scale)) return d;
     }
     return null;
   }
@@ -1146,6 +1156,13 @@ export class StageView {
     // A refusal from the last click has been read by now; this one speaks for itself.
     state.ui.hint = null;
     const p = this.local(e);
+    if (!this.compact && state.ui.fill === 'plan' && state.ui.tiltMode) {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      this.grab = { type: 'tilt', y: e.clientY, angle: Number(state.ui.planTilt) || 0 };
+      this.canvas.setPointerCapture(e.pointerId);
+      return;
+    }
     if (this.compact) {
       const d = this.hitDancer(p.x, p.y);
       if (d) this.app.select(d.id);
@@ -1344,7 +1361,7 @@ export class StageView {
 
   onContext(e) {
     e.preventDefault();
-    if (this.compact || state.ui.watch) return;
+    if (this.compact || state.ui.watch || (state.ui.fill === 'plan' && state.ui.tiltMode)) return;
     const p = this.local(e);
     const hit = this.hitStation(p.x, p.y);
     if (hit) this.app.deleteFrom(hit.dancer, hit.index);
@@ -1353,7 +1370,16 @@ export class StageView {
   onMove(e) {
     if (this.compact) return;
     if (!this.grab) {
+      if (state.ui.fill === 'plan' && state.ui.tiltMode) {
+        this.canvas.style.cursor = 'ns-resize';
+        return;
+      }
       this.hover(e);
+      return;
+    }
+    if (this.grab.type === 'tilt') {
+      state.ui.planTilt = Math.max(0, Math.min(55, this.grab.angle + (e.clientY - this.grab.y) * 0.25));
+      this.draw();
       return;
     }
     const p = this.local(e);
@@ -1482,6 +1508,10 @@ export class StageView {
     if (!this.grab) return;
     const kind = this.grab.type;
     this.grab = null;
+    if (kind === 'tilt') {
+      this.canvas.dispatchEvent(new Event('viewtiltchange'));
+      return;
+    }
     // A moved leg, light or cloth changes the numbers in the panel, so redraw that too.
     if (kind === 'leg' || kind === 'cloth' || kind === 'light') this.app.rebuild();
     else if (kind === 'bend') {
