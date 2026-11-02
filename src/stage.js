@@ -5,9 +5,9 @@ import {
   addStation, objectShown, wingBays, findObject, propPosOfContent, carrierOf, sceneryStateAt,
   clothSpan, clothX, clothDepth, clothThick, clampClothX, curtainLegW, POSE_LABEL, lightLevelAt,
   lightSpot, costumeOf, legPoints, curveAt, BEND_LIMIT,
-  footAtLocal, footSkate, legOverreach, feetOnFloor,
+  footAtLocal, footSkate, legOverreach, feetOnFloor, poseOfContent, dancerHeight, footPins,
 } from './model.js';
-import { drawAvatar } from './draw.js';
+import { blendSpecs, specOf, joints, darker } from './pose.js';
 
 // A lantern's colour at a given strength, so every pool and beam is drawn from
 // the same hex rather than from a hand-written rgba per place it appears.
@@ -634,8 +634,8 @@ export class StageView {
       ctx.lineCap = 'butt';
     }
 
-    // The feet go under the body, because that is where feet are: a footprint is read by what
-    // shows around the dancer, not by a pair of dots painted on her middle.
+    // Draw the figure at the exact floor position, not an upright icon offset from it.
+    if (!this.compact) this.drawOverhead(d, p, lt);
     if (!this.compact) this.drawFeet(d, lt);
 
     if (selected) {
@@ -651,7 +651,7 @@ export class StageView {
     // narrow one, and plain is barely there. The body keeps the performer's own
     // colour, so the plan still answers "which dancer" at a glance.
     const cos = costumeOf(show, d);
-    if (cos) {
+    if (cos && this.compact) {
       const wide = cos.style === 'tutu' ? 0.62 : cos.style === 'tunic' ? 0.34 : 0.16;
       const thick = Math.max(1.2, r * wide);
       ctx.beginPath();
@@ -674,6 +674,70 @@ export class StageView {
       this.drawShort(d, lt);
     }
     ctx.globalAlpha = 1;
+  }
+
+
+  drawOverhead(d, p, lt) {
+    const ctx = this.ctx;
+    const at = poseOfContent(state.show, d, state.ui.playhead);
+    const spec = blendSpecs(specOf(at.pose), specOf(at.next), at.t);
+    const h = dancerHeight(state.show);
+    const angle = (Number(at.turn) || 0) * Math.PI / 180;
+    const c = Math.cos(angle), s = Math.sin(angle);
+    const mirror = at.facing < 0 ? -1 : 1;
+    const contacts = footPins(state.show, d, lt);
+    const pins = contacts && Object.fromEntries(Object.entries(contacts).map(([side, pin]) => {
+      const across = (pin.sx - p.x) / h / mirror;
+      const house = (p.y - pin.sy) / h;
+      return [side, { ...pin, x: across * c - house * s, z: across * s + house * c }];
+    }));
+    const figure = joints(spec, 1, 0, pins);
+    const project = (x, z) => this.w2s(
+      p.x + mirror * (x * c + z * s) * h,
+      p.y - (z * c - x * s) * h
+    );
+    const cos = costumeOf(state.show, d);
+    const body = cos ? cos.body : d.color;
+    const size = h * this.scale;
+    const stroke = (points, color, width) => {
+      ctx.beginPath();
+      points.forEach((pt, i) => i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y));
+      ctx.strokeStyle = '#080c13'; ctx.lineWidth = width + 2; ctx.stroke();
+      ctx.strokeStyle = color; ctx.lineWidth = width; ctx.stroke();
+    };
+    ctx.save();
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    // Actual fore/aft depth, ending at the same planted contacts as the foot markers.
+    const feet = feetOnFloor(state.show, d, lt);
+    figure.legs3.forEach((leg, i) => {
+      const points = leg.map(j => project(j[0], j[2]));
+      const foot = feet[i === 0 ? 'left' : 'right'];
+      if (foot) points[2] = this.w2s(foot.x, foot.y);
+      stroke(points, body, Math.max(2, size * 0.035));
+    });
+    const center = project(figure.pelvis[0], 0);
+    ctx.save();
+    ctx.translate(center.x, center.y); ctx.rotate(mirror * angle);
+    ctx.beginPath();
+    const tutu = cos && cos.style === 'tutu';
+    ctx.ellipse(0, 0, size * (tutu ? 0.18 : 0.07), size * (tutu ? 0.18 : 0.045), 0, 0, Math.PI * 2);
+    ctx.fillStyle = cos ? cos.skirt : body; ctx.fill();
+    ctx.strokeStyle = '#080c13'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.restore();
+    // Arms use the shared pose joints, flattened vertically rather than drawn upright.
+    figure.arms.forEach(arm => {
+      stroke(arm.map(j => project(j[0], 0)), body, Math.max(2.5, size * 0.03));
+    });
+    stroke([project(-0.075, 0), project(0.075, 0)], body, Math.max(3, size * 0.055));
+    const head = project(figure.head[0], 0);
+    const radius = Math.max(3, size * figure.headR);
+    ctx.beginPath(); ctx.arc(head.x, head.y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = cos ? cos.hair : darker(body, 0.55); ctx.fill();
+    ctx.strokeStyle = 'rgba(235,242,252,.8)'; ctx.lineWidth = 1; ctx.stroke();
+    const headAngle = (Number(at.headTurn) || 0) * Math.PI / 180 - angle;
+    const nose = project(figure.head[0] + Math.sin(headAngle) * figure.headR * 1.4, Math.cos(headAngle) * figure.headR * 1.4);
+    stroke([head, nose], '#f1cfad', Math.max(2, size * 0.024));
+    ctx.restore();
   }
 
   // Two marks under a dancer: which foot is carrying her, and where the other one is. A planted
@@ -1425,4 +1489,3 @@ export class StageView {
     } else persist();
   }
 }
-

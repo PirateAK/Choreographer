@@ -312,6 +312,8 @@ export function joints(spec, facing = 1, turn = 0, pins = null) {
     // The hip is the pivot and has no depth of its own; the knee and the ankle are solved in space and
     // then projected onto this plane.
     legs: legs3.map((leg) => leg.map(projected)),
+    // Unprojected joints for the overhead plan; never reconstruct depth from elevation.
+    legs3,
     head: narrow([leanX * 1.05, headY]),
     headR: BODY.headR,
     rise,
