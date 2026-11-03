@@ -188,3 +188,15 @@ Proposed order: (a) add shared `evaluateMovement` in model.js, (b) switch elevat
 - Ankle sits 0.3 of foot length from the heel: a solver assumption, not a school measurement.
 - Out of reach (e.g. 0.95 with foot length 0.15; reachable gap is about −0.15 to 0.886): the drawing stays at the nearest reachable gap, spec.spacingShortfall is set, and the School banner reports the shortfall.
 - Verified: test-fourth-spacing.mjs, test-fourth-turnout.mjs (spacing reaches solver), full engine suite, syntax, School smoke, out-of-reach banner in browser.
+
+## Basic-movement review (review-basic-movements.mjs, provisional, not in test suite)
+
+- Scope: balance, floor contact, joint continuity across consecutive basic blends, stationary transitions. Fourth-position spacing is unset and not scored.
+- Floor reference: standing flat-foot ankle height in first position (0.010 body units). Contact tolerance 2 mm. Balance uses pelvis x and z = 0 against the support base with an assumed half foot width 0.05 and the same heel/toe allowance as the spacing solver (provisional).
+- Continuity: largest joint move per sample step, flagged above 0.03 body units (a review threshold, not a ballet claim). All 12 basic blends pass (largest 9.3 mm, releve to arabesque).
+- Stationary transitions (same station): 0 mm target shortfall for first→second, second→third, fifth→first, plié→relevé.
+- Failing (not hidden, not threshold-raised):
+  - Contact, support foot above floor reference: second 28 mm; fourth 45/49 mm; fifth 3 mm (one foot); plié 15 mm; chassé 40 mm; pas de bourrée 29 mm.
+  - Balance, centre outside support base: fourth −9 mm; tendu −9 mm; chassé −194 mm; pas de bourrée −74 mm. Arabesque, attitude and pirouette sit on the edge (0 mm margin).
+- Plié contact note: the plié preview uses a 0.025 flat-foot height, which differs from the 0.010 first-position reference by 15 mm. The two conventions need reconciling.
+- Not decided: whether second and fourth should sink or change their leg geometry to put the feet on the floor. That changes established stationary positions, so it needs the user's direction.
