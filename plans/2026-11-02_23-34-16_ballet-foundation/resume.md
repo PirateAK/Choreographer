@@ -32,6 +32,15 @@ Findings:
 
 Proposed order: (a) add shared `evaluateMovement` in model.js, (b) switch elevation, house, overhead, legOverreach to it with a test that the four agree on shortfall/feet at sampled times, (c) then leg-length/ankle articulation, arabesque rear depth, per-dancer height.
 
+## Status: shared movement evaluation (2026-11-03)
+- Added `evaluateMovement(show, dancer, lt)` in model.js: pose, rise+absorb spec, footPins, blended lift. Used by overheadPoseAtLocal, legOverreach, elevation drawDancer, house drawDancer.
+- House now passes real pins (feet held) and blended lift (was start level only). Overhead reach now includes rise and plié absorption.
+- Import map: model trajectory6, house slides10, elevation move1 (new entry).
+- New test `test-movement-views.mjs`: pins/rise/lift agreement, overhead reach vs shared spec. Discriminating case: 17 unreachable samples agree; dropping rise/absorb changes one verdict.
+- Full engine suite (13 tests) passes; `git diff --check` clean; browser smoke loads with no page errors (House view not opened by smoke).
+- Watch: overhead can now show new red X where rise/absorb shorten the leg. This is the honest result, not a threshold change. Review existing shows before calling it done.
+- Not done: House render path not exercised in browser; leg-length (rise/2 per leg) still open (Phase 2).
+
 ## Guardrails (from plan.md and guidelines.md)
 - Do not move user stations or rewrite existing choreography silently.
 - Keep warnings honest; do not raise thresholds to hide them.

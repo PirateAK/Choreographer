@@ -3207,16 +3207,26 @@ export function feetOnFloor(show, dancer, lt) {
   return out;
 }
 
+// One evaluated movement state for every view. The pose blend, the level's rise and the plié
+// absorption all go into the leg's spec here, so the elevation, House, overhead and the reach
+// warning read the same leg length at the same moment. `lift` is the blended height of the feet
+// off the deck in metres (a jump), not the start level's.
+export function evaluateMovement(show, dancer, lt) {
+  const at = poseAtLocal(dancer, lt);
+  const h = dancerHeight(show);
+  const lvl = levelBlend(at.level, at.nextLevel, at.levelT);
+  const posed = blendSpecs(specOf(at.pose), specOf(at.next), at.t);
+  const spec = { ...posed, rise: (posed.rise || 0) + lvl.rise - lvl.absorb / h };
+  const pins = footPins(show, dancer, lt);
+  return { at, h, lvl, spec, pins, lift: lvl.lift };
+}
+
 // Overhead geometry keeps solved ankles distinct from requested contacts.
-// Preserve the current pose/rise assumptions for this bounded rendering correction.
 export function overheadPoseAtLocal(show, dancer, lt) {
   const origin = posAtLocal(dancer, lt);
   if (!origin) return null;
-  const at = poseAtLocal(dancer, lt);
-  const spec = blendSpecs(specOf(at.pose), specOf(at.next), at.t);
-  const h = dancerHeight(show);
+  const { at, h, spec, pins: contacts } = evaluateMovement(show, dancer, lt);
   const frame = contactFrame(origin, h, at.facing, at.turn);
-  const contacts = footPins(show, dancer, lt);
   const pins = contacts && Object.fromEntries(Object.entries(contacts).map(([side, pin]) => {
     const [x, y, z] = frame.toLocal({ x: pin.sx, y: pin.sy, h: pin.y * h });
     return [side, { ...pin, x, y, z }];
@@ -3276,13 +3286,8 @@ export function legOverreach(show, dancer, i) {
   const steps = 16;
   for (let s = 0; s <= steps; s++) {
     const lt = a.t + ((b.t - a.t) * s) / steps;
-    const pins = footPins(show, dancer, lt);
+    const { at, spec, pins } = evaluateMovement(show, dancer, lt);
     if (!pins) continue;
-    const at = poseAtLocal(dancer, lt);
-    const lvl = levelBlend(at.level, at.nextLevel, at.levelT);
-    // The height the leg is actually asked for: a rise lengthens it, a landing's plié shortens it.
-    const posed = blendSpecs(specOf(at.pose), specOf(at.next), at.t);
-    const spec = { ...posed, rise: (posed.rise || 0) + lvl.rise - lvl.absorb / h };
     const j = joints(spec, at.facing, at.turn, pins);
     const body = posAtLocal(dancer, lt);
     for (const side of ['left', 'right']) {

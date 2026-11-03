@@ -2,10 +2,10 @@
 // answers "where", this answers "how high, and can the audience see it".
 import {
   THEME, state, posOfContent, propPosOfContent, objectShown, sceneryStateAt,
-  clothSpan, clothX, clothDepth, curtainLegW, lightLevelAt, lightSpot, costumeOf, poseOfContent, levelBlend,
-  footPins, localOfContent,
+  clothSpan, clothX, clothDepth, curtainLegW, lightLevelAt, lightSpot, costumeOf, evaluateMovement,
+  localOfContent,
 } from './model.js';
-import { specOf, blendSpecs, drawPose, darker } from './pose.js';
+import { drawPose, darker } from './pose.js';
 
 // The opening and dancer heights are stage settings; each curtain and drop carries
 // its own height, so a border can hang at 3 m beside an 8 m backdrop.
@@ -414,13 +414,10 @@ export class ElevationView {
 
     // The position the station carries, eased towards the next one: this is what turns
     // a marker sliding across the stage into a dancer doing fifth, then arabesque.
-    const at = poseOfContent(state.show, d, state.ui.playhead);
+    const { at, lvl, spec, pins } = evaluateMovement(state.show, d, localOfContent(state.show, d.id, state.ui.playhead));
     // The feet she is standing on, so the drawing can bend her legs over them instead of letting the
-    // position drag them across the floor.
-    const pins = footPins(state.show, d, localOfContent(state.show, d.id, state.ui.playhead));
-    // How the feet meet the floor, from the levels at either end of the leg: a rise makes
-    // the body taller, a height lifts it clear of the deck.
-    const lvl = levelBlend(at.level, at.nextLevel, at.levelT);
+    // position drag them across the floor. How the feet meet the floor comes from the same evaluated
+    // state the overhead and reach warning read.
     const air = lvl.lift * s;
 
     // Shadow on the floor: it reads as "standing here" rather than floating — and a jump
@@ -441,11 +438,7 @@ export class ElevationView {
 
     // The pose, plus the rise the level adds: the same joints, standing taller. A jump's
     // height is not in the body at all, so it moves the whole figure up from the feet.
-    // A plié is the body lower on the same feet: the rise comes down, which shortens the legs
-    // and drops the hips, exactly as standing higher does the opposite. The drop is in metres
-    // and the rise in body heights, so the dancer's own height converts it.
-    const posed = blendSpecs(specOf(at.pose), specOf(at.next), at.t);
-    const spec = { ...posed, rise: (posed.rise || 0) + lvl.rise - lvl.absorb / height };
+    // The spec is the shared evaluated one (pose, rise, plié) from evaluateMovement.
     const box = drawPose(ctx, {
       spec,
       x: feet.x,

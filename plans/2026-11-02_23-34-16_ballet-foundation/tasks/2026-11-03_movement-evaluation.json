@@ -1,0 +1,32 @@
+[
+  {
+    "id": "mv-1",
+    "content": "[mv-1] Add shared evaluateMovement in model.js (pose, rise/absorb spec, pins, lift)",
+    "status": "in_progress"
+  },
+  {
+    "id": "mv-2",
+    "content": "[mv-2] Route overheadPoseAtLocal and legOverreach through evaluateMovement",
+    "status": "pending"
+  },
+  {
+    "id": "mv-3",
+    "content": "[mv-3] Route elevation drawDancer and house drawDancer through evaluateMovement; bump import-map versions",
+    "status": "pending"
+  },
+  {
+    "id": "mv-4",
+    "content": "[mv-4] Add test-movement-views.mjs asserting overhead/elevation/legOverreach reach agree at sampled times",
+    "status": "pending"
+  },
+  {
+    "id": "mv-5",
+    "content": "[mv-5] Run full engine suite, syntax checks, git diff --check, browser smoke",
+    "status": "pending"
+  },
+  {
+    "id": "mv-6",
+    "content": "[mv-6] Commit verified checkpoint and update resume.md",
+    "status": "pending"
+  }
+]

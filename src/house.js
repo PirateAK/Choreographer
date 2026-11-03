@@ -1,10 +1,10 @@
 // Audience-facing theatre view. Stage metres are projected into a shallow floor
 // perspective; all drawing stays on the supplied canvas.
 import {
-  sceneryStateAt, posOfContent, poseOfContent, localOfContent, feetOnFloor,
+  sceneryStateAt, posOfContent, evaluateMovement, localOfContent, feetOnFloor,
   propPosOfContent, objectShown, costumeOf, dancerHeight, clothDepth,
 } from './model.js';
-import { specOf, blendSpecs, drawPose, darker } from './pose.js';
+import { drawPose, darker } from './pose.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const num = (v, fallback) => Number.isFinite(Number(v)) ? Number(v) : fallback;
@@ -135,8 +135,8 @@ export class HouseView {
     }
     dancers.sort((a, b) => b.p.y - a.p.y);
     for (const { d, p } of dancers) {
-      const at = poseOfContent(show, d, contentTimeMs);
-      if (!at) continue;
+      const ev = evaluateMovement(show, d, localOfContent(show, d.id, contentTimeMs));
+      const at = ev.at;
       const local = localOfContent(show, d.id, contentTimeMs);
       const feet = feetOnFloor(show, d, local) || {};
       const contacts = Object.values(feet).filter((f) => f && Number.isFinite(f.x));
@@ -144,8 +144,7 @@ export class HouseView {
       const groundX = xAt(cx, p.y);
       const groundY = floorAt(p.y);
       const s = zScale(p.y);
-      const levelLift = at.level && at.level.lift ? at.level.lift : 0;
-      const air = Number.isFinite(levelLift) ? levelLift : 0;
+      const air = ev.lift;
       ctx.fillStyle = 'rgba(0,0,0,.28)';
       ctx.beginPath();
       ctx.ellipse(groundX, groundY, Math.max(3, dancerH * s * 0.16), Math.max(1.5, s * 0.035), 0, 0, Math.PI * 2);
@@ -154,13 +153,10 @@ export class HouseView {
       const body = costume && costume.body || d.color || '#f0d4b8';
       const hair = costume && costume.hair || darker(body, 0.42);
       const skirt = costume && costume.skirt ? { style: costume.skirt, color: costume.skirtColor || body } : null;
-      const posed = { ...blendSpecs(specOf(at.pose), specOf(at.next), at.t) };
-      const lvlRise = at.level && at.nextLevel ? ((at.level.rise || 0) + ((at.nextLevel.rise || 0) - (at.level.rise || 0)) * (at.levelT || 0)) : 0;
-      posed.rise = (posed.rise || 0) + lvlRise;
       drawPose(ctx, {
-        spec: posed, x: xAt(p.x, p.y), y: groundY - air * s, h: dancerH * s,
+        spec: ev.spec, x: xAt(p.x, p.y), y: groundY - (Number.isFinite(air) ? air : 0) * s, h: dancerH * s,
         facing: at.facing || 1, turn: at.turn || 0, headTurn: at.headTurn || at.turn || 0,
-        body, hair, skirt, pins: null,
+        body, hair, skirt, pins: ev.pins,
       });
     }
 
