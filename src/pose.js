@@ -153,14 +153,15 @@ const STEP_SINK_MAX = Math.abs(POSE_SPECS.plie.rise);
 // are planted, because the weight is then between them and the hips stay square.
 function weightOf(pins) {
   if (!pins) return { leg: null, w: 0 };
-  // Two contacts share the weight by how firmly each is held, so the hips leave square gradually as
-  // one foot lets go instead of snapping across when its hold finally reaches zero.
+  // Pin strength (`w`) controls where the ankle is solved; optional `load` controls support
+  // independently. Legacy pins omit load and retain their previous w-based behavior.
+  const carried = (pin) => (Number.isFinite(pin.load) ? Math.max(0, Math.min(1, pin.load)) : pin.w);
   if (pins.left && pins.right) {
-    const d = pins.left.w - pins.right.w;
+    const d = carried(pins.left) - carried(pins.right);
     return Math.abs(d) < 1e-9 ? { leg: null, w: 0 } : { leg: d > 0 ? 0 : 1, w: Math.abs(d) };
   }
-  if (pins.left) return { leg: 0, w: pins.left.w };
-  if (pins.right) return { leg: 1, w: pins.right.w };
+  if (pins.left) return { leg: 0, w: carried(pins.left) };
+  if (pins.right) return { leg: 1, w: carried(pins.right) };
   return { leg: null, w: 0 };
 }
 
