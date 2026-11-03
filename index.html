@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Choreographer</title>
-<link rel="stylesheet" href="styles.css?v=scroll21" />
+<link rel="stylesheet" href="styles.css?v=scroll22" />
 </head>
 <body>
 <header>
@@ -14,6 +14,7 @@
   <button id="btnUndo" class="ghost" title="Undo (Ctrl+Z)">Undo</button>
   <button id="btnRedo" class="ghost" title="Redo (Ctrl+Shift+Z)">Redo</button>
   <button id="btnMoves" class="ghost" title="The movement cheat sheet: every position, step and level, drawn and moving — click one to put it on the point being edited">Moves</button>
+  <button id="btnSchool" class="ghost" title="School conventions: the values a school or teacher sets for each position. Defaults are the current best case; a school value is applied where the solver reads it">School</button>
   <button id="btnSave" class="ghost" title="Save the whole show: writes the browser's copy first, then a JSON file you choose">Save</button>
   <button id="btnReload" class="ghost" title="Reload a show from a JSON file">Reload</button>
   <button id="btnClear" class="ghost" title="Clear the stage for a new show — keeps dancers, costumes, props, cloth, lanterns, music, voice and every setting. Undo brings it back">Clear</button>
@@ -245,14 +246,27 @@
   </div>
 </div>
 
+<div id="schoolSheet" class="moves-sheet" hidden>
+  <div class="moves-panel school-panel" role="dialog" aria-modal="true" aria-labelledby="schoolTitle">
+    <header class="moves-head">
+      <h2 id="schoolTitle">School conventions</h2>
+      <span class="moves-where">Defaults are the current best case. Enter the school's value to change a position; clear it to return to the default.</span>
+      <button id="btnSchoolClose" class="ghost">Close</button>
+    </header>
+    <div id="schoolBody" class="moves-body school-body"></div>
+    <p class="hint">Applied rows change the drawing now. Recorded rows are the school's words for a position the solver does not read yet; they wait until that position is re-solved, and the table does not pretend otherwise.</p>
+  </div>
+</div>
+
 <script type="importmap">
 {"imports": {
-  "./src/app.js": "./src/app.js?v=scroll21",
+  "./src/app.js": "./src/app.js?v=scroll22",
   "./src/stage.js": "./src/stage.js?v=guide20",
-  "./src/cheatsheet.js": "./src/cheatsheet.js?v=guide21",
+  "./src/cheatsheet.js": "./src/cheatsheet.js?v=guide22",
   "./src/placement-guide.js": "./src/placement-guide.js?v=guide20",
-  "./src/pose.js": "./src/pose.js?v=load4",
-  "./src/model.js": "./src/model.js?v=trajectory8",
+  "./src/pose.js": "./src/pose.js?v=load5",
+  "./src/model.js": "./src/model.js?v=trajectory9",
+  "./src/conventions.js": "./src/conventions.js?v=conv1",
   "./src/elevation.js": "./src/elevation.js?v=move1",
   "./src/contact-frame.js": "./src/contact-frame.js?v=contacts17",
   "./src/timeline.js": "./src/timeline.js?v=slides-on10",

@@ -724,3 +724,24 @@ body.watch #stage { cursor: default; }
 ::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-thumb { background: #253141; border-radius: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* School conventions: the table of values a school sets for each position. */
+.school-panel { width: min(1100px, calc(100vw - 48px)); }
+.school-body { padding-bottom: 6px; }
+.school-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.school-table th {
+  text-align: left; padding: 8px 10px; font-size: 10px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--dim); font-weight: 600; border-bottom: 1px solid var(--line);
+}
+.school-table td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.school-table strong { color: var(--text); font-weight: 600; }
+.school-table small { color: var(--dim); font-size: 11px; line-height: 1.4; }
+.school-note { color: var(--dim); line-height: 1.45; max-width: 340px; }
+.school-default { color: var(--dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.school-table input { width: 130px; font-variant-numeric: tabular-nums; }
+.school-table input[type="text"] { width: 200px; }
+.school-row.set td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+.school-msg { color: var(--danger); font-size: 11px; margin-top: 4px; min-height: 0; }
+.school-status { color: var(--dim); white-space: nowrap; }
+.school-row.set .school-status { color: var(--accent); }
+.school-status button { margin-top: 6px; }

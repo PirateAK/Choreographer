@@ -107,3 +107,13 @@ Proposed order: (a) add shared `evaluateMovement` in model.js, (b) switch elevat
 
 ### Not started
 - Per-dancer height settings. Only start after the moves above are confirmed for height. `dancerHeight(show)` is still global.
+
+## Status: school conventions table (2026-11-03)
+- New `src/conventions.js`: one table of school-set values. Each row has the built-in default (the best case now), unit, anatomical reference, note, and `applied`. Overrides are stored in browser storage under `choreographer.conventions.v1`, never in show files. Invalid values are refused with a reason, not clamped.
+- Applied now (the pose and levels read the school value): releve, pirouette, arabesque, attitude, pas de bourrée rise; level demi and pointe (model.js and cheatsheet.js). `specOf` returns a copy only when a school value is set, so defaults are the shared table as before.
+- Recorded, not applied (the solver does not read them yet): plié depth, arabesque elevation, attitude knee height, fourth-position geometry. The table says "Recorded, not applied yet" for these rows.
+- UI: "School" button in the header opens the table sheet (same overlay as Moves). Enter a value to apply; Reset returns a row to the default; Esc or click outside closes.
+- Note for the teacher: the earlier note listed relevé ball-of-foot height as 0.010 (HEAD). Current code uses 0.03 (set during the ankle work). The table uses 0.03; confirm which the school wants.
+- Import map: pose load5, model trajectory9, cheatsheet guide22, conventions conv1, app scroll22 (styles.css scroll22).
+- Verified: 15 engine tests incl. test-conventions.mjs (defaults equal code, override reaches specOf and contact stays on ball-of-foot, refusals, reset); syntax; `git diff --check`; browser check of the sheet (rows, save, reset, refusal, Esc) with no page errors besides the pre-existing favicon 404.
+- Next: wire the recorded rows into the solver as the school supplies values (plié depth needs a re-solve of the sink and shin; arabesque/attitude height needs the working-leg angle solve; fourth needs a geometry definition).

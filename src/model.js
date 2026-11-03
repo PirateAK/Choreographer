@@ -4,6 +4,7 @@
 // that a contact is measured from the same table the figures are drawn from.
 import { PLANT_BY_POSE, feetPlaceOf, joints, specOf, blendSpecs } from './pose.js';
 import { contactFrame } from './contact-frame.js';
+import { conventionValue } from './conventions.js';
 import { sampleFootTrajectory, validateFootTrajectory } from './foot-trajectory.js';
 import { compileFootSchedule } from './foot-scheduler.js';
 
@@ -78,7 +79,12 @@ export const LEVEL_LABEL = Object.fromEntries(LEVELS);
 // legs and lifts the hips, which is what standing higher actually is. A half, then full
 // point for a 1.7 m dancer is about 3 cm and 8 cm. Fractions of the dancer's height, so a
 // small dancer rises a small amount.
-const LEVEL_RISE = { flat: 0, demi: 0.03, pointe: 0.06, air: 0 };
+// Level rises come from the school conventions table; the defaults there are these values.
+function levelRise(name) {
+  if (name === 'demi') return conventionValue('level.demi');
+  if (name === 'pointe') return conventionValue('level.pointe');
+  return 0;
+}
 // A jump clears the deck rather than stretching upwards, so it is a height in metres. A
 // grand jeté's apex is around a third of a metre; a small sauté can be typed in smaller.
 export const AIR_LIFT = 0.35;
@@ -104,7 +110,7 @@ function baseLevel(key) {
   const typed = Number(key && key.lift);
   const has = Number.isFinite(typed) && typed > 0;
   const lift = name === 'air' ? (has ? Math.min(LIFT_MAX, typed) : AIR_LIFT) : has ? Math.min(LIFT_MAX, typed) : 0;
-  return { name, rise: LEVEL_RISE[name] || 0, lift };
+  return { name, rise: levelRise(name), lift };
 }
 
 // A station's level, including the landing it has to receive. `from` is the station the

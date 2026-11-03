@@ -9,6 +9,7 @@
 
 import { POSES, STEPS, LEVELS, THEME, AIR_LIFT, phraseShape, phraseOffsets, COUNT_EPS } from './model.js';
 import { specOf, blendSpecs, drawPose, darker } from './pose.js';
+import { conventionValue } from './conventions.js';
 
 /* --------------------------------------------------------- what is on the sheet */
 
@@ -138,7 +139,7 @@ function drawCell(cell, ms) {
     // for a jump. The dashed line is where the plain dancer's head reaches, which is what
     // makes a few centimetres legible at this size.
     const lv = cell.value;
-    const rise = lv === 'demi' ? 0.03 : lv === 'pointe' ? 0.06 : 0;
+    const rise = lv === 'demi' ? conventionValue('level.demi') : lv === 'pointe' ? conventionValue('level.pointe') : 0;
     const lift = lv === 'air' ? 0.35 : 0;
     const t = smooth(0.5 - 0.5 * Math.cos(p * Math.PI * 2));
     const spec = { ...specOf('none'), rise: rise * t };

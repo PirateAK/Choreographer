@@ -23,6 +23,7 @@ import {
 } from './model.js';
 import { StageView } from './stage.js';
 import { MoveSheet } from './cheatsheet.js';
+import { conventionRows, setConvention, resetConvention } from './conventions.js';
 import { ElevationView } from './elevation.js';
 import { Timeline, GUTTER } from './timeline.js';
 import { CompanyLine } from './company.js';
@@ -3247,7 +3248,113 @@ function fitViews() {
   center.style.gridTemplateRows = `${tabsH}px ${scenesH}px ${stageH}px minmax(0, 1fr)`;
 }
 
+/* ------------------------------------------------------- school conventions */
+
+// One row per convention. The school's entry is applied on change; clearing it returns the row to
+// the default. A row the solver does not read yet says so, rather than looking like it works.
+function openSchool() {
+  paintSchool();
+  $('schoolSheet').hidden = false;
+  $('btnSchoolClose').focus();
+}
+
+function closeSchool() {
+  $('schoolSheet').hidden = true;
+}
+
+function paintSchool() {
+  const body = $('schoolBody');
+  body.replaceChildren();
+  const table = document.createElement('table');
+  table.className = 'school-table';
+  const head = table.createTHead().insertRow();
+  for (const label of ['Position', 'Convention', 'Default', 'School value', 'Status']) {
+    const th = document.createElement('th');
+    th.textContent = label;
+    head.appendChild(th);
+  }
+  const tbody = table.createTBody();
+  for (const row of conventionRows()) {
+    const tr = tbody.insertRow();
+    tr.className = row.source === 'school' ? 'school-row set' : 'school-row';
+    const name = tr.insertCell();
+    const title = document.createElement('strong');
+    title.textContent = row.label;
+    const ref = document.createElement('small');
+    ref.textContent = `${row.unit} · ${row.reference}`;
+    name.append(title, document.createElement('br'), ref);
+
+    const note = tr.insertCell();
+    note.className = 'school-note';
+    note.textContent = row.note;
+
+    const def = tr.insertCell();
+    def.className = 'school-default';
+    def.textContent = String(row.defaultValue);
+
+    const cell = tr.insertCell();
+    const input = document.createElement('input');
+    input.setAttribute('aria-label', `School value: ${row.label}`);
+    if (row.kind === 'rise') {
+      input.type = 'number';
+      input.step = '0.005';
+      input.min = String(row.min);
+      input.max = String(row.max);
+      input.placeholder = String(row.defaultValue);
+      input.value = row.source === 'school' ? String(row.value) : '';
+    } else {
+      input.type = 'text';
+      input.maxLength = 500;
+      input.placeholder = row.defaultValue;
+      input.value = row.source === 'school' ? row.value : '';
+    }
+    const msg = document.createElement('div');
+    msg.className = 'school-msg';
+    input.addEventListener('change', () => {
+      const text = input.value.trim();
+      if (text === '') {
+        resetConvention(row.id);
+        msg.textContent = '';
+        // Repaint after the blur that fired this change has finished; repainting inside it removes
+        // the node the browser is still blurring.
+        setTimeout(afterSchoolChange, 0);
+        return;
+      }
+      const result = setConvention(row.id, text);
+      if (!result.ok) {
+        msg.textContent = result.reason;
+        input.focus();
+        return;
+      }
+      setTimeout(afterSchoolChange, 0);
+    });
+    cell.append(input, msg);
+
+    const status = tr.insertCell();
+    status.className = 'school-status';
+    const applied = row.applied;
+    status.textContent = applied ? 'Applied to the pose' : 'Recorded, not applied yet';
+    if (row.source === 'school') {
+      const reset = document.createElement('button');
+      reset.className = 'ghost';
+      reset.textContent = 'Reset';
+      reset.addEventListener('click', () => {
+        resetConvention(row.id);
+        afterSchoolChange();
+      });
+      status.append(document.createElement('br'), reset);
+    }
+  }
+  body.appendChild(table);
+}
+
+function afterSchoolChange() {
+  paintSchool();
+  render();
+}
+
 function render() {
+
   // The stage pane belongs to the act the playhead is in, so scrubbing across a
   // boundary puts that act's arrangement back.
   syncFoldsToAct();
@@ -4158,6 +4265,10 @@ function boot() {
 
   $('btnMoves').addEventListener('click', () => app.openMoves());
   $('btnMovesClose').addEventListener('click', () => moves && moves.close());
+  $('btnSchool').addEventListener('click', openSchool);
+  $('btnSchoolClose').addEventListener('click', closeSchool);
+  $('schoolSheet').addEventListener('click', (e) => { if (e.target === $('schoolSheet')) closeSchool(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('schoolSheet').hidden) closeSchool(); });
   // The sheet is a layer over the stage, so clicking past it closes it and clicking inside
   // it does not.
   $('movesSheet').addEventListener('pointerdown', (e) => {

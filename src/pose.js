@@ -1,3 +1,5 @@
+import { riseFor } from './conventions.js';
+
 // Ballet positions, drawn as a jointed figure rather than a symbol. A station has
 // always carried a position — first, arabesque, pirouette — but nothing drew it, so a
 // dancer looked the same standing in fifth as in a split. Here the position is geometry:
@@ -76,8 +78,12 @@ export const POSE_SPECS = {
   chasse: { arms: [[55, 50], [55, 50]], legs: [[25, 20], [-25, -15]], lean: 6, rise: 0, rock: 5 },
 };
 
+// The school's rise for a position replaces the built-in one when a school has set it (see
+// conventions.js). Without an override the shared table entry is returned, as before.
 export function specOf(id) {
-  return POSE_SPECS[id] || NEUTRAL;
+  const base = POSE_SPECS[id] || NEUTRAL;
+  const rise = riseFor(id);
+  return rise === undefined || rise === base.rise ? base : { ...base, rise };
 }
 
 // Which foot carries the weight in each position, read off the angle table rather than
