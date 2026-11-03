@@ -91,16 +91,16 @@ export const CONVENTIONS = [
     school_method: 'Unset. Not inferred from the knee bend angle, which describes a different part of the pose.',
   },
   {
-    id: 'fourth.turnout', kind: 'measure', applied: false, value: null, min: 0, max: 180, status: 'unset',
+    id: 'fourth.turnout', kind: 'measure', applied: true, value: null, min: 0, max: 180, status: 'unset',
     label: 'Fourth position turnout', unit: 'degrees',
     measurement_reference: 'angle of each foot from the line of travel; 0 = parallel',
-    school_method: 'Unset. Turnout is not universally fixed across systems.',
+    school_method: 'Unset. Turnout is not universally fixed across systems. When entered, the solver turns each leg about its hip by this angle and the foot follows (knee-over-toe alignment not modelled).',
   },
   {
     id: 'fourth.spacing', kind: 'measure', applied: false, value: null, min: 0, max: 1, status: 'unset',
     label: 'Fourth position front-to-back spacing', unit: 'body height (1 = dancer height)',
     measurement_reference: 'distance from the heel of the front foot to the toe of the back foot, front-to-back',
-    school_method: 'Unset. Spacing is not universally fixed across systems.',
+    school_method: 'Unset. Spacing is not universally fixed across systems. Recorded only: the measure is heel-to-toe, which needs a foot length the solver does not have yet.',
   },
   {
     id: 'fourth.feet', kind: 'note', applied: false, value: 'Crossed, turned out (preview preset)', status: 'provisional',

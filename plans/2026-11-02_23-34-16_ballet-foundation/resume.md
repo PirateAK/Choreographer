@@ -157,3 +157,13 @@ Proposed order: (a) add shared `evaluateMovement` in model.js, (b) switch elevat
 - Arm set and standing leg are unchanged. The arm set stays a provisional note, recorded, not applied.
 - Limit: a school arabesque may not match the 90° horizontal line. Elevation is a provisional target only.
 - Verified: test-arabesque-elevation.mjs, test-conventions.mjs (elevation provisional-in-use, arms recorded-only), full engine suite, syntax, `git diff --check`, School smoke.
+
+## Fourth position turnout (load8, conv6)
+
+- `fourth.turnout` is applied when entered. Unset (default) draws the existing preset unchanged.
+- Entered turnout turns each leg about its own hip by that angle, outward for both feet. The foot follows; bone lengths are unchanged (verified 0–180° in 1° steps). Contacts follow the turned ankles through feetPlaceOf.
+- Limit: knee-over-toe alignment is not modelled. The toe drawn from the ankle does not yet rotate in plan view; the toe segment stays as drawn.
+- `fourth.spacing` stays recorded only. Its measure is heel-to-toe, which needs a foot length the solver does not have. Needs a school value for foot length.
+- `fourth.feet` (crossed, turned-out) stays a provisional text preset. Its "turned out" label is not drawn until a turnout value is entered.
+- Blends carry `turnout` when either end sets it (blendSpecs). Blends without turnout are unchanged.
+- Verified: test-fourth-turnout.mjs, test-conventions.mjs, full engine suite, syntax, `git diff --check`, School smoke.

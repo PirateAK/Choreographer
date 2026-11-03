@@ -124,6 +124,11 @@ export function specOf(id) {
     const elevation = conventionValue('arabesque.elevation');
     if (typeof elevation === 'number' && elevation !== ARABESQUE_BASELINE_ELEVATION) shaped = arabesqueSpec(elevation) || base;
   }
+  if (id === 'fourth') {
+    // Unset turnout leaves the preset as drawn; an entered value turns each leg out by that angle.
+    const turnout = conventionValue('fourth.turnout');
+    if (typeof turnout === 'number') shaped = { ...base, turnout };
+  }
   const rise = riseFor(id);
   return rise === undefined || rise === shaped.rise ? shaped : { ...shaped, rise };
 }
@@ -181,6 +186,7 @@ export function blendSpecs(a, b, t) {
     lean: lerp(a.lean, b.lean, t),
     rise: lerp(a.rise || 0, b.rise || 0, t),
     rock: lerp(a.rock || 0, b.rock || 0, t),
+    ...(a.turnout || b.turnout ? { turnout: lerp(a.turnout || 0, b.turnout || 0, t) } : {}),
   };
 }
 
@@ -291,9 +297,22 @@ export function joints(spec, facing = 1, turn = 0, pins = null) {
     const flat = leg * Math.cos(swing);
     const flatShin = leg * Math.cos(shinSwing);
     const [kx, ky] = reach(hip, flat, side);
-    const kneePoint = [base[0] + kx, base[1] + ky, base[2] + Math.sin(swing) * leg];
+    const K0 = [base[0] + kx, base[1] + ky, base[2] + Math.sin(swing) * leg];
     const [ax, ay] = reach(knee, flatShin, side);
-    const ankle = [kneePoint[0] + ax, kneePoint[1] + ay, kneePoint[2] + Math.sin(shinSwing) * leg];
+    const A0 = [K0[0] + ax, K0[1] + ay, K0[2] + Math.sin(shinSwing) * leg];
+    // Turnout: each leg turns about its own hip (vertical axis), outward for both sides, bones unchanged.
+    // Measured in a frame where both legs mirror onto the same side, so one sign serves both feet.
+    const yaw = (Number(spec.turnout) || 0) * Math.PI / 180;
+    const cy = Math.cos(yaw);
+    const sy = Math.sin(yaw);
+    const yawTo = (p) => {
+      if (!yaw) return p;
+      const dx = (p[0] - base[0]) * side;
+      const dz = p[2] - base[2];
+      return [base[0] + (dx * cy + dz * sy) * side, p[1], base[2] + dz * cy - dx * sy];
+    };
+    const kneePoint = yawTo(K0);
+    const ankle = yawTo(A0);
     return [base, tip(base, kneePoint), tip(base, ankle)];
   };
 
