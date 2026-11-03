@@ -67,10 +67,10 @@ export const CONVENTIONS = [
     school_method: 'Pending the syllabus. Confirm value and whether demi-pointe or pointe.',
   },
   {
-    id: 'plie.depth', kind: 'measure', applied: true, value: 42.68, min: 15, max: 90, status: 'provisional',
+    id: 'plie.depth', kind: 'measure', applied: true, value: 42.68, min: 17.9, max: 90, status: 'provisional',
     label: 'Plié hip depth (preview target)', unit: 'degrees from vertical',
     measurement_reference: 'thigh angle from vertical at the hip, hip joint to knee; thigh-to-floor = 90 − value',
-    school_method: 'Preview target. 42.68 is the current contact-constrained baseline, not a school depth. The solver re-solves knee and body sink to keep flat feet on the floor. Below 15° the body would rise past the floor-contact rule, so the minimum is 15.',
+    school_method: 'Preview target. 42.68 is the current contact-constrained baseline, not a school depth. The solver re-solves knee and body sink to keep flat feet on the floor. Below about 17.9° the solved body would lift the ankles onto the ball of the foot, so the minimum is 17.9 (the flat-foot limit is 17.86).',
   },
   {
     id: 'arabesque.elevation', kind: 'measure', applied: false, value: 90, min: 0, max: 180, status: 'provisional',

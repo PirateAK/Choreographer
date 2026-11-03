@@ -138,8 +138,8 @@ Proposed order: (a) add shared `evaluateMovement` in model.js, (b) switch elevat
 ## Preview re-solve and approvals (conv3)
 
 - Storage moved to `choreographer.conventions.v2` with `{values, approvals, approver}`. v1 overrides are not migrated (dev data only).
-- Plié: `plie.depth` default is 42.68°, the contact-constrained baseline from the closed form (not a demi target). Status provisional. `plieSpec(depth)` (pose.js) re-solves shin angle and body sink to keep ankles at x 0.089 / y 0.025. Accepted range 15–90; 0 gives a positive rise, which triggers the ball-of-foot convention, so it is refused. Baseline `specOf('plie')` returns the shared spec unchanged.
-- Limit: `STEP_SINK_MAX` is still tied to the baseline plié rise. Deeper preview depths sink past that cap; the cap is not yet derived from the depth.
+- Plié: `plie.depth` default is 42.68°, the contact-constrained baseline from the closed form (not a demi target). Status provisional. `plieSpec(depth)` (pose.js) re-solves shin angle and body sink to keep ankles at x 0.089 / y 0.025. Accepted range 17.9–90. The flat-foot limit is 17.86°: below it the solved rise turns positive and lifts the ankle onto the ball of the foot, so the table refuses it. Baseline `specOf('plie')` returns the shared spec unchanged.
+- Limit: `STEP_SINK_MAX` stays tied to the table's baseline plié rise (not the preview depth). It caps contact compensation in travelling steps. Tying it to a deeper preview would raise the travel allowance, so it is left as is until the school decides.
 - Arabesque 90° is kept as an optional provisional target; arm set is a provisional note. Not school-approved. Elevation is recorded, not read by the solver.
 - Attitude knee height stays unset. Solver does not infer it.
 - Fourth position: crossed, turned-out preset is provisional (text, not read). Turnout, spacing, and foot orientation remain unset or unapproved.
