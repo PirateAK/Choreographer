@@ -1,0 +1,17 @@
+[
+  {
+    "id": "range",
+    "content": "[placement-1] delegate — Draft height/time-scaled distance bands and deterministic tests passed.",
+    "status": "completed"
+  },
+  {
+    "id": "ui",
+    "content": "[placement-2] self — Moves → Next station and tilt-aware draft shaded guide implemented; existing choreography untouched.",
+    "status": "completed"
+  },
+  {
+    "id": "verify",
+    "content": "[placement-3] self — Geometry/media regressions, browser guide placement/cancellation, syntax and independent review passed; context updated.",
+    "status": "completed"
+  }
+]

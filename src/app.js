@@ -95,6 +95,10 @@ const app = {
     // else cancels it rather than putting it on whoever happens to be picked next.
     state.ui.phraseArmed = null;
     if (state.ui.selectedId !== id) {
+      if (state.ui.stationGuide) {
+        state.ui.stationGuide = null;
+        state.ui.placingStations = false;
+      }
       state.ui.stationIdx = null;
       // A picked cue belongs to one piece of scenery; focusing something else
       // must not leave it looking edited.
@@ -220,6 +224,19 @@ const app = {
       moves.say(`${d.name} has no path yet — press + Stations and click the stage for a first point`);
       return;
     }
+    if (opts.station) {
+      state.ui.phraseArmed = null;
+      state.ui.stationGuide = {
+        id: d.id, step: opts.step || 'walk', pose: opts.pose || 'none', level: opts.level || 'flat',
+        durationMs: Math.max(1, Number(opts.counts) || 1) * countGrid(state.show).count,
+      };
+      state.ui.placingStations = true;
+      if (state.ui.playing) pause();
+      moves.close();
+      state.ui.hint = `Click the stage for ${d.name}'s next station · draft distance bands, not technique limits · Esc cancels`;
+      state.ui.dirtyPanels = true;
+      return;
+    }
     // "On the ruler" hands the placement to the timeline: the sheet closes and the next click on
     // a count puts the phrase there, so its counts divide from that count instead of from the end
     // of her path.
@@ -263,6 +280,8 @@ const app = {
   // is the music, and a panel over the stage is in the way of it. What was chosen is kept whole
   // — step, position, level and counts — because the sheet is closed by the time it is used.
   armPhrase(d, opts) {
+    state.ui.stationGuide = null;
+    state.ui.placingStations = false;
     const step = opts.step || 'chasse';
     const label = (STEP_LABEL[step] || step).toLowerCase();
     state.ui.phraseArmed = {
@@ -4086,6 +4105,7 @@ function boot() {
   $('btnKey').addEventListener('click', addKeyAtPlayhead);
   $('btnPath').addEventListener('click', () => {
     state.ui.placingStations = !state.ui.placingStations;
+    state.ui.stationGuide = null;
     state.ui.dirtyPanels = true;
   });
   $('btnHold').addEventListener('click', addHold);
@@ -4121,7 +4141,13 @@ function boot() {
       return;
     }
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
-    if (e.key === 'Escape' && state.ui.phraseArmed) {
+    if (e.key === 'Escape' && state.ui.stationGuide) {
+      e.preventDefault();
+      state.ui.stationGuide = null;
+      state.ui.placingStations = false;
+      state.ui.hint = 'Next station cancelled';
+      app.rebuild();
+    } else if (e.key === 'Escape' && state.ui.phraseArmed) {
       e.preventDefault();
       state.ui.phraseArmed = null;
       state.ui.hint = 'Phrase cancelled';

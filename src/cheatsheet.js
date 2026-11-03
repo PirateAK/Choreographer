@@ -192,7 +192,8 @@ export class MoveSheet {
         <label>level${'<select id="phraseLevel">' + opts(LEVELS, 'flat') + '</select>'}</label>
         <label>counts<input id="phraseCounts" type="number" min="1" max="32" step="1" value="${phraseShape(step).counts}" title="How many counts of the music the whole phrase takes. Its stations divide them in the proportion the step is counted, and the show's tempo says how long a count is" /></label>
         <label>on the${'<select id="phraseSnap"><option value="1">count</option><option value="bar">bar</option><option value="0">path</option></select>'}</label>
-        <button id="btnPhrasePlace" class="primary">Place</button>
+        <button id="btnStationGuide" title="Choose the next station yourself on the stage, with a draft distance guide for this step, position and count duration">Next station…</button>
+        <button id="btnPhrasePlace" class="primary">Place phrase</button>
         <button id="btnPhrasePick" title="Take the start from the music instead of from the end of her path: the next double-click on the timeline ruler starts the phrase on that count">On the ruler...</button>
       </div>
       <p class="phrase-where" id="phraseWhere"></p>
@@ -256,6 +257,7 @@ export class MoveSheet {
         snap: snap === 'bar' ? 'bar' : Number(snap),
       };
     };
+    body.querySelector('#btnStationGuide').addEventListener('click', () => this.place({ ...phraseOpts(), station: true }));
     body.querySelector('#btnPhrasePlace').addEventListener('click', () => this.place(phraseOpts()));
     body.querySelector('#btnPhrasePick').addEventListener('click', () => this.place({ ...phraseOpts(), pick: true }));
   }

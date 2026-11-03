@@ -8,6 +8,7 @@ import {
   footAtLocal, footSkate, legOverreach, dancerHeight, overheadPoseAtLocal,
 } from './model.js';
 import { darker } from './pose.js';
+import { placementRange } from './placement-guide.js';
 
 // A lantern's colour at a given strength, so every pool and beam is drawn from
 // the same hex rather than from a hand-written rgba per place it appears.
@@ -154,6 +155,7 @@ export class StageView {
     // Lighting first: a pool is what is already on the floor before anyone
     // walks into it, so it goes under the scenery and the cast.
     this.drawLightPools();
+    this.drawPlacementGuide(floor);
 
     // proscenium
     const pr = this.w2s(-halfW - st.wingDepth, 0);
@@ -486,6 +488,52 @@ export class StageView {
       ctx.fillText(item.name, label.x, label.y - 5);
       ctx.textAlign = 'left';
     }
+  }
+
+  // A planning overlay only: floor distance, independent of grid and contact warnings.
+  drawPlacementGuide(floor) {
+    const guide = state.ui.stationGuide;
+    if (this.compact || state.ui.watch || !state.ui.placingStations || !guide || guide.id !== state.ui.selectedId) return;
+    const dancer = findObject(state.show, guide.id);
+    const origin = dancer && dancer.keys[dancer.keys.length - 1];
+    if (!origin) return;
+    const range = placementRange({ ...guide, height: dancerHeight(state.show) });
+    const ctx = this.ctx;
+    ctx.save();
+    if (range) {
+      ctx.beginPath();
+      ctx.rect(floor.x, floor.y, floor.w, floor.h);
+      ctx.clip();
+      const p = this.w2s(origin.x, origin.y);
+      const ellipse = (r) => ctx.ellipse(p.x, p.y, r * this.scale, r * this.scale * Math.cos(this.tiltAngle()), 0, 0, Math.PI * 2);
+      const band = (inner, outer, color) => {
+        ctx.beginPath(); ellipse(outer);
+        if (inner > 0) ellipse(inner);
+        ctx.fillStyle = color; ctx.fill('evenodd');
+      };
+      band(range.comfortableMax, range.stretchMax, 'rgba(232,188,108,.13)');
+      band(range.comfortableMin, range.comfortableMax, 'rgba(94,207,182,.25)');
+      ctx.strokeStyle = 'rgba(94,207,182,.8)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ellipse(range.comfortableMax); ctx.stroke();
+      ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(232,188,108,.8)';
+      ctx.beginPath(); ellipse(range.stretchMax); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = '#daeee8'; ctx.beginPath();
+      ctx.moveTo(p.x - 4, p.y); ctx.lineTo(p.x + 4, p.y);
+      ctx.moveTo(p.x, p.y - 4); ctx.lineTo(p.x, p.y + 4); ctx.stroke();
+    }
+    ctx.restore();
+    ctx.save();
+    ctx.font = '11px system-ui, sans-serif'; ctx.textAlign = 'left';
+    const text = range
+      ? `Draft · ${range.label} · teal ${range.comfortableMin.toFixed(2)}–${range.comfortableMax.toFixed(2)} m · amber to ${range.stretchMax.toFixed(2)} m`
+      : 'Draft · no distance estimate for this move';
+    const sub = `${(guide.durationMs / 1000).toFixed(2)} s · ${dancerHeight(state.show).toFixed(2)} m show height · not a technique limit · Esc cancels`;
+    const boxW = Math.max(ctx.measureText(text).width, ctx.measureText(sub).width) + 20;
+    ctx.fillStyle = 'rgba(12,20,29,.94)'; ctx.fillRect(12, 12, boxW, 47);
+    ctx.fillStyle = '#b9eadd'; ctx.fillText(text, 22, 31);
+    ctx.fillStyle = '#a7b4c6'; ctx.fillText(sub, 22, 48);
+    ctx.restore();
   }
 
   drawPath(dancer, strong) {
@@ -1203,7 +1251,16 @@ export class StageView {
       }
       const mx = st.width / 2 + st.wingDepth - 0.4;
       commit();
-      const key = addStation(sel, Math.max(-mx, Math.min(mx, x)), Math.max(0.35, Math.min(st.depth - 0.35, y)));
+      const armed = state.ui.stationGuide;
+      const guide = armed && armed.id === sel.id ? armed : null;
+      const key = addStation(sel, Math.max(-mx, Math.min(mx, x)), Math.max(0.35, Math.min(st.depth - 0.35, y)),
+        guide ? { step: guide.step, pose: guide.pose, dur: guide.durationMs } : {});
+      if (guide) {
+        key.level = guide.level;
+        state.ui.stationGuide = null;
+        state.ui.placingStations = false;
+        state.ui.hint = 'Next station placed · distance bands are draft planning estimates';
+      }
       this.app.focusStation(sel, sel.keys.indexOf(key));
       this.app.rebuild();
       return;
