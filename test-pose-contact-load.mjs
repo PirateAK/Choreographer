@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { joints, specOf } from './src/pose.js';
 import { createShow, footPinsFromTrajectory, posAtLocal, poseAtLocal, dancerHeight } from './src/model.js';
 import { contactFrame } from './src/contact-frame.js';
+import { sampleFootTrajectory } from './src/foot-trajectory.js';
 
 const spec = specOf('first');
 const target = { x: 0.08, y: 0.04, z: 0.02, w: 1 };
@@ -34,29 +35,43 @@ for (const [figure, side, point] of [[early, 0, [0.08, 0.04, 0.02]], [early, 1, 
     'load changes must not change the ankle target');
 }
 
-// Stage-space trajectories convert to solver pins without losing the world mark.
-// including mirrored and turned bodies. Pin following stays exact for load 0 and load 1 alike.
+// Stage-space trajectories convert to solver pins without losing the world mark,
+// for mirrored and turned bodies alike.
 const show = createShow();
+const local = [0.07, 0.03, -0.04];
 for (const facing of [1, -1]) for (const turn of [0, 90, 270]) {
   const dancer = { keys: [{ t: 0, x: 1.2, y: 2.8, pose: 'first', facing, turn }] };
   const t = 0, h = dancerHeight(show), body = posAtLocal(dancer, t), at = poseAtLocal(dancer, t);
   const frame = contactFrame(body, h, at.facing, at.turn);
-  const point = frame.toStage([0.07, 0.03, -0.04]);
-  const pins = footPinsFromTrajectory(show, dancer, t, {
-    left: { ...point, load: 0, swing: true },
-    right: { ...point, load: 1, swing: false },
-  });
+  const point = frame.toStage(local);
+  const trajectory = {
+    left: [
+      { t: 0, x: point.x, y: point.y, h: point.h, load: 0, toNext: 'hold' },
+      { t: 1000, x: point.x, y: point.y, h: point.h, load: 0 },
+    ],
+    right: [
+      { t: 0, x: point.x, y: point.y, h: point.h, load: 1, toNext: 'hold' },
+      { t: 1000, x: point.x, y: point.y, h: point.h, load: 1 },
+    ],
+  };
+  const evaluated = sampleFootTrajectory(trajectory, t);
+  assert.deepEqual([evaluated.left.x, evaluated.left.y, evaluated.left.h], [point.x, point.y, point.h],
+    `sampled left ankle stays on stage mark, facing ${facing}, turn ${turn}`);
+
+  const pins = footPinsFromTrajectory(show, dancer, t, trajectory);
+  const label = `facing ${facing}, turn ${turn}`;
+  assert.equal(pins.left.load, 0, `left load ${label}`);
+  assert.equal(pins.left.w, 1, `left w ${label}`);
+  assert.equal(pins.left.swing, false, `hold segment is not a swing ${label}`);
+  assert.equal(pins.right.load, 1, `right load ${label}`);
+  assert.equal(pins.right.w, 1, `right w ${label}`);
   for (const side of ['left', 'right']) {
-    const local = frame.toLocal({ x: pins[side].sx, y: pins[side].sy, h: pins[side].y * h });
-    local.forEach((value, i) => assert(Math.abs(value - [0.07, 0.03, -0.04][i]) < 1e-10,
-      `${side} trajectory roundtrip facing ${facing}, turn ${turn}`));
+    const [x, y, z] = [pins[side].x, pins[side].y, pins[side].z];
+    assert(Math.abs(x - local[0]) < 1e-10 && Math.abs(y - local[1]) < 1e-10 && Math.abs(z - local[2]) < 1e-10,
+      `${side} trajectory round-trip ${label}`);
   }
-  assert.equal(pins.left.load, 0);
-  assert.equal(pins.left.w, 1);
-  assert.equal(pins.left.swing, true);
-  assert.equal(pins.right.load, 1);
-  assert.equal(pins.right.w, 1);
 }
-assert.equal(footPinsFromTrajectory(show, { keys: [] }, 0, { left: { x: 0, y: 0, h: 0 } }), null,
+
+assert.equal(footPinsFromTrajectory(show, { keys: [] }, 0, { left: [] }), null,
   'a trajectory without a dancer body has no solver frame');
 console.log('pose contact-load separation: ok');

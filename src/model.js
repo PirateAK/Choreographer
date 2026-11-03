@@ -4,6 +4,7 @@
 // that a contact is measured from the same table the figures are drawn from.
 import { PLANT_BY_POSE, feetPlaceOf, joints, specOf, blendSpecs } from './pose.js';
 import { contactFrame } from './contact-frame.js';
+import { sampleFootTrajectory, validateFootTrajectory } from './foot-trajectory.js';
 
 // The four things a station can stand on. Kept here rather than beside the contact code so a
 // show read from a file can be tidied before anything else in the module has been evaluated.
@@ -2967,14 +2968,15 @@ export function plantProblem(show, dancer, i) {
 export function footPinsFromTrajectory(show, dancer, lt, trajectory) {
   const body = posAtLocal(dancer, lt);
   if (!body || !trajectory || typeof trajectory !== 'object') return null;
+  const sample = sampleFootTrajectory(trajectory, lt);
+  if (!sample) return null;
   const h = dancerHeight(show), at = poseAtLocal(dancer, lt);
   const frame = contactFrame(body, h, at.facing, at.turn), out = {};
   for (const side of ['left', 'right']) {
-    const target = trajectory[side];
-    if (!target || ![target.x, target.y, target.h].every(Number.isFinite)) continue;
+    const target = sample[side];
+    if (!target) continue;
     const [x, y, z] = frame.toLocal({ x: target.x, y: target.y, h: target.h });
-    const load = Number.isFinite(target.load) ? Math.max(0, Math.min(1, target.load)) : 0;
-    out[side] = { x, y, z, sx: target.x, sy: target.y, w: 1, load, swing: target.swing === true };
+    out[side] = { x, y, z, sx: target.x, sy: target.y, w: 1, load: target.load, swing: target.swing };
   }
   return Object.keys(out).length ? out : null;
 }
