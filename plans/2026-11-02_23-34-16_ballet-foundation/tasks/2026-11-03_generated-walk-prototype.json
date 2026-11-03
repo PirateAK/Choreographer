@@ -1,0 +1,17 @@
+[
+  {
+    "content": "[walk-3] Resolve generated-walk endpoint following and constrain schedule use to its interval (self)",
+    "id": "walk-3",
+    "status": "completed"
+  },
+  {
+    "content": "[walk-4] Add deterministic interval/endpoint/reach tests and run regressions (self)",
+    "id": "walk-4",
+    "status": "completed"
+  },
+  {
+    "content": "[walk-5] Browser smoke test, review, and commit verified prototype (self)",
+    "id": "walk-5",
+    "status": "completed"
+  }
+]

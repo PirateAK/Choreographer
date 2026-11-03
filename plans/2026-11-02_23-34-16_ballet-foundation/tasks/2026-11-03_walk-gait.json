@@ -1,0 +1,27 @@
+[
+  {
+    "content": "[gait-1] Read foundation plan/guidelines and inspect current pose/contact APIs and tests",
+    "id": "[gait-1]",
+    "status": "completed"
+  },
+  {
+    "content": "[gait-2] Introduce and test independent pin-following and support-load semantics in pose solver",
+    "id": "[gait-2]",
+    "status": "completed"
+  },
+  {
+    "content": "[gait-3] Add an optional stage-space foot-trajectory evaluator, preserving legacy footPins behavior",
+    "id": "[gait-3]",
+    "status": "completed"
+  },
+  {
+    "content": "[gait-4] Add continuity/load tests and run engine plus browser regression suites",
+    "id": "[gait-4]",
+    "status": "completed"
+  },
+  {
+    "content": "[gait-5] Update versions/context and commit only after stable tests pass",
+    "id": "[gait-5]",
+    "status": "completed"
+  }
+]

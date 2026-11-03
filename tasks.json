@@ -1,0 +1,22 @@
+[
+  {
+    "content": "[audit-1] Inspect pose, timing and contact model against supplied ballet concepts [self]",
+    "id": "ballet-1",
+    "status": "completed"
+  },
+  {
+    "content": "[audit-2] Inventory Moves gallery and implemented choreography sequences [delegate]",
+    "id": "ballet-2",
+    "status": "completed"
+  },
+  {
+    "content": "[audit-3] Review figure rendering and wireframe/wardrobe feasibility [delegate]",
+    "id": "ballet-3",
+    "status": "completed"
+  },
+  {
+    "content": "[audit-4] Summarize evidenced gaps, corrections and recommended next scope [self]",
+    "id": "ballet-4",
+    "status": "completed"
+  }
+]

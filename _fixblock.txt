@@ -1,0 +1,207 @@
+// One fix, ranked, for one overlap: whichever of a small set of edits costs the dance least and
+// actually clears it. Each candidate is tried on the real show and put straight back, so what is
+// measured is what would happen — and the plant, skate and reach checks around the edit are re-run,
+// because a nudge that clears a body and pulls a planted foot is a different fault, not a fix.
+//
+// Three kinds, cheapest first. A **nudge** moves one station, which is enough when she is standing
+// where the other passes: a station is where a still dancer is. A **shift** moves both ends of the
+// leg she is on, which is what a pass made *while travelling* needs — moving one end of a blend
+// moves her by half at the moment that matters, and half is still a collision. A **retime** moves a
+// station on the clock, which is one dancer waiting for the other: the cheapest thing a
+// choreographer does about traffic, and the only one that leaves the picture alone.
+const FIX_MARGIN = 0.12;
+const FIX_RETIMES = [300, 600, 1000, 1500, 2000, 3000, 4000];
+// What a metre of movement costs against a second of displaced music. A path is the dance; the
+// clock is only where it sits, so moving a body is dearer than waiting a beat for a gap.
+const FIX_COST_M = 3;
+const FIX_COST_SHIFT = 4;
+const FIX_COST_S = 0.7;
+
+// How a move is said out loud, in the words the stage uses.
+function movedWords(dx, dy) {
+  const bits = [];
+  if (Math.abs(dx) > 0.01) bits.push(`${dx > 0 ? 'stage right' : 'stage left'} ${Math.abs(dx).toFixed(1)} m`);
+  if (Math.abs(dy) > 0.01) bits.push(`${dy > 0 ? 'upstage' : 'downstage'} ${Math.abs(dy).toFixed(1)} m`);
+  return bits.join(' and ') || 'a step';
+}
+
+// Where her feet would be wrong if a station moved. Only the legs touching what was edited are
+// counted: a fault further down the path was there before the fix and is not this fix's business,
+// and re-measuring a whole path for every candidate would make a scan of a long show crawl.
+function legFaults(show, dancer, idxs) {
+  const keys = (dancer && dancer.keys) || [];
+  const legs = new Set();
+  let n = 0;
+  for (const i of idxs) {
+    if (i < 0 || i >= keys.length) continue;
+    if (plantProblem(show, dancer, i)) n += 1;
+    if (i >= 1) legs.add(i);
+    if (i + 1 < keys.length) legs.add(i + 1);
+  }
+  for (const leg of legs) {
+    if (footSkate(show, dancer, leg)) n += 1;
+    if (legOverreach(show, dancer, leg)) n += 1;
+  }
+  return n;
+}
+
+// A station can be moved into the wings but not off the floor: the wings are where a dancer waits,
+// and out beyond them is nowhere.
+function stageRoom(show, x, y) {
+  const s = show.stage;
+  const halfW = s.width / 2 + (Number(s.wingDepth) || 0);
+  return Math.abs(x) <= halfW + 0.01 && y >= -0.5 && y <= s.depth + 0.5;
+}
+
+export function overlapFix(show, overlap) {
+  if (!overlap) return null;
+  const cast = show.cast || [];
+  const a = cast.find((d) => d.id === overlap.ids[0]);
+  const b = cast.find((d) => d.id === overlap.ids[1]);
+  if (!a || !b) return null;
+  const grid = Number(show.stage.grid) || 0.5;
+  const candidates = [];
+
+  for (const [mover, other] of [
+    [a, b],
+    [b, a],
+  ]) {
+    const keys = mover.keys || [];
+    if (!keys.length) continue;
+    const lt = localOfContent(show, mover.id, overlap.at);
+    const mine = posOfContent(show, mover, overlap.at);
+    const theirs = posOfContent(show, other, overlap.at);
+    if (!mine || !theirs) continue;
+    // The station she is at, or the one she has just left. Before her first station she is already
+    // standing on it, which is a real case: two dancers waiting in position before the show starts.
+    let idx = 0;
+    for (let i = 1; i < keys.length; i++) if (keys[i].t <= lt) idx = i;
+    const gap = Math.hypot(mine.x - theirs.x, mine.y - theirs.y);
+    const deficit = CLEARANCE + FIX_MARGIN - gap;
+    if (deficit <= 0) continue;
+
+    // Which way she could go. Away from the other body is the obvious one; across that line is the
+    // one that fixes a crossing, because two dancers walking through each other are not helped by
+    // being pushed along the line they are both travelling on.
+    const dirs = [];
+    const push = (x, y) => {
+      const l = Math.hypot(x, y);
+      if (l < 1e-6) return;
+      const u = [x / l, y / l];
+      if (dirs.some((d) => Math.abs(d[0] - u[0]) < 0.2 && Math.abs(d[1] - u[1]) < 0.2)) return;
+      dirs.push(u);
+    };
+    push(mine.x - theirs.x, mine.y - theirs.y);
+    push(-(mine.y - theirs.y), mine.x - theirs.x);
+    push(mine.y - theirs.y, -(mine.x - theirs.x));
+    if (!dirs.length) {
+      // Standing exactly on top of each other: no line to run away along, so take her own way out —
+      // across the leg she is travelling, or stage right if she is not travelling at all.
+      const step = keys[idx + 1] || keys[idx - 1];
+      if (step) push(-(step.y - keys[idx].y), step.x - keys[idx].x);
+      push(1, 0);
+      push(0, 1);
+    }
+
+    // A candidate is measured, not guessed: put into the real show, read for both faults — another
+    // body too close anywhere in the stretch, or a foot pulled off its mark — and put straight back.
+    // True when it is a fix, which is what lets the loops below stop at the first one that works.
+    const consider = (kind, edits, cost, label, touched) => {
+      const baseline = legFaults(show, mover, touched);
+      const saved = edits.map((e) => ({ ...keys[e.idx] }));
+      for (const e of edits) {
+        const k = keys[e.idx];
+        if (e.dx != null) k.x = round2(k.x + e.dx);
+        if (e.dy != null) k.y = round2(k.y + e.dy);
+        if (e.dt != null) k.t = Math.round(k.t + e.dt);
+      }
+      let ok = !stillTight(show, mover.id, overlap.start - 500, overlap.end + 800);
+      if (ok) ok = legFaults(show, mover, touched) <= baseline;
+      edits.forEach((e, n) => Object.assign(keys[e.idx], saved[n]));
+      if (!ok) return false;
+      candidates.push({ kind, dancerId: mover.id, edits, cost, label });
+      return true;
+    };
+
+    // 1. One station. Enough when she is standing, or when the moment she is closest is a station.
+    let done = false;
+    for (const [ux, uy] of dirs) {
+      for (let extra = 0; extra <= 2 && !done; extra++) {
+        // A grid step is a coarse thing to need, so a move is tried at the clearance it lacks and
+        // then a step further out, until one is far enough to clear the margin.
+        const dist = deficit + extra * grid;
+        const dx = Math.round((ux * dist) / grid) * grid;
+        const dy = Math.round((uy * dist) / grid) * grid;
+        if (!dx && !dy) continue;
+        const k = keys[idx];
+        if (!stageRoom(show, k.x + dx, k.y + dy)) continue;
+        done = consider('nudge', [{ idx, dx, dy }], Math.hypot(dx, dy) * FIX_COST_M, `move ${mover.name}'s point ${movedWords(dx, dy)}`, [idx]);
+      }
+      if (done) break;
+    }
+
+    // 2. The whole leg she is on, carried aside. The fix for a pass made while travelling: both
+    // ends move together, so she is the full distance further away at the moment that matters.
+    const pair = keys[idx + 1] ? [idx, idx + 1] : keys[idx - 1] ? [idx - 1, idx] : null;
+    if (pair) {
+      for (const [ux, uy] of dirs) {
+        let moved = false;
+        for (let extra = 0; extra <= 2 && !moved; extra++) {
+          const dist = deficit + extra * grid;
+          const dx = Math.round((ux * dist) / grid) * grid;
+          const dy = Math.round((uy * dist) / grid) * grid;
+          if (!dx && !dy) continue;
+          if (pair.some((i) => !stageRoom(show, keys[i].x + dx, keys[i].y + dy))) continue;
+          moved = consider(
+            'shift',
+            pair.map((i) => ({ idx: i, dx, dy })),
+            Math.hypot(dx, dy) * FIX_COST_SHIFT,
+            `carry ${mover.name}'s path ${movedWords(dx, dy)}`,
+            pair
+          );
+        }
+        if (moved) break;
+      }
+    }
+
+    // 3. Time. She waits, or she arrives later, and the other one goes through the gap. Tried in
+    // ascending order, so the smallest wait that clears is the one offered.
+    for (const j of [idx, idx + 1]) {
+      const k = keys[j];
+      if (!k) continue;
+      const prev = keys[j - 1];
+      const next = keys[j + 1];
+      for (const dt of FIX_RETIMES) {
+        const moved = k.t + dt;
+        if (prev && moved < prev.t + 120) continue;
+        if (next && moved > next.t - 120) break;
+        const label = j === idx ? `${mover.name} leaves ${(dt / 1000).toFixed(1)} s later` : `${mover.name} arrives ${(dt / 1000).toFixed(1)} s later`;
+        if (consider('retime', [{ idx: j, dt }], (dt / 1000) * FIX_COST_S, label, [j])) break;
+      }
+    }
+  }
+
+  candidates.sort((x, y) => x.cost - y.cost);
+  const best = candidates[0] || null;
+  return best ? { ...best, overlapId: overlap.id, at: overlap.at, gap: overlap.gap } : null;
+}
+
+// Put a fix into the show. Separated from choosing it so the caller can commit first: a fix is an
+// edit like any other, and Undo has to bring the path back exactly as it was. A station may be moved
+// on the floor, on the clock, or both, which is why a fix is a list of edits rather than one of each.
+export function applyOverlapFix(show, fix) {
+  if (!fix || !fix.edits) return false;
+  const d = (show.cast || []).find((x) => x.id === fix.dancerId);
+  const keys = d && d.keys;
+  if (!keys) return false;
+  let any = false;
+  for (const e of fix.edits) {
+    const k = keys[e.idx];
+    if (!k) continue;
+    if (e.dx != null) k.x = round2(k.x + e.dx);
+    if (e.dy != null) k.y = round2(k.y + e.dy);
+    if (e.dt != null) k.t = Math.round(k.t + e.dt);
+    any = true;
+  }
+  return any;
+}

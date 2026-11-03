@@ -1,0 +1,17 @@
+[
+  {
+    "content": "[trajectory-1] Implement pure, deterministic stage-space foot trajectory sampler with validation",
+    "id": "[trajectory-1]",
+    "status": "in_progress"
+  },
+  {
+    "content": "[trajectory-2] Test interpolation, contact holds, support loads, endpoints, and malformed inputs",
+    "id": "[trajectory-2]",
+    "status": "pending"
+  },
+  {
+    "content": "[trajectory-3] Connect sampler to the pin adapter, run regression suite, update version/context, commit",
+    "id": "[trajectory-3]",
+    "status": "pending"
+  }
+]

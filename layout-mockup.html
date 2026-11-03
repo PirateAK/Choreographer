@@ -1,0 +1,985 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Choreographer — layout mockup</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #11161f;
+    --panel2: #0d121a;
+    --line: #202a39;
+    --text: #c9d4e3;
+    --dim: #6f7f96;
+    --accent: #ffb703;
+    --danger: #ff4d6d;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 13px/1.42 "Segoe UI", system-ui, -apple-system, sans-serif;
+    display: grid;
+    grid-template-rows: 46px minmax(0, 1fr) 300px;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ---------- header ---------- */
+  header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 12px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+  }
+  header h1 {
+    font-size: 13px; letter-spacing: .18em; text-transform: uppercase;
+    margin: 0 10px 0 0; color: var(--accent); font-weight: 600;
+  }
+  .badge {
+    font-size: 9px; letter-spacing: .14em; text-transform: uppercase;
+    color: #7f8fa6; border: 1px dashed #33435a; border-radius: 3px;
+    padding: 2px 6px; margin-right: 8px;
+  }
+  .spacer { flex: 1; }
+  .saved { color: var(--dim); font-size: 11px; min-width: 44px; text-align: right; }
+  .show-name {
+    background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 5px; padding: 5px 8px; width: 260px; font: inherit;
+  }
+  button {
+    background: #1b2431; border: 1px solid var(--line); color: var(--text);
+    border-radius: 5px; padding: 5px 9px; font: inherit; cursor: pointer;
+  }
+  button.ghost { background: transparent; }
+  button.primary {
+    background: var(--accent); color: #1a1200; border-color: #d99c00;
+    font-weight: 700; width: 34px;
+  }
+
+  /* ---------- main ---------- */
+  main { display: grid; grid-template-columns: 276px minmax(0, 1fr) 300px; min-height: 0; }
+  .panel { background: var(--panel); overflow-y: auto; display: flex; flex-direction: column; }
+  #left { border-right: 1px solid var(--line); }
+  #right { border-left: 1px solid var(--line); }
+  .panel section { padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  .panel h2 {
+    font-size: 10px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--dim); margin: 0 0 8px; font-weight: 600;
+  }
+  .count { color: var(--accent); }
+  .field { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
+  .field label { color: var(--dim); font-size: 12px; }
+  .field input {
+    width: 78px; background: var(--panel2); border: 1px solid var(--line);
+    color: var(--text); border-radius: 4px; padding: 4px 6px; font: inherit;
+  }
+  .list { display: flex; flex-direction: column; gap: 5px; }
+  .item {
+    background: var(--panel2); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 8px;
+  }
+  .item.sel { border-color: var(--accent); }
+  .item .row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .item .row:last-child { margin-bottom: 0; }
+  .item input[type="text"] {
+    background: #0a0f16; border: 1px solid var(--line); color: var(--text);
+    border-radius: 4px; padding: 3px 5px; font: inherit; min-width: 0; flex: 1;
+  }
+  .item .label { color: var(--text); font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .swatch { width: 13px; height: 13px; border-radius: 50%; flex: none; border: 1px solid rgba(255,255,255,.25); }
+  .item .tag { font-size: 9px; text-transform: uppercase; letter-spacing: .1em; color: var(--dim); white-space: nowrap; }
+  .item .del { border: none; background: transparent; color: var(--dim); padding: 0 4px; font-size: 15px; line-height: 1; }
+  .eye {
+    width: 20px; height: 18px; border: none; background: transparent;
+    color: var(--text); padding: 0; font-size: 12px; line-height: 1;
+  }
+  .eye.off { color: #3c4757; }
+  .hint { color: var(--dim); font-size: 11px; line-height: 1.45; margin: 6px 0 0; }
+  .hint b { color: #93a4bb; font-weight: 600; }
+  .slider { display: flex; align-items: center; gap: 6px; }
+  .slider input { flex: 1; accent-color: var(--accent); width: 100%; }
+  .planned { color: #6b5b2a; border-color: #4a3f1e; }
+
+  /* ---------- stage ---------- */
+  #center {
+    min-width: 0; min-height: 0; background: #080b10;
+    display: grid; grid-template-rows: minmax(0, 1fr) 42px;
+  }
+  #stage { display: block; width: 100%; height: 100%; cursor: crosshair; }
+
+  /* the focused station, edited next to the stage instead of in a far panel */
+  .point-strip {
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 12px; background: #0f141c;
+    border-top: 1px solid var(--line);
+    overflow: hidden; white-space: nowrap;
+  }
+  .ps-tag {
+    font-size: 9px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--accent); font-weight: 600;
+  }
+  .ps-who { font-size: 12px; color: var(--text); }
+  .ps-div { width: 1px; height: 18px; background: var(--line); margin: 0 2px; flex: none; }
+  .point-strip label { color: var(--dim); font-size: 10px; text-transform: uppercase; letter-spacing: .1em; }
+  .point-strip select, .point-strip input {
+    background: #0a0f16; border: 1px solid var(--line); color: var(--text);
+    border-radius: 4px; padding: 3px 5px; font: inherit; font-size: 12px;
+  }
+  .point-strip select { width: 138px; }
+  .point-strip input.num { width: 48px; font-variant-numeric: tabular-nums; }
+  .point-strip .unit { color: var(--dim); font-size: 11px; margin-left: -4px; }
+  .point-strip .grow { flex: 1; }
+  .point-strip .warn { color: var(--danger); border-color: #4a2028; background: transparent; }
+  .point-strip .ps-hint { color: #4a576b; font-size: 10px; }
+
+  /* ---------- transport + tracks ---------- */
+  #bottom {
+    background: var(--panel); border-top: 1px solid var(--line);
+    display: grid; grid-template-rows: 40px minmax(0, 1fr); min-height: 0;
+  }
+  #transport {
+    display: flex; align-items: center; gap: 7px;
+    padding: 0 12px; border-bottom: 1px solid var(--line); overflow: hidden;
+  }
+  .divider { width: 1px; height: 18px; background: var(--line); margin: 0 3px; }
+  .time {
+    font-variant-numeric: tabular-nums; font-family: Consolas, "SF Mono", monospace;
+    color: var(--accent); min-width: 84px; font-size: 12px;
+  }
+  .check { display: flex; align-items: center; gap: 4px; color: var(--dim); font-size: 11px; white-space: nowrap; }
+  .check input { accent-color: var(--accent); }
+  .collision { color: var(--dim); font-size: 11px; white-space: nowrap; }
+
+  .tracks { position: relative; overflow: hidden; }
+  .grid { display: grid; grid-template-columns: 176px minmax(0, 1fr); grid-auto-rows: 26px; min-height: 100%; }
+  .thead {
+    background: #0e131b; border-bottom: 1px solid #1d2634; border-right: 1px solid #1d2634;
+    color: var(--dim); font-size: 9px; letter-spacing: .12em;
+    display: flex; align-items: center; padding-left: 10px;
+  }
+  .ruler {
+    position: relative; background: #0e131b; border-bottom: 1px solid #1d2634;
+  }
+  .ruler .tick { position: absolute; top: 0; bottom: 0; width: 1px; background: #1b2431; }
+  .ruler .tlab {
+    position: absolute; top: 5px; font-size: 9px; color: #55637a;
+    font-variant-numeric: tabular-nums; transform: translateX(3px);
+  }
+  .gcell {
+    display: flex; align-items: center; gap: 6px; padding: 0 8px 0 8px;
+    border-bottom: 1px solid #161e29; border-right: 1px solid #1d2634;
+    background: #11161f; overflow: hidden;
+  }
+  .gcell .csw { width: 7px; height: 7px; flex: none; }
+  .gcell .nm { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gcell .num { font-size: 10px; color: var(--dim); width: 11px; text-align: right; flex: none; }
+  .gcell.master { gap: 5px; }
+  .gcell.master .nm { font-size: 11px; color: #8fa3bd; }
+  .gcell.master .tag { font-size: 8px; letter-spacing: .1em; color: #55637a; border: 1px solid #253141; border-radius: 3px; padding: 0 3px; margin-left: auto; }
+  .lane {
+    position: relative; border-bottom: 1px solid #151d28;
+    background: #0d1219;
+  }
+  .lane.alt { background: #0f141c; }
+  .diamond {
+    position: absolute; top: 50%; width: 7px; height: 7px;
+    transform: translate(-50%, -50%) rotate(45deg);
+    background: #0b0e14; border: 1.5px solid currentColor;
+  }
+  .diamond.hollow { background: transparent; }
+  .band {
+    position: absolute; top: 6px; bottom: 6px; border-radius: 3px;
+    border: 1px dashed currentColor; background: rgba(255,183,3,.08);
+  }
+  .focus-row .gcell { background: rgba(255,183,3,.055); }
+  .focus-row .gcell .nm { color: var(--accent); font-weight: 600; }
+  .dim-row .gcell .nm, .dim-row .gcell .num { color: #4a576b; }
+  .dim-row .diamond { opacity: .3; }
+  .ov { position: absolute; top: 26px; bottom: 0; left: 176px; right: 0; pointer-events: none; }
+  .ov.all { top: 0; }
+  .vtick { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(45,60,80,.5); }
+  .pause {
+    position: absolute; top: 0; bottom: 0; border: 1px dashed rgba(255,183,3,.55);
+    background: rgba(255,183,3,.07);
+  }
+  .pause span {
+    position: absolute; top: 3px; left: 4px; font-size: 8px; letter-spacing: .08em;
+    color: rgba(255,183,3,.8); white-space: nowrap;
+  }
+  .playhead { position: absolute; top: 0; bottom: 0; width: 1.5px; background: var(--accent); }
+  .playhead::before {
+    content: ""; position: absolute; top: 0; left: -5.5px;
+    border-left: 6px solid transparent; border-right: 6px solid transparent;
+    border-top: 9px solid var(--accent);
+  }
+
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: #253141; border-radius: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Choreographer</h1>
+  <span class="badge">layout mockup</span>
+  <input class="show-name" value="Winter Recital — sketch 1" aria-label="Show name" />
+  <div class="spacer"></div>
+  <button class="ghost">Undo</button>
+  <button class="ghost">Redo</button>
+  <button class="ghost">Export</button>
+  <button class="ghost">Import</button>
+  <span class="saved">saved</span>
+</header>
+
+<main>
+  <!-- ------------------------------------------------ stage assets -->
+  <aside id="left" class="panel">
+    <section>
+      <h2>Stage</h2>
+      <div class="field"><label>Width (m)</label><input value="16" /></div>
+      <div class="field"><label>Depth (m)</label><input value="10" /></div>
+      <div class="field"><label>Wing depth (m)</label><input value="4.5" /></div>
+      <div class="field"><label>Grid (m)</label><input value="0.5" /></div>
+    </section>
+
+    <section>
+      <h2>Wing legs <span class="count">4</span></h2>
+      <div class="list">
+        <div class="item">
+          <div class="row"><span class="tag">left</span><span class="label">Leg 1</span>
+            <span class="tag">3.2 m</span><button class="del">×</button></div>
+        </div>
+        <div class="item">
+          <div class="row"><span class="tag">left</span><span class="label">Leg 2</span>
+            <span class="tag">6.6 m</span><button class="del">×</button></div>
+        </div>
+        <div class="item">
+          <div class="row"><span class="tag">right</span><span class="label">Leg 1</span>
+            <span class="tag">3.2 m</span><button class="del">×</button></div>
+        </div>
+        <div class="item">
+          <div class="row"><span class="tag">right</span><span class="label">Leg 2</span>
+            <span class="tag">6.6 m</span><button class="del">×</button></div>
+        </div>
+      </div>
+      <p class="hint">Two legs a side make <b>front</b>, <b>middle</b> and <b>back</b> wings. Drag a leg to move it.</p>
+    </section>
+
+    <section>
+      <h2>Curtains &amp; drops</h2>
+      <div class="list">
+        <div class="item">
+          <div class="row"><span class="tag">curtain</span><input type="text" value="Main curtain" /><button class="del">×</button></div>
+          <div class="row"><span class="tag">front</span>
+            <div class="slider"><input type="range" min="0" max="100" value="22" /><span class="tag">22%</span></div></div>
+        </div>
+        <div class="item">
+          <div class="row"><span class="tag">curtain</span><input type="text" value="Tab legs" /><button class="del">×</button></div>
+          <div class="row"><span class="tag">centre</span>
+            <div class="slider"><input type="range" min="0" max="100" value="88" /><span class="tag">88%</span></div></div>
+        </div>
+        <div class="item">
+          <div class="row"><span class="tag">drop</span><input type="text" value="Backdrop — forest" /><button class="del">×</button></div>
+          <div class="row"><span class="tag">back</span><span class="tag">9.5 m upstage</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Lighting</h2>
+      <div class="list">
+        <div class="item"><div class="row"><span class="label">Warm wash</span><span class="tag planned">planned</span></div></div>
+        <div class="item"><div class="row"><span class="label">Cool side</span><span class="tag planned">planned</span></div></div>
+      </div>
+
+    </section>
+  </aside>
+
+  <!-- ------------------------------------------------ stage -->
+  <section id="center">
+    <canvas id="stage"></canvas>
+    <div class="point-strip">
+      <span class="ps-tag">Point 3 of 7</span>
+      <span class="ps-who">Ada</span>
+      <span class="ps-div"></span>
+      <select title="Ballet position at this point">
+        <option>— none —</option>
+        <option>Tendu</option>
+        <option selected>4th position</option>
+        <option>Arabesque</option>
+      </select>
+      <input class="num" value="1.50" title="Transition from the previous point" /><span class="unit">s</span>
+      <span class="grow"></span>
+      <button title="Keep this point and continue building from it">Continue</button>
+      <button class="warn" title="Restore the performer to this point and remove everything after it">Delete from here</button>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------ performance assets -->
+  <aside id="right" class="panel">
+    <section>
+      <h2>Performers <span class="count">3</span></h2>
+      <div class="list">
+        <div class="item sel">
+          <div class="row">
+            <button class="eye">◉</button>
+            <span class="swatch" style="background:#ffd166"></span>
+            <span class="label">1. Ada</span><span class="tag">6</span>
+          </div>
+        </div>
+        <div class="item">
+          <div class="row">
+            <button class="eye">◉</button>
+            <span class="swatch" style="background:#2ec4b6"></span>
+            <span class="label">2. Bea</span><span class="tag">5</span>
+          </div>
+        </div>
+        <div class="item">
+          <div class="row">
+            <button class="eye off">○</button>
+            <span class="swatch" style="background:#4cc9f0"></span>
+            <span class="label" style="color:#5d6b80">3. Cleo</span><span class="tag">5</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Props <span class="count">2</span></h2>
+      <div class="list">
+        <div class="item">
+          <div class="row">
+            <button class="eye">◉</button>
+            <span class="swatch" style="border-radius:2px;background:#8fa3bd"></span>
+            <span class="label">Bench</span><span class="tag">fixed</span>
+          </div>
+        </div>
+        <div class="item">
+          <div class="row">
+            <button class="eye">◉</button>
+            <span class="swatch" style="border-radius:2px;background:#9b5de5"></span>
+            <span class="label">Chair</span><span class="tag">on timer · 3 pts</span>
+          </div>
+        </div>
+      </div>
+      <p class="hint">A prop becomes a timed object the moment it gets a station — until then it is dressing and stays off the track list.</p>
+    </section>
+
+    <section>
+      <h2>Focused — dancer 1</h2>
+      <div class="item sel">
+        <div class="row"><input type="text" value="Ada" /></div>
+        <div class="row">
+          <input type="color" value="#ffd166" style="width:26px;height:22px;padding:0;border:1px solid var(--line);background:none;border-radius:4px" />
+          <span class="tag">circle</span><span class="tag">solid</span>
+        </div>
+        <div class="row"><span class="label">6 stations · 22.0 s</span><button class="del">remove</button></div>
+      </div>
+      <p class="hint">Station details — position, transition, pose — open at the point you select on the stage.</p>
+    </section>
+  </aside>
+</main>
+
+<!-- ------------------------------------------------ transport + tracks -->
+<section id="bottom">
+  <div id="transport">
+    <button class="primary">▶</button>
+    <button>■</button>
+    <span class="time">00:09.000</span>
+    <span class="divider"></span>
+    <button>+ Key</button>
+    <button>+ Stations</button>
+    <button>+ Hold</button>
+    <button>+ Pause</button>
+    <span class="divider"></span>
+    <button>−</button>
+    <button>+</button>
+    <label class="check"><input type="checkbox" checked /> Stop at collisions</label>
+    <span class="collision">no overlaps</span>
+  </div>
+
+  <div class="tracks" id="tracks">
+    <div class="grid" id="trackGrid"></div>
+    <div class="ov" id="ovLanes"></div>
+    <div class="ov all" id="ovAll"></div>
+  </div>
+</section>
+
+<script>
+/* ------------------------------------------------------------------ mock data */
+const DUR = 26000;
+const PLAYHEAD = 9000;
+
+const SHOW = {
+  stage: { w: 16, d: 10, wing: 4.5, grid: 0.5 },
+  legs: [
+    { side: -1, y: 3.4 },
+    { side: -1, y: 6.8 },
+    { side: 1, y: 3.4 },
+    { side: 1, y: 6.8 },
+  ],
+  cast: [
+    {
+      n: 1, name: 'Ada', color: '#ffd166', shape: 'circle', fill: 'solid', eye: true, focus: true,
+      keys: [
+        { t: 0, x: -10.6, y: 7.8 },
+        { t: 3000, x: -6.4, y: 5.2 },
+        { t: 6500, x: -3.0, y: 3.0, pose: '4th position' },
+        { t: 10000, x: 0.8, y: 4.6 },
+        { t: 14000, x: 4.6, y: 2.2, pose: 'arabesque' },
+        { t: 18000, x: 8.4, y: 3.4 },
+        { t: 22000, x: 10.8, y: 1.6 },
+      ],
+    },
+    {
+      n: 2, name: 'Bea', color: '#2ec4b6', shape: 'triangle', fill: 'hollow', eye: true, focus: false,
+      keys: [
+        { t: 0, x: 10.4, y: 6.0 },
+        { t: 3500, x: 4.8, y: 3.4 },
+        { t: 8000, x: 0.4, y: 2.2 },
+        { t: 12000, x: -4.4, y: 4.2 },
+        { t: 17000, x: -10.2, y: 2.0 },
+      ],
+    },
+    {
+      n: 3, name: 'Cleo', color: '#4cc9f0', shape: 'square', fill: 'half', eye: false, focus: false,
+      keys: [
+        { t: 0, x: -1.6, y: 8.6 },
+        { t: 5000, x: -1.2, y: 5.4 },
+        { t: 9000, x: -1.0, y: 2.6 },
+        { t: 13000, x: -1.4, y: 5.8 },
+        { t: 17500, x: -1.8, y: 8.4 },
+      ],
+    },
+  ],
+  props: [
+    { name: 'Bench', color: '#8fa3bd', kind: 'fixed', x: 3.2, y: 1.1, w: 2.4, d: 0.7 },
+    {
+      name: 'Chair', color: '#9b5de5', kind: 'timed',
+      keys: [
+        { t: 0, x: -9.6, y: 8.6 },
+        { t: 6000, x: -3.4, y: 6.2 },
+        { t: 14000, x: 2.5, y: 3.0 },
+      ],
+    },
+  ],
+  scenery: [
+    { name: 'Main curtain', y: 0.55, thick: 0.5, open: 0.22, color: '#7b2d3b' },
+    { name: 'Tab legs', y: 5.0, thick: 0.5, open: 0.88, color: '#4a2a3c' },
+    { name: 'Backdrop — forest', y: 9.5, thick: 0.35, drop: true, color: '#24506b' },
+  ],
+  tracks: [
+    { id: 'curtain', name: 'Curtain main', color: '#a3405a', kind: 'system' },
+    { id: 'music', name: 'Music', color: '#4cc9f0', kind: 'system' },
+    { id: 'lights', name: 'Lights', color: '#ffd166', kind: 'system' },
+    { id: 'ada', name: '1. Ada', color: '#ffd166', kind: 'cast', n: 1 },
+    { id: 'bea', name: '2. Bea', color: '#2ec4b6', kind: 'cast', n: 2 },
+    { id: 'cleo', name: '3. Cleo', color: '#4cc9f0', kind: 'cast', n: 3, eye: false },
+    { id: 'chair', name: 'Chair', color: '#9b5de5', kind: 'prop' },
+  ],
+};
+
+/* ------------------------------------------------------------------ helpers */
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+function posAt(obj, t) {
+  const k = obj.keys || [];
+  if (!k.length) return null;
+  if (t <= k[0].t) return { x: k[0].x, y: k[0].y };
+  for (let i = 0; i < k.length - 1; i++) {
+    if (t >= k[i].t && t <= k[i + 1].t) {
+      const span = k[i + 1].t - k[i].t || 1;
+      const f = (t - k[i].t) / span;
+      return { x: k[i].x + (k[i + 1].x - k[i].x) * f, y: k[i].y + (k[i + 1].y - k[i].y) * f };
+    }
+  }
+  const last = k[k.length - 1];
+  return { x: last.x, y: last.y };
+}
+
+/* ------------------------------------------------------------------ stage */
+const canvas = document.getElementById('stage');
+const ctx = canvas.getContext('2d');
+const view = { scale: 1, ox: 0, oy: 0 };
+
+function w2s(x, y) {
+  return { x: view.ox + x * view.scale, y: view.oy - y * view.scale };
+}
+
+const THEME = {
+  bg: '#080b10', floor: '#18202d', wing: '#0f1620', grid: '#232e3f',
+  gridMajor: '#31405a', line: '#3b4a60', accent: '#ffb703', dim: '#6f7f96',
+};
+
+function drawStage() {
+  const show = SHOW;
+  const st = show.stage;
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  if (!w || !h) return;
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = THEME.bg;
+  ctx.fillRect(0, 0, w, h);
+
+  const halfW = st.w / 2;
+  const worldW = st.w + st.wing * 2;
+  const pad = 36;
+  const s = Math.max(0.5, Math.min((w - pad * 2) / worldW, (h - pad * 2) / st.d));
+  view.scale = s;
+  view.ox = w / 2;
+  view.oy = h / 2 + (st.d / 2) * s;
+
+  const rect = (x0, y0, x1, y1) => {
+    const a = w2s(x0, y0), b = w2s(x1, y1);
+    return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) };
+  };
+
+  // wings
+  for (const side of [-1, 1]) {
+    const r = rect(side * (halfW + st.wing), 0, side * halfW, st.d);
+    ctx.fillStyle = THEME.wing;
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.strokeStyle = '#1b2534';
+    ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+  }
+
+  // floor
+  const floor = rect(-halfW, 0, halfW, st.d);
+  ctx.fillStyle = THEME.floor;
+  ctx.fillRect(floor.x, floor.y, floor.w, floor.h);
+
+  // grid
+  ctx.lineWidth = 1;
+  for (let x = -halfW; x <= halfW + 1e-6; x += st.grid) {
+    const p = w2s(Math.min(x, halfW), 0);
+    ctx.strokeStyle = Math.abs(x) < 1e-6 ? THEME.gridMajor : THEME.grid;
+    ctx.beginPath();
+    ctx.moveTo(Math.round(p.x) + 0.5, floor.y);
+    ctx.lineTo(Math.round(p.x) + 0.5, floor.y + floor.h);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= st.d + 1e-6; y += st.grid) {
+    const p = w2s(-halfW, Math.min(y, st.d));
+    ctx.strokeStyle = THEME.grid;
+    ctx.beginPath();
+    ctx.moveTo(floor.x, Math.round(p.y) + 0.5);
+    ctx.lineTo(floor.x + floor.w, Math.round(p.y) + 0.5);
+    ctx.stroke();
+  }
+
+  // centre line
+  const cl = w2s(0, 0);
+  ctx.strokeStyle = 'rgba(150,175,210,.28)';
+  ctx.setLineDash([5, 6]);
+  ctx.beginPath();
+  ctx.moveTo(cl.x, floor.y);
+  ctx.lineTo(cl.x, floor.y + floor.h);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // proscenium
+  const pr = w2s(-halfW - st.wing, 0);
+  const pr2 = w2s(halfW + st.wing, 0);
+  ctx.strokeStyle = THEME.line;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(pr.x, pr.y);
+  ctx.lineTo(pr2.x, pr2.y);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+
+  ctx.fillStyle = '#3b4a60';
+  ctx.font = '10px "Segoe UI", system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('A U D I E N C E', w / 2, pr.y + 18);
+  ctx.fillText('U P S T A G E', w / 2, floor.y + 13);
+  ctx.textAlign = 'left';
+
+  // wing legs + bay labels
+  const baysFor = (side) => {
+    const ys = show.legs.filter((l) => l.side === side).map((l) => l.y).sort((a, b) => a - b);
+    const edges = [0, ...ys, st.d];
+    const names = ['FRONT', 'MIDDLE', 'BACK'];
+    return edges.slice(0, -1).map((lo, i) => ({ lo, hi: edges[i + 1], name: names[i] || 'BAY ' + (i + 1) }));
+  };
+
+  for (const side of [-1, 1]) {
+    for (const b of baysFor(side)) {
+      const label = w2s(side * (halfW + st.wing * 0.86), (b.lo + b.hi) / 2);
+      ctx.save();
+      ctx.translate(label.x, label.y);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillStyle = 'rgba(125,145,175,.42)';
+      ctx.font = '8px "Segoe UI", system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(b.name, 0, 0);
+      ctx.restore();
+      ctx.textAlign = 'left';
+    }
+  }
+
+  for (const leg of show.legs) {
+    const r = rect(
+      leg.side * halfW,
+      leg.y - 0.17,
+      leg.side * (halfW + 1.7),
+      leg.y + 0.17
+    );
+    ctx.fillStyle = 'rgba(74,42,60,.95)';
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.strokeStyle = '#6a3a4f';
+    ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+    const folds = Math.max(2, Math.round(r.w / 16));
+    ctx.strokeStyle = 'rgba(0,0,0,.3)';
+    for (let i = 1; i < folds; i++) {
+      const fx = r.x + (r.w / folds) * i;
+      ctx.beginPath();
+      ctx.moveTo(fx, r.y + 1);
+      ctx.lineTo(fx, r.y + r.h - 1);
+      ctx.stroke();
+    }
+  }
+
+  // scenery, back to front
+  for (const item of show.scenery.slice().sort((a, b) => b.y - a.y)) {
+    const y = item.y;
+    if (item.drop) {
+      const r = rect(-halfW, y, halfW, y + item.thick);
+      ctx.fillStyle = 'rgba(36,80,107,.85)';
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.strokeStyle = item.color;
+      ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+    } else {
+      const legW = 0.55 + (1 - item.open) * (halfW - 0.55);
+      for (const side of [-1, 1]) {
+        const x0 = side === -1 ? -halfW : halfW - legW;
+        const r = rect(x0, y, x0 + legW, y + item.thick);
+        ctx.fillStyle = hexA(item.color, 0.7);
+        ctx.fillRect(r.x, r.y, r.w, r.h);
+        ctx.strokeStyle = hexA(item.color, 0.95);
+        ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+      }
+    }
+    const lp = w2s(0, y);
+    ctx.font = '10px "Segoe UI", system-ui, sans-serif';
+    const tw = ctx.measureText(item.name).width;
+    ctx.fillStyle = 'rgba(8,11,16,.74)';
+    ctx.fillRect(lp.x - tw / 2 - 4, lp.y - 16, tw + 8, 14);
+    ctx.fillStyle = 'rgba(226,236,248,.75)';
+    ctx.textAlign = 'center';
+    ctx.fillText(item.name, lp.x, lp.y - 5);
+    ctx.textAlign = 'left';
+  }
+
+  // paths
+  for (const d of show.cast) {
+    if (!d.eye) continue;
+    drawPath(d, d.focus);
+  }
+  const chair = show.props.find((p) => p.kind === 'timed');
+  if (chair) drawPath(chair, false, true);
+
+  // prop bodies
+  const bench = show.props.find((p) => p.kind === 'fixed');
+  if (bench) {
+    const r = rect(bench.x - bench.w / 2, bench.y, bench.x + bench.w / 2, bench.y + bench.d);
+    ctx.fillStyle = hexA(bench.color, 0.5);
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.strokeStyle = bench.color;
+    ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+    ctx.fillStyle = 'rgba(220,232,245,.75)';
+    ctx.font = '10px "Segoe UI", system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(bench.name, r.x + r.w / 2, r.y + r.h / 2 + 3);
+    ctx.textAlign = 'left';
+  }
+  if (chair) {
+    const p = posAt(chair, PLAYHEAD);
+    const sp = w2s(p.x, p.y);
+    const sz = Math.max(5, 0.34 * s);
+    ctx.fillStyle = 'rgba(11,14,20,.85)';
+    ctx.fillRect(sp.x - sz / 2, sp.y - sz / 2, sz, sz);
+    ctx.strokeStyle = chair.color;
+    ctx.strokeRect(sp.x - sz / 2 + 0.5, sp.y - sz / 2 + 0.5, sz - 1, sz - 1);
+    ctx.fillStyle = 'rgba(215,200,250,.8)';
+    ctx.font = '9px "Segoe UI", system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(chair.name, sp.x, sp.y - sz / 2 - 4);
+    ctx.textAlign = 'left';
+  }
+
+  // cast
+  for (const d of show.cast) drawCast(d);
+
+  // focused station ring
+  const ada = show.cast[0];
+  const sel = ada.keys[2];
+  const selP = w2s(sel.x, sel.y);
+  ctx.beginPath();
+  ctx.arc(selP.x, selP.y, 10, 0, Math.PI * 2);
+  ctx.strokeStyle = THEME.accent;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.lineWidth = 1;
+}
+
+function drawPath(obj, strong, isProp) {
+  const keys = obj.keys;
+  if (!keys || keys.length < 2) return;
+  const lastT = keys[keys.length - 1].t;
+  const step = 250;
+  const pts = [];
+  for (let t = 0; t <= lastT; t += step) pts.push(posAt(obj, t));
+  pts.push(posAt(obj, lastT));
+
+  const halfW = SHOW.stage.w / 2;
+  ctx.strokeStyle = obj.color;
+  ctx.lineWidth = strong ? 2 : 1;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = w2s(pts[i].x, pts[i].y);
+    const b = w2s(pts[i + 1].x, pts[i + 1].y);
+    const wing = Math.abs((pts[i].x + pts[i + 1].x) / 2) > halfW;
+    ctx.globalAlpha = strong ? (wing ? 0.34 : 0.85) : 0.16;
+    ctx.setLineDash(wing || isProp ? [4, 5] : []);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+
+  // equal-time ticks: spacing reads as speed
+  if (strong) {
+    for (let i = 4; i < pts.length - 1; i += 4) {
+      const prev = w2s(pts[i - 1].x, pts[i - 1].y);
+      const next = w2s(pts[i + 1].x, pts[i + 1].y);
+      const p = w2s(pts[i].x, pts[i].y);
+      const dx = next.x - prev.x;
+      const dy = next.y - prev.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len, ny = dx / len;
+      ctx.beginPath();
+      ctx.moveTo(p.x - nx * 3.2, p.y - ny * 3.2);
+      ctx.lineTo(p.x + nx * 3.2, p.y + ny * 3.2);
+      ctx.strokeStyle = 'rgba(235,242,252,.45)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  // stations
+  keys.forEach((k, i) => {
+    const sp = w2s(k.x, k.y);
+    const b = strong ? 4 : 3;
+    ctx.fillStyle = '#0b0e14';
+    ctx.strokeStyle = obj.color;
+    ctx.lineWidth = 1.4;
+    ctx.globalAlpha = strong ? 1 : 0.7;
+    ctx.beginPath();
+    ctx.rect(sp.x - b, sp.y - b, b * 2, b * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 1;
+    if (strong) {
+      ctx.fillStyle = 'rgba(200,215,235,.9)';
+      ctx.font = '9px "Segoe UI", system-ui, sans-serif';
+      ctx.fillText(String(i + 1), sp.x + 7, sp.y - 6);
+      if (k.pose && i !== 2) {
+        ctx.fillStyle = 'rgba(255,183,3,.9)';
+        ctx.font = '9px "Segoe UI", system-ui, sans-serif';
+        ctx.fillText(k.pose, sp.x + 7, sp.y + 14);
+      }
+    }
+  });
+}
+
+function drawCast(d) {
+  const p = posAt(d, PLAYHEAD);
+  const sp = w2s(p.x, p.y);
+  const r = clamp(0.26 * view.scale, 4.5, 12);
+
+  if (!d.eye) ctx.globalAlpha = 0.2;
+
+  if (d.focus) {
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, r + 5, 0, Math.PI * 2);
+    ctx.strokeStyle = THEME.accent;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.lineWidth = 1;
+  }
+
+  ctx.beginPath();
+  if (d.shape === 'circle') {
+    ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
+  } else if (d.shape === 'square') {
+    ctx.rect(sp.x - r * 0.86, sp.y - r * 0.86, r * 1.72, r * 1.72);
+  } else {
+    ctx.moveTo(sp.x, sp.y - r * 1.1);
+    ctx.lineTo(sp.x + r, sp.y + r * 0.75);
+    ctx.lineTo(sp.x - r, sp.y + r * 0.75);
+    ctx.closePath();
+  }
+  if (d.fill === 'solid') {
+    ctx.fillStyle = d.color;
+    ctx.fill();
+  } else if (d.fill === 'half') {
+    ctx.fillStyle = hexA(d.color, 0.45);
+    ctx.fill();
+    ctx.strokeStyle = d.color;
+    ctx.stroke();
+  } else {
+    ctx.strokeStyle = d.color;
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+    ctx.lineWidth = 1;
+  }
+
+  ctx.fillStyle = 'rgba(230,240,252,.85)';
+  ctx.font = 'bold 9px "Segoe UI", system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(String(d.n), sp.x, sp.y - r - 5);
+  if (d.focus) {
+    ctx.fillStyle = THEME.accent;
+    ctx.font = '9px "Segoe UI", system-ui, sans-serif';
+    ctx.fillText(d.name, sp.x, sp.y + r + 12);
+  }
+  ctx.textAlign = 'left';
+  ctx.globalAlpha = 1;
+}
+
+function hexA(hex, a) {
+  const n = hex.replace('#', '');
+  const full = n.length === 3 ? n.split('').map((c) => c + c).join('') : n;
+  return `rgba(${parseInt(full.slice(0, 2), 16)},${parseInt(full.slice(2, 4), 16)},${parseInt(full.slice(4, 6), 16)},${a})`;
+}
+
+/* ------------------------------------------------------------------ tracks */
+function buildTracks() {
+  const grid = document.getElementById('trackGrid');
+  const ovLanes = document.getElementById('ovLanes');
+  const ovAll = document.getElementById('ovAll');
+  grid.innerHTML = '';
+
+  // header row
+  const thead = document.createElement('div');
+  thead.className = 'thead';
+  thead.textContent = 'TRACKS';
+  const ruler = document.createElement('div');
+  ruler.className = 'ruler';
+  for (let t = 0; t <= DUR; t += 2000) {
+    const pct = (t / DUR) * 100;
+    const tick = document.createElement('div');
+    tick.className = 'tick';
+    tick.style.left = pct + '%';
+    ruler.appendChild(tick);
+    const lab = document.createElement('div');
+    lab.className = 'tlab';
+    lab.style.left = pct + '%';
+    lab.textContent = t / 1000 + 's';
+    ruler.appendChild(lab);
+  }
+  grid.appendChild(thead);
+  grid.appendChild(ruler);
+
+  // master eye row
+  const mGut = document.createElement('div');
+  mGut.className = 'gcell master';
+  mGut.innerHTML = '<button class="eye">◉</button><span class="nm">Only focused</span>';
+  const mLane = document.createElement('div');
+  mLane.className = 'lane alt';
+  grid.appendChild(mGut);
+  grid.appendChild(mLane);
+
+  SHOW.tracks.forEach((tr) => {
+    const dancer = tr.kind === 'cast' ? SHOW.cast.find((d) => d.n === tr.n) : null;
+    const eyeOn = dancer ? dancer.eye : true;
+    const focused = !!(dancer && dancer.focus);
+
+    const g = document.createElement('div');
+    g.className = 'gcell' + (focused ? ' focus-row' : '') + (dancer && !dancer.eye ? ' dim-row' : '');
+    if (focused) g.classList.add('focus-row');
+    g.innerHTML =
+      `<button class="eye ${eyeOn ? '' : 'off'}">${eyeOn ? '◉' : '○'}</button>` +
+      `<span class="csw" style="background:${tr.color}"></span>` +
+      `<span class="nm">${tr.name}</span>`;
+
+    const lane = document.createElement('div');
+    lane.className = 'lane' + (tr.kind === 'cast' ? '' : ' alt');
+    if (focused) lane.classList.add('focus-row');
+    if (dancer && !dancer.eye) lane.classList.add('dim-row');
+
+    const add = (t, opts) => {
+      const d = document.createElement('div');
+      d.className = 'diamond' + (opts && opts.hollow ? ' hollow' : '');
+      d.style.color = tr.color;
+      d.style.left = (t / DUR) * 100 + '%';
+      lane.appendChild(d);
+    };
+
+    if (dancer) dancer.keys.forEach((k) => add(k.t));
+    if (tr.kind === 'prop') SHOW.props.find((p) => p.kind === 'timed').keys.forEach((k) => add(k.t, { hollow: true }));
+    if (tr.id === 'curtain') {
+      const b = document.createElement('div');
+      b.className = 'band';
+      b.style.color = '#a3405a';
+      b.style.left = (5000 / DUR) * 100 + '%';
+      b.style.width = (1800 / DUR) * 100 + '%';
+      lane.appendChild(b);
+    }
+    if (tr.n === 2) {
+      const b = document.createElement('div');
+      b.className = 'band';
+      b.style.color = '#ffb703';
+      b.style.left = (8000 / DUR) * 100 + '%';
+      b.style.width = (1800 / DUR) * 100 + '%';
+      lane.appendChild(b);
+    }
+
+    grid.appendChild(g);
+    grid.appendChild(lane);
+  });
+
+  // vertical time gridlines behind the lanes
+  for (let t = 2000; t <= DUR; t += 2000) {
+    const v = document.createElement('div');
+    v.className = 'vtick';
+    v.style.left = (t / DUR) * 100 + '%';
+    ovLanes.appendChild(v);
+  }
+
+  // show-wide pause band
+  const pause = document.createElement('div');
+  pause.className = 'pause';
+  pause.style.left = (2700 / DUR) * 100 + '%';
+  pause.style.width = (2000 / DUR) * 100 + '%';
+  pause.innerHTML = '<span>PAUSE 2.0s</span>';
+  ovLanes.appendChild(pause);
+
+  // playhead
+  const ph = document.createElement('div');
+  ph.className = 'playhead';
+  ph.style.left = (PLAYHEAD / DUR) * 100 + '%';
+  ovAll.appendChild(ph);
+}
+
+/* ------------------------------------------------------------------ boot */
+buildTracks();
+drawStage();
+window.addEventListener('resize', () => {
+  drawStage();
+});
+</script>
+</body>
+</html>

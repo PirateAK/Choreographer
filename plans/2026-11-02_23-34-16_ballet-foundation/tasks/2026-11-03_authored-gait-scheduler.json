@@ -1,0 +1,22 @@
+[
+  {
+    "content": "[scheduler-1] Confirm existing trajectory validation, adapter, solver, and diagnostic boundaries (self)",
+    "id": "scheduler-1",
+    "status": "completed"
+  },
+  {
+    "content": "[scheduler-2] Implement pure opt-in compiler for contiguous authored bilateral foot phases (self)",
+    "id": "scheduler-2",
+    "status": "completed"
+  },
+  {
+    "content": "[scheduler-3] Add deterministic continuity, load, adapter/solver, and unreachable-contact tests (self)",
+    "id": "scheduler-3",
+    "status": "completed"
+  },
+  {
+    "content": "[scheduler-4] Run focused and full engine tests, syntax checks, diff review, commit coherent changes (self)",
+    "id": "scheduler-4",
+    "status": "completed"
+  }
+]
