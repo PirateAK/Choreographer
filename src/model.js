@@ -2961,6 +2961,24 @@ export function plantProblem(show, dancer, i) {
 // the two, and the crossing is blended so a foot that is swinging slides through the air instead of
 // jumping. Read at her own clock, so a hold freezes the feet with her, and at the station itself the
 // pin is exactly where the position already puts the foot, so nothing moves when a leg begins.
+// Convert a separately evaluated stage-space ankle trajectory into solver pins. Existing authored
+// shows continue through footPins() until a trajectory has been explicitly planned and validated.
+// Targets are `{x, y, h}` stage metres; support `load` never weakens ankle following.
+export function footPinsFromTrajectory(show, dancer, lt, trajectory) {
+  const body = posAtLocal(dancer, lt);
+  if (!body || !trajectory || typeof trajectory !== 'object') return null;
+  const h = dancerHeight(show), at = poseAtLocal(dancer, lt);
+  const frame = contactFrame(body, h, at.facing, at.turn), out = {};
+  for (const side of ['left', 'right']) {
+    const target = trajectory[side];
+    if (!target || ![target.x, target.y, target.h].every(Number.isFinite)) continue;
+    const [x, y, z] = frame.toLocal({ x: target.x, y: target.y, h: target.h });
+    const load = Number.isFinite(target.load) ? Math.max(0, Math.min(1, target.load)) : 0;
+    out[side] = { x, y, z, sx: target.x, sy: target.y, w: 1, load, swing: target.swing === true };
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 export function footPins(show, dancer, lt) {
   const keys = (dancer && dancer.keys) || [];
   if (!keys.length) return null;

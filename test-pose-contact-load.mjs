@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { joints, specOf } from './src/pose.js';
+import { createShow, footPinsFromTrajectory, posAtLocal, poseAtLocal, dancerHeight } from './src/model.js';
+import { contactFrame } from './src/contact-frame.js';
 
 const spec = specOf('first');
 const target = { x: 0.08, y: 0.04, z: 0.02, w: 1 };
@@ -31,4 +33,30 @@ for (const [figure, side, point] of [[early, 0, [0.08, 0.04, 0.02]], [early, 1, 
   assert(distance(figure.legs3[side][2], { x: point[0], y: point[1], z: point[2] }) < 1e-10,
     'load changes must not change the ankle target');
 }
+
+// Stage-space trajectories convert to solver pins without losing the world mark.
+// including mirrored and turned bodies. Pin following stays exact for load 0 and load 1 alike.
+const show = createShow();
+for (const facing of [1, -1]) for (const turn of [0, 90, 270]) {
+  const dancer = { keys: [{ t: 0, x: 1.2, y: 2.8, pose: 'first', facing, turn }] };
+  const t = 0, h = dancerHeight(show), body = posAtLocal(dancer, t), at = poseAtLocal(dancer, t);
+  const frame = contactFrame(body, h, at.facing, at.turn);
+  const point = frame.toStage([0.07, 0.03, -0.04]);
+  const pins = footPinsFromTrajectory(show, dancer, t, {
+    left: { ...point, load: 0, swing: true },
+    right: { ...point, load: 1, swing: false },
+  });
+  for (const side of ['left', 'right']) {
+    const local = frame.toLocal({ x: pins[side].sx, y: pins[side].sy, h: pins[side].y * h });
+    local.forEach((value, i) => assert(Math.abs(value - [0.07, 0.03, -0.04][i]) < 1e-10,
+      `${side} trajectory roundtrip facing ${facing}, turn ${turn}`));
+  }
+  assert.equal(pins.left.load, 0);
+  assert.equal(pins.left.w, 1);
+  assert.equal(pins.left.swing, true);
+  assert.equal(pins.right.load, 1);
+  assert.equal(pins.right.w, 1);
+}
+assert.equal(footPinsFromTrajectory(show, { keys: [] }, 0, { left: { x: 0, y: 0, h: 0 } }), null,
+  'a trajectory without a dancer body has no solver frame');
 console.log('pose contact-load separation: ok');
