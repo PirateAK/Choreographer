@@ -184,4 +184,7 @@ Proposed order: (a) add shared `evaluateMovement` in model.js, (b) switch elevat
 - Pas de bourrée rise 0.02, relevé rise 0.03: provisional, editable, with unit and measurement reference.
 - Plié: 42.68° is the current contact-constrained pose, provisional preview depth, not a school demi-plié depth.
 - test-conventions.mjs summary now reflects the default state (no approvals). Its previous approval fixture printed releve.rise as school-approved.
-- Not done: solver use of fourth.spacing and fourth.foot_length.
+- Spacing solver (fourth position, conv7, load10, scroll25): when fourth.spacing is entered, specOf scales both legs' fore/aft angles together until the front heel-to-back toe gap matches. Hip and knee angles and bone lengths are unchanged. Foot length is read only then.
+- Ankle sits 0.3 of foot length from the heel: a solver assumption, not a school measurement.
+- Out of reach (e.g. 0.95 with foot length 0.15; reachable gap is about −0.15 to 0.886): the drawing stays at the nearest reachable gap, spec.spacingShortfall is set, and the School banner reports the shortfall.
+- Verified: test-fourth-spacing.mjs, test-fourth-turnout.mjs (spacing reaches solver), full engine suite, syntax, School smoke, out-of-reach banner in browser.

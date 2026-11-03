@@ -100,13 +100,13 @@ export const CONVENTIONS = [
     id: 'fourth.foot_length', kind: 'measure', applied: false, value: 0.15, min: 0.05, max: 0.3, status: 'provisional',
     label: 'Foot length (provisional)', unit: 'body height (1 = dancer height); 0.15 ≈ 25.5 cm at 1.7 m',
     measurement_reference: 'heel to longest toe, standing foot, flat',
-    school_method: 'Provisional default for development. Recorded only: the solver does not read it yet. Needed to turn fourth-position spacing into a heel-to-toe distance.',
+    school_method: 'Provisional default for development. Read by fourth-position spacing once a spacing value is entered; otherwise recorded only.',
   },
   {
-    id: 'fourth.spacing', kind: 'measure', applied: false, value: null, min: 0, max: 1, status: 'unset',
+    id: 'fourth.spacing', kind: 'measure', applied: true, value: null, min: 0, max: 1, status: 'unset',
     label: 'Fourth position front-to-back spacing', unit: 'body height (1 = dancer height)',
     measurement_reference: 'distance from the heel of the front foot to the toe of the back foot, front-to-back',
-    school_method: 'Unset. Spacing is not universally fixed across systems. Recorded only: the measure is heel-to-toe, which needs a foot length the solver does not have yet.',
+    school_method: 'Unset: the solver skips the constraint until a value is entered. When entered, the solver scales each leg’s fore/aft angle so the heel-to-toe gap matches, using the foot length. Spacing is not universally fixed across systems; the value is the school’s.',
   },
   {
     id: 'fourth.feet', kind: 'note', applied: false, value: 'Crossed, turned out (preview preset)', status: 'provisional',

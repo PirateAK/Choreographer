@@ -2,8 +2,8 @@
 // feet, with bone lengths unchanged and the contacts following the feet. Unset turnout keeps the preset.
 // Spacing stays recorded only. Engine check only; it does not certify any turnout as school-correct.
 import assert from 'node:assert/strict';
-import { POSE_SPECS, specOf, joints, feetPlaceOf, blendSpecs, BODY, toeDirection } from './src/pose.js';
-import { setConvention, resetConvention, statusOf, validate, previewSummary } from './src/conventions.js';
+import { POSE_SPECS, specOf, joints, feetPlaceOf, blendSpecs, BODY, toeDirection, fourthSpacingGap } from './src/pose.js';
+import { setConvention, resetConvention, conventionValue, statusOf, validate, previewSummary } from './src/conventions.js';
 import { createShow, overheadPoseAtLocal } from './src/model.js';
 
 const near = (a, b, tol, msg) => assert(Math.abs(a - b) <= tol, `${msg}: ${a} vs ${b}`);
@@ -58,8 +58,9 @@ assert.equal(statusOf('fourth.turnout'), 'provisional', 'entered turnout is prov
 assert.equal(specOf('fourth').turnout, 45, 'entered turnout reaches the fourth preset');
 assert(previewSummary().provisionalInUse.includes('fourth.turnout'), 'entered turnout is listed as provisional in use');
 assert.equal(setConvention('fourth.spacing', 0.5).ok, true, 'spacing accepted');
-assert(previewSummary().recordedOnly.includes('fourth.spacing'), 'spacing stays recorded only');
-assert.equal(specOf('fourth').turnout, 45, 'spacing does not change the solver');
+assert(previewSummary().provisionalInUse.includes('fourth.spacing'), 'entered spacing is listed as provisional in use');
+assert.equal(specOf('fourth').turnout, 45, 'spacing keeps the turnout');
+assert(Math.abs(fourthSpacingGap(specOf('fourth'), conventionValue('fourth.foot_length')) - 0.5) < 1e-6, 'spacing reaches the solver');
 resetConvention('fourth.spacing');
 resetConvention('fourth.turnout');
 assert.equal(specOf('fourth'), POSE_SPECS.fourth, 'reset turnout returns the shared preset');

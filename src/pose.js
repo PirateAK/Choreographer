@@ -109,6 +109,54 @@ export function arabesqueSpec(elevation) {
   return { ...base, legs: base.legs.map((leg, i) => (i === 1 ? [leg[0], leg[1], front] : leg)) };
 }
 
+// Fourth-position spacing: the heel-to-toe gap, front to back, between the front foot's heel and the back
+// foot's toe. The feet's fore/aft angles are scaled together (k) and bisected until the gap matches. Each leg
+// keeps its length and its hip and knee angles; only the fore/aft angle moves. ANKLE_FROM_HEEL is a solver
+// assumption (the ankle sits about 0.3 of the foot length from the heel), not a school measurement.
+const ANKLE_FROM_HEEL = 0.3;
+const spacingCache = new Map();
+export function fourthSpacingGap(spec, footLength) {
+  const heel = ANKLE_FROM_HEEL * footLength;
+  const toe = (1 - ANKLE_FROM_HEEL) * footLength;
+  const ank = feetPlaceOf(spec, 1, 0);
+  const dir = [0, 1].map((i) => toeDirection(spec, i));
+  const f = ank[0].z >= ank[1].z ? 0 : 1;
+  const b = 1 - f;
+  return (ank[f].z - heel * dir[f][1]) - (ank[b].z + toe * dir[b][1]);
+}
+function fourthAtScale(spec, k) {
+  return { ...spec, legs: spec.legs.map((leg) => [leg[0], leg[1], leg[2] * k]) };
+}
+export function fourthSpacingSolve(spec, spacing, footLength) {
+  const L = Number(footLength);
+  const S = Number(spacing);
+  if (!Number.isFinite(S) || !Number.isFinite(L) || L <= 0) return spec;
+  const key = `${S}|${L}|${spec.turnout || 0}`;
+  if (spacingCache.has(key)) return spacingCache.get(key);
+  // fore/aft angles may not pass 90° (horizontal); the scale stops where the larger one reaches it
+  const maxFront = Math.max(...spec.legs.map((leg) => Math.abs(leg[2] || 0)));
+  const kMax = maxFront > 0 ? 90 / maxFront : 1;
+  const gMin = fourthSpacingGap(fourthAtScale(spec, 0), L);
+  const gMax = fourthSpacingGap(fourthAtScale(spec, kMax), L);
+  let k;
+  let shortfall = 0;
+  if (S <= gMin) { k = 0; shortfall = gMin - S; }
+  else if (S >= gMax) { k = kMax; shortfall = S - gMax; }
+  else {
+    let lo = 0;
+    let hi = kMax;
+    for (let n = 0; n < 60; n++) {
+      const mid = (lo + hi) / 2;
+      if (fourthSpacingGap(fourthAtScale(spec, mid), L) < S) lo = mid;
+      else hi = mid;
+    }
+    k = (lo + hi) / 2;
+  }
+  const out = { ...fourthAtScale(spec, k), spacingShortfall: shortfall };
+  spacingCache.set(key, out);
+  return out;
+}
+
 // The school's rise for a position replaces the built-in one when a school has set it (see
 // conventions.js). Without an override the shared table entry is returned, as before. A plié depth
 // other than the baseline is re-solved for the preview.
@@ -128,6 +176,9 @@ export function specOf(id) {
     // Unset turnout leaves the preset as drawn; an entered value turns each leg out by that angle.
     const turnout = conventionValue('fourth.turnout');
     if (typeof turnout === 'number') shaped = { ...base, turnout };
+    // An entered spacing sets the heel-to-toe gap between the feet, once the foot length is known.
+    const spacing = conventionValue('fourth.spacing');
+    if (typeof spacing === 'number') shaped = fourthSpacingSolve(shaped, spacing, conventionValue('fourth.foot_length'));
   }
   const rise = riseFor(id);
   return rise === undefined || rise === shaped.rise ? shaped : { ...shaped, rise };

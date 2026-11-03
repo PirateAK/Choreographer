@@ -24,6 +24,7 @@ import {
 import { StageView } from './stage.js';
 import { MoveSheet } from './cheatsheet.js';
 import { conventionRows, setConvention, resetConvention, getApprover, setApprover, approveConvention, revokeApproval, previewSummary } from './conventions.js';
+import { specOf } from './pose.js';
 import { ElevationView } from './elevation.js';
 import { Timeline, GUTTER } from './timeline.js';
 import { CompanyLine } from './company.js';
@@ -3273,6 +3274,13 @@ function paintSchool() {
   banner.className = 'school-banner';
   banner.textContent = `Preview is running on ${summary.provisionalInUse.length} provisional value${summary.provisionalInUse.length === 1 ? '' : 's'} and ${summary.approvedInUse.length} school-approved. Results built on provisional values are not school-correct until the school reviews them.`;
   body.appendChild(banner);
+  const shortfall = specOf('fourth').spacingShortfall || 0;
+  if (shortfall > 0) {
+    const reach = document.createElement('p');
+    reach.className = 'school-banner school-reach';
+    reach.textContent = `Fourth-position spacing is out of reach: the drawing stands at the nearest gap the legs can make, ${shortfall.toFixed(3)} body heights short of the entered value.`;
+    body.appendChild(reach);
+  }
 
   const approverRow = document.createElement('div');
   approverRow.className = 'school-approver';
