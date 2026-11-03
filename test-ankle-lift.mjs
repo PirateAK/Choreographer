@@ -53,13 +53,23 @@ assert.equal(POSE_SPECS.arabesque.rise, 0.03, 'arabesque rise');
 assert.equal(POSE_SPECS.attitude.rise, 0.03, 'attitude rise');
 assert.equal(POSE_SPECS.pirouette.rise, 0.06, 'pirouette rise');
 
-// Arabesque: the working leg goes up and back (rear depth), not out to the side and down.
+// Arabesque: the working leg is level at hip height and runs back (rear depth), not out to the side and down.
 {
   const [, working] = joints(POSE_SPECS.arabesque).legs3;
   const [hip, , ankle] = working;
-  assert(ankle[2] < -0.3, `arabesque working foot rear depth ${ankle[2]}`);
-  assert(ankle[1] > hip[1] + 0.2, `arabesque working foot lifted above hip`);
+  assert(ankle[2] < -0.45, `arabesque working foot rear depth ${ankle[2]}`);
+  assert(Math.abs(ankle[1] - hip[1]) < 0.02, `arabesque working leg level with the hip`);
   assert(Math.abs(ankle[0] - hip[0]) < 0.02, 'arabesque working leg in the sagittal plane');
+}
+
+// Attitude: the thigh runs back at hip height, the knee folds and the lower leg hangs straight down.
+{
+  const [, working] = joints(POSE_SPECS.attitude).legs3;
+  const [hip, knee, ankle] = working;
+  assert(knee[2] < -0.2 && Math.abs(knee[1] - hip[1]) < 0.05, 'attitude thigh level behind the hip');
+  // The 3 degrees of rock tip the whole folded leg, so the lower leg is vertical to within that tip (about 14 mm).
+  assert(Math.abs(ankle[0] - knee[0]) < 0.01 && Math.abs(ankle[2] - knee[2]) < 0.02, 'attitude lower leg vertical');
+  assert(ankle[1] < knee[1] - 0.2, 'attitude lower leg folds down');
 }
 
 console.log('ankle lift: ok');

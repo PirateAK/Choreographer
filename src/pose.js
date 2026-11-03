@@ -59,11 +59,14 @@ export const POSE_SPECS = {
   // Both knees out over the toes, the whole body a hand's width lower.
   plie: { arms: [[30, -6], [30, -6]], legs: [[42.68, -30.57], [42.68, -30.57]], lean: 0, rise: -0.09 },
   releve: { arms: [[60, 64], [60, 64]], legs: [[1, 1], [1, 1]], lean: 0, rise: 0.03 },
-  // The long line: one leg carried back and up, one arm forward, one back — and the body tipped
-  // forward over the standing foot, which is what a balance is.
-  arabesque: { arms: [[95, 70], [-60, -30]], legs: [[1, 0], [180, 180, -60]], lean: -6, rise: 0.03, rock: 6 },
-  // The same lifted leg, bent — the toe drawn up towards the standing knee.
-  attitude: { arms: [[130, 190], [70, 66]], legs: [[1, 0], [45, -30]], lean: 3, rise: 0.03, rock: 3 },
+  // The long line: one leg carried back at hip height, one arm forward, one back — and the body tipped
+  // forward over the standing foot, which is what a balance is. The working leg is straight and reads as
+  // 90 degrees (horizontal behind) relative to the tipped body: the six degrees of rock are cancelled so
+  // the line is level in the front view, not lifted by the tip.
+  arabesque: { arms: [[95, 70], [-60, -30]], legs: [[1, 0], [180, 180, -96]], lean: -6, rise: 0.03, rock: 6 },
+  // Attitude: the thigh at hip height behind, the knee bent to 90 degrees and the lower leg folded straight
+  // down from it. The shin has its own fore-and-aft, so the fold does not swing the thigh with it.
+  attitude: { arms: [[130, 190], [70, 66]], legs: [[1, 0], [180, 0, -87, 0]], lean: 3, rise: 0.03, rock: 3 },
   // Up on one pointe, the other foot at the knee, arms rounded to make a hoop.
   pirouette: { arms: [[35, -15], [35, -15]], legs: [[1, 0], [40, -35]], lean: 0, rise: 0.06 },
   // The travelling step that links two poses: crossed feet, one on the pointe behind.
@@ -124,6 +127,8 @@ export function blendSpecs(a, b, t) {
       lerp(a.legs[i][0], b.legs[i][0], t),
       lerp(a.legs[i][1], b.legs[i][1], t),
       lerp(a.legs[i][2] || 0, b.legs[i][2] || 0, t),
+      // The shin's own fore-and-aft, when it has one, else it follows the thigh as it always did.
+      lerp(a.legs[i][3] ?? a.legs[i][2] ?? 0, b.legs[i][3] ?? b.legs[i][2] ?? 0, t),
     ]),
     lean: lerp(a.lean, b.lean, t),
     rise: lerp(a.rise || 0, b.rise || 0, t),
@@ -197,11 +202,13 @@ export function joints(spec, facing = 1, turn = 0, pins = null) {
     if (!rockAngle) return 0;
     // Compare the lowest ankle before and after tipping, whichever leg each one is.
     let before = Infinity, after = Infinity;
-    for (const [hip, knee, front = 0] of spec.legs) {
+    for (const [hip, knee, front = 0, shinFront = front] of spec.legs) {
       const swing = (Number(front) * Math.PI) / 180;
+      const shinSwing = (Number(shinFront) * Math.PI) / 180;
       const flat = leg * Math.cos(swing);
-      const dy = -Math.cos((hip * Math.PI) / 180) * flat - Math.cos((knee * Math.PI) / 180) * flat;
-      const dz = 2 * Math.sin(swing) * leg;
+      const flatShin = leg * Math.cos(shinSwing);
+      const dy = -Math.cos((hip * Math.PI) / 180) * flat - Math.cos((knee * Math.PI) / 180) * flatShin;
+      const dz = (Math.sin(swing) + Math.sin(shinSwing)) * leg;
       before = Math.min(before, dy);
       after = Math.min(after, dy * rc - dz * rs);
     }
@@ -230,13 +237,15 @@ export function joints(spec, facing = 1, turn = 0, pins = null) {
   const squareBase = (i) => [(i === 0 ? 1 : -1) * m * BODY.hipW, hipY, 0];
   const limbFrom = (i, base) => {
     const side = (i === 0 ? 1 : -1) * m;
-    const [hip, knee, front = 0] = spec.legs[i];
+    const [hip, knee, front = 0, shinFront = front] = spec.legs[i];
     const swing = (Number(front) * Math.PI) / 180;
+    const shinSwing = (Number(shinFront) * Math.PI) / 180;
     const flat = leg * Math.cos(swing);
+    const flatShin = leg * Math.cos(shinSwing);
     const [kx, ky] = reach(hip, flat, side);
     const kneePoint = [base[0] + kx, base[1] + ky, base[2] + Math.sin(swing) * leg];
-    const [ax, ay] = reach(knee, flat, side);
-    const ankle = [kneePoint[0] + ax, kneePoint[1] + ay, kneePoint[2] + Math.sin(swing) * leg];
+    const [ax, ay] = reach(knee, flatShin, side);
+    const ankle = [kneePoint[0] + ax, kneePoint[1] + ay, kneePoint[2] + Math.sin(shinSwing) * leg];
     return [base, tip(base, kneePoint), tip(base, ankle)];
   };
 

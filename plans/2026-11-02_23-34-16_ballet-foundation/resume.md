@@ -74,3 +74,21 @@ Proposed order: (a) add shared `evaluateMovement` in model.js, (b) switch elevat
 - Attitude has the same lowered-sideways working leg (`[45, -30]`, ankle 0.12). Not changed yet; needs the same review.
 - Import map: pose load3, model trajectory8. Engine suite passes (14 tests incl. rear-depth assertions in test-ankle-lift.mjs). Browser smoke: no page errors.
 
+
+## Status: arabesque/attitude convention and attitude fix (2026-11-03)
+- Arabesque now 90° (thigh and leg horizontal behind, straight): legs `[[1, 0], [180, 180, -96]]`. The 6° rock tip is cancelled by `front −96` so the line is level with the hip (ankle y − hip y < 0.02). Rear depth z < −0.45 of body height. Rise 0.03 on the standing foot.
+- Attitude fixed: thigh level behind (`[180, 0, -87, 0]`: hip 180, knee 0, front −87), knee at 90°, lower leg folded straight down with its own fore-and-aft (`shinFront` 0). Knee z < −0.2 and level with the hip (|Δy| < 0.05). Ankle is below the knee by > 0.2. Shin verticality tolerance is 0.02 because the 3° rock tips the shin 13 mm in z. Documented in test-ankle-lift.mjs.
+- Code: `shinFront` (optional 4th entry of a leg triplet, default = front) is supported in `blendSpecs`, `rockSink`, and `limbFrom`. Settle stays 0 mm.
+- Import map: pose load4 (model trajectory8, unchanged).
+- Verified: syntax, 14 engine tests including test-ankle-lift.mjs, `git diff --check`, browser smoke (title ok, no page errors).
+
+### Teacher questions (unresolved, school-dependent)
+- Arabesque at 90° horizontal behind is the convention used here; confirm against the school's line (some syllabi use lower or higher elevation).
+- Attitude fold: thigh horizontal, knee 90°, lower leg vertical. Confirm the fold and whether the foot sits at knee height or lower.
+- Fourth-position shape: angles changed a lot in the re-solve, contacts match HEAD.
+- Plié thigh 20° → 43°.
+- Pas de bourrée rise 0.02 pending syllabus.
+- Relevé ball-of-foot height 0.010 (HEAD), confirm the floor convention.
+
+### Not started
+- Per-dancer height settings. Only start after the moves above are confirmed for height. `dancerHeight(show)` is still global.
