@@ -41,6 +41,13 @@ Proposed order: (a) add shared `evaluateMovement` in model.js, (b) switch elevat
 - Watch: overhead can now show new red X where rise/absorb shorten the leg. This is the honest result, not a threshold change. Review existing shows before calling it done.
 - Not done: House render path not exercised in browser; leg-length (rise/2 per leg) still open (Phase 2).
 
+## Leg length / ankle articulation: design findings (2026-11-03, not yet implemented)
+- `pose.js` joints(): `leg = BODY.leg + rise/2` per leg; `hipY = BODY.hip + rise - rockSink`. Rise lengthens legs and raises hips; ankles stay on floor.
+- Fixed legs cannot do this: a straight leg with the hip raised by `rise` cannot reach the floor. Fixing lengths REQUIRES an ankle-lift term: the ankle sits `ankleLift` above the ball-of-foot contact, and the hip rises by the same amount.
+- Consequences if changed: `floorY` clamp in joints (ownAnkle), pins (`y` is contact height 0; relevé pins need the lift), `feetPlaceOf`/contacts (contacts equal ankles today), `test-pose-calibration.mjs` line ~30 asserts `len = BODY.leg + rise/2` (encodes current lengthening; must be updated deliberately), cheatsheet.js line ~141 (level rise for drawing).
+- Rise values today: demi 0.02, pointe 0.045 (LEVEL_RISE, body heights); releve 0.04, pirouette 0.05, arabesque/attitude/pas-de-bourree 0.02, plie -0.09, fourth -0.02.
+- Open decision for the user: ankle-lift per level (demi vs pointe heights), and whether the ball of the foot or the ankle is the contact on relevé. Arabesque and attitude carry a rise of 0.02 on the standing foot, which may be a flat foot or a pointe — needs clarifying.
+
 ## Guardrails (from plan.md and guidelines.md)
 - Do not move user stations or rewrite existing choreography silently.
 - Keep warnings honest; do not raise thresholds to hide them.
