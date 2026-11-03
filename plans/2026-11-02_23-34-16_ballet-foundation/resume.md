@@ -117,3 +117,9 @@ Proposed order: (a) add shared `evaluateMovement` in model.js, (b) switch elevat
 - Import map: pose load5, model trajectory9, cheatsheet guide22, conventions conv1, app scroll22 (styles.css scroll22).
 - Verified: 15 engine tests incl. test-conventions.mjs (defaults equal code, override reaches specOf and contact stays on ball-of-foot, refusals, reset); syntax; `git diff --check`; browser check of the sheet (rows, save, reset, refusal, Esc) with no page errors besides the pre-existing favicon 404.
 - Next: wire the recorded rows into the solver as the school supplies values (plié depth needs a re-solve of the sink and shin; arabesque/attitude height needs the working-leg angle solve; fourth needs a geometry definition).
+
+## Decision: relevé ball-of-foot height (2026-11-03)
+- Value: 0.03 body height (1 = dancer height), provisional default. Not a school-approved measurement. Editable in the School table (`releve.rise`).
+- Meaning: vertical distance from the floor to the ball-of-foot contact point during relevé, both feet. Zero is the floor contact. Unit: fraction of dancer height.
+- Prior value: 0.010 at HEAD, kept here as a prior value. It is not used and was not silently replaced.
+- Open: the school to confirm or replace the value, and whether it is demi-pointe or pointe for the relevé step.

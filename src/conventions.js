@@ -24,8 +24,9 @@ export const CONVENTIONS = [
   },
   {
     id: 'releve.rise', kind: 'rise', pose: 'releve', applied: true, value: 0.03, min: 0, max: 0.1,
-    label: 'Relevé', unit: 'body height', reference: 'floor to the ball of the foot, both feet',
-    note: 'Heel lifted, weight on the balls of the feet. Zero is the floor contact.',
+    label: 'Relevé (provisional)', unit: 'body height (1 = dancer height)',
+    reference: 'vertical distance from the floor to the ball-of-foot contact point during relevé, both feet',
+    note: 'Provisional default 0.03, not a school-approved measurement. Editable. The earlier 0.010 (HEAD) is kept in the notes as a prior value and is not used.',
   },
   {
     id: 'pirouette.rise', kind: 'rise', pose: 'pirouette', applied: true, value: 0.06, min: 0, max: 0.1,
