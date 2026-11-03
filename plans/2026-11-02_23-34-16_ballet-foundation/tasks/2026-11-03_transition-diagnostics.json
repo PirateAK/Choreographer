@@ -1,0 +1,14 @@
+[
+  {
+    "content": "[diagnostics-1] Compare stationary pose and short/long transition contact gaps [self]",
+    "id": "diagnostic-1",
+    "status": "completed",
+    "findings": "At default 1.7m height, most stationary fixtures have no visible warning; stationary arabesque has ~6mm model shortfall (over 5mm display threshold). First→second in place clean; moving it 0.1m gives ~12mm maximum gap; 4m gives ~999mm. none→none 0.3m gives ~11mm, 0.9m ~67mm, 4m ~804mm. These are model measurements, not validated human limits. Reproduce with node test-transition-diagnostics.mjs."
+  },
+  {
+    "content": "[diagnostics-2] Save measured findings and next bounded work; no choreography changes [self]",
+    "id": "diagnostic-2",
+    "status": "completed",
+    "next_step": "Both random distant placement AND contact/pose model limitations contribute. Do not blame all warnings on user. Before Fix transition UI or automatic intermediate stations, calibrate fixed-length geometry/contact targets on stationary arabesque and short walking fixtures; inspect rise/hip shift/contact transfer. Preserve warning honesty; do not merely raise thresholds. No runtime/model behavior changed by this diagnostic. Await user direction for Phase 2. User wants app to supply plausible intermediate footwork instead of requiring novice to know it; daughter expert review later."
+  }
+]
