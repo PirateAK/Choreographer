@@ -3,6 +3,7 @@
 // The positions' geometry lives in pose.js — the angles, and therefore where the feet are — so
 // that a contact is measured from the same table the figures are drawn from.
 import { PLANT_BY_POSE, feetPlaceOf, joints, specOf, blendSpecs } from './pose.js';
+import { contactFrame } from './contact-frame.js';
 
 // The four things a station can stand on. Kept here rather than beside the contact code so a
 // show read from a file can be tidied before anything else in the module has been evaluated.
@@ -3045,12 +3046,35 @@ export function feetOnFloor(show, dancer, lt) {
   return out;
 }
 
-// A stance foot that moves while the body stays where it is: the skate nobody can see, because
-// the floor is not drawn. Only a leg that does not travel is measured — a travelling leg is a
-// step, and its feet are meant to change — and only a single planted foot, because changing from
-// first to second on both feet moves both of them and always has. What this can measure is the
-// whole floor: since the pose table gained a fore/aft swing, a foot that creeps upstage is as visible as
-// one that creeps across, and both are measured from the same three-axis foot position.
+// Overhead geometry keeps solved ankles distinct from requested contacts.
+// Preserve the current pose/rise assumptions for this bounded rendering correction.
+export function overheadPoseAtLocal(show, dancer, lt) {
+  const origin = posAtLocal(dancer, lt);
+  if (!origin) return null;
+  const at = poseAtLocal(dancer, lt);
+  const spec = blendSpecs(specOf(at.pose), specOf(at.next), at.t);
+  const h = dancerHeight(show);
+  const frame = contactFrame(origin, h, at.facing, at.turn);
+  const contacts = footPins(show, dancer, lt);
+  const pins = contacts && Object.fromEntries(Object.entries(contacts).map(([side, pin]) => {
+    const [x, y, z] = frame.toLocal({ x: pin.sx, y: pin.sy, h: pin.y * h });
+    return [side, { ...pin, x, y, z }];
+  }));
+  const figure = joints(spec, 1, 0, pins);
+  const legs = figure.legs3.map(leg => leg.map(frame.toStage));
+  const feet = {};
+  for (const [i, side] of ['left', 'right'].entries()) {
+    const pin = pins && pins[side];
+    const short = figure.shortfall[i];
+    feet[side] = { ...legs[i][2], held: !!(pin && pin.w > 0.5 && !short),
+      unreachable: !!(short && pin), target: short && pin ? frame.toStage(short.target) : null,
+      shortfall: short ? short.over * h : 0 };
+  }
+  return { at, figure, frame, legs, feet };
+}
+
+// A single planted foot drifting during an otherwise stationary transition.
+// Destination two-foot plants intentionally transfer contacts and are not skate faults.
 export function footSkate(show, dancer, i) {
   const keys = (dancer && dancer.keys) || [];
   const a = keys[i - 1];

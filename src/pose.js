@@ -293,7 +293,7 @@ export function joints(spec, facing = 1, turn = 0, pins = null) {
       // How much further than the leg the foot was asked to be, and how much of that lies across the
       // floor and upstage: a plan is read from above, so it needs the floor part of the same figure.
       const over = D - 2 * leg;
-      shortfall[i] = { over, overX: (over * dx) / D, overZ: (over * dz) / D };
+      shortfall[i] = { over, overX: (over * dx) / D, overZ: (over * dz) / D, target };
     }
     return [root, bend, toe];
   });

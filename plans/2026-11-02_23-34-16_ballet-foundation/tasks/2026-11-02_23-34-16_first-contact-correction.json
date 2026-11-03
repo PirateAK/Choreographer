@@ -1,27 +1,27 @@
 [
   {
-    "id": "contact-1",
     "content": "[foundation-1] Trace contact transforms and create reachable/unreachable geometry fixtures [self]",
-    "status": "pending"
+    "id": "contact-1",
+    "status": "completed"
   },
   {
-    "id": "contact-2",
     "content": "[foundation-2] Stop overriding solved ankles and distinguish unreachable contact targets [self]",
-    "status": "pending"
+    "id": "contact-2",
+    "status": "completed"
   },
   {
-    "id": "contact-3",
     "content": "[foundation-3] Review fixed segment lengths and contact/view consistency [delegate]",
-    "status": "pending"
+    "id": "contact-3",
+    "status": "completed"
   },
   {
-    "id": "contact-4",
     "content": "[foundation-4] Run focused and existing regressions plus browser playback/scrub checks [self]",
-    "status": "pending"
+    "id": "contact-4",
+    "status": "completed"
   },
   {
-    "id": "contact-5",
     "content": "[foundation-5] Save checkpoint and request user visual review before broader model changes [self]",
-    "status": "pending"
+    "id": "contact-5",
+    "status": "completed"
   }
 ]

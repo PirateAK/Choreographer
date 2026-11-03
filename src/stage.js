@@ -5,9 +5,9 @@ import {
   addStation, objectShown, wingBays, findObject, propPosOfContent, carrierOf, sceneryStateAt,
   clothSpan, clothX, clothDepth, clothThick, clampClothX, curtainLegW, POSE_LABEL, lightLevelAt,
   lightSpot, costumeOf, legPoints, curveAt, BEND_LIMIT,
-  footAtLocal, footSkate, legOverreach, feetOnFloor, poseOfContent, dancerHeight, footPins,
+  footAtLocal, footSkate, legOverreach, dancerHeight, overheadPoseAtLocal,
 } from './model.js';
-import { blendSpecs, specOf, joints, darker } from './pose.js';
+import { darker } from './pose.js';
 
 // A lantern's colour at a given strength, so every pool and beam is drawn from
 // the same hex rather than from a hand-written rgba per place it appears.
@@ -642,8 +642,9 @@ export class StageView {
     }
 
     // Draw the figure at the exact floor position, not an upright icon offset from it.
-    if (!this.compact) this.drawOverhead(d, p, lt);
-    if (!this.compact) this.drawFeet(d, lt);
+    const solved = this.compact ? null : overheadPoseAtLocal(show, d, lt);
+    if (solved) this.drawOverhead(d, p, lt, solved);
+    if (solved) this.drawFeet(d, lt, solved);
 
     if (selected) {
       ctx.beginPath();
@@ -684,26 +685,17 @@ export class StageView {
   }
 
 
-  drawOverhead(d, p, lt) {
+  drawOverhead(d, p, lt, solved = overheadPoseAtLocal(state.show, d, lt)) {
+    if (!solved) return;
     const ctx = this.ctx;
-    const at = poseOfContent(state.show, d, state.ui.playhead);
-    const spec = blendSpecs(specOf(at.pose), specOf(at.next), at.t);
+    const { at, figure, frame } = solved;
     const h = dancerHeight(state.show);
     const angle = (Number(at.turn) || 0) * Math.PI / 180;
-    const c = Math.cos(angle), s = Math.sin(angle);
     const mirror = at.facing < 0 ? -1 : 1;
-    const contacts = footPins(state.show, d, lt);
-    const pins = contacts && Object.fromEntries(Object.entries(contacts).map(([side, pin]) => {
-      const across = (pin.sx - p.x) / h / mirror;
-      const house = (p.y - pin.sy) / h;
-      return [side, { ...pin, x: across * c - house * s, z: across * s + house * c }];
-    }));
-    const figure = joints(spec, 1, 0, pins);
-    const project = (x, z, height = 0) => this.w2s(
-      p.x + mirror * (x * c + z * s) * h,
-      p.y - (z * c - x * s) * h,
-      height * h
-    );
+    const project = (x, z, height = 0) => {
+      const point = frame.toStage([x, height, z]);
+      return this.w2s(point.x, point.y, point.h);
+    };
     const cos = costumeOf(state.show, d);
     const body = cos ? cos.body : d.color;
     const size = h * this.scale;
@@ -715,14 +707,10 @@ export class StageView {
     };
     ctx.save();
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    // Actual fore/aft depth, ending at the same planted contacts as the foot markers.
-    const feet = feetOnFloor(state.show, d, lt);
-    figure.legs3.forEach((leg, i) => {
-      const points = leg.map(j => project(j[0], j[2], j[1]));
-      const foot = feet[i === 0 ? 'left' : 'right'];
-      if (foot) points[2] = this.w2s(foot.x, foot.y, foot.h);
-      stroke(points, body, Math.max(2, size * 0.035));
-    });
+    // Every endpoint comes from the solver, including an ankle that cannot reach its target.
+    for (const leg of solved.legs) {
+      stroke(leg.map(j => this.w2s(j.x, j.y, j.h)), body, Math.max(2, size * 0.035));
+    }
     // Costume visibility is independent from paths and station markers.
     if (state.ui.showCostumes === true) {
       const center = project(figure.pelvis[0], 0, figure.pelvis[1]);
@@ -757,23 +745,29 @@ export class StageView {
   // one she can move. A foot the position has off the deck is drawn faint, so an arabesque reads as
   // one foot down rather than as two. The floor is the one thing a choreographer reads a plan for,
   // and until now it was the one thing the plan did not draw.
-  drawFeet(d, lt) {
+  drawFeet(d, lt, solved = overheadPoseAtLocal(state.show, d, lt)) {
+    if (!solved) return;
     const ctx = this.ctx;
-    const show = state.show;
-    const keys = d.keys || [];
-    if (!keys.length) return;
-    // Which station she is standing on, and therefore which foot is still down while she travels
-    // towards the next one: the departure foot carries the stance, not the arrival foot.
-    let idx = 0;
-    for (let i = 0; i < keys.length; i++) if (keys[i].t <= lt) idx = i;
-    // The foot she is standing on is on its contact, so a mark stays where it was put while she
-    // travels. A foot in the air is drawn where it is, faint.
-    const feet = feetOnFloor(show, d, lt);
+    const feet = solved.feet;
     const R = Math.max(2.4, Math.min(7, 0.085 * this.scale));
     for (const side of ['left', 'right']) {
       const f = feet[side];
       if (!f) continue;
-      const sp = this.w2s(f.x, f.y);
+      const sp = this.w2s(f.x, f.y, f.h);
+      if (f.unreachable && f.target && f.shortfall > 0.005) {
+        const target = this.w2s(f.target.x, f.target.y, f.target.h);
+        ctx.save();
+        ctx.strokeStyle = THEME.danger;
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.moveTo(sp.x, sp.y); ctx.lineTo(target.x, target.y); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(target.x - 3, target.y - 3); ctx.lineTo(target.x + 3, target.y + 3);
+        ctx.moveTo(target.x - 3, target.y + 3); ctx.lineTo(target.x + 3, target.y - 3);
+        ctx.stroke();
+        ctx.restore();
+      }
       // A foot more than a hand's width up is not on the floor at all, so it is drawn faint:
       // an arabesque should read as one foot down, not as two.
       const down = f.h <= 0.12;
