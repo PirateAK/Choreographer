@@ -90,5 +90,14 @@ Proposed order: (a) add shared `evaluateMovement` in model.js, (b) switch elevat
 - Pas de bourrée rise 0.02 pending syllabus.
 - Relevé ball-of-foot height 0.010 (HEAD), confirm the floor convention.
 
+### Teacher answers (received 2026-11-03; standard conventions vs school-specific measurements)
+- Arabesque 90° (horizontal behind, straight leg): recognized target for the working leg. The school's line decides the arm and body shape. Keep hips and shoulders aligned to that line rather than turning to force height. Current code matches the 90° target. Confirm the school's arm and body shape before fixing it.
+- Attitude: 90° knee bend is the common reference. Knee sits higher than the pointed foot, not level with it. Current code has the foot below the knee (test: ankle y < knee y − 0.2), which matches this. Still confirm the school's knee height.
+- Fourth position: define the school's geometry explicitly: turnout, spacing, and whether the feet are crossed or parallel to the direction of travel. Contacts match HEAD, but the shape may differ visually. Needs school definition before further changes.
+- Plié thigh 20° → 43°: the number alone does not show correctness. Specify the measurement convention (thigh-to-floor or thigh-to-vertical) and intended depth. Grand plié thighs are generally described as reaching horizontal. Needs a measurement convention before the change is judged.
+- Pas de bourrée rise 0.02: keep pending syllabus. Needs units and a reference point (floor, ball of foot, or heel) before it is actionable.
+- Relevé ball-of-foot height 0.010: define height from the floor to the ball of the foot, in body-height units. On demi-pointe the heel lifts while rising onto the balls of the feet. The floor convention must state which contact is the zero-height reference.
+- Principle: record angle or height, anatomical reference point, units, and school or syllabus convention separately. The same pose can otherwise be read differently.
+
 ### Not started
 - Per-dancer height settings. Only start after the moves above are confirmed for height. `dancerHeight(show)` is still global.
