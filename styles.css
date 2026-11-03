@@ -543,7 +543,7 @@ body.watch #stage { cursor: default; }
   background: var(--panel);
   border-top: 1px solid var(--line);
   display: grid;
-  grid-template-rows: 40px minmax(0, 1fr) 46px;
+  grid-template-rows: 40px minmax(0, 1fr) 24px 46px;
   min-height: 0;
 }
 #transport {
@@ -564,6 +564,17 @@ body.watch #stage { cursor: default; }
 .check input { accent-color: var(--accent); }
 .collision { color: var(--danger); font-size: 11px; white-space: nowrap; overflow: hidden; }
 #timeline { display: block; width: 100%; height: 100%; }
+/* The window's place along the whole show. The label sits in the track gutter so the bar
+   starts where the tracks do. */
+.time-scroll {
+  display: grid; grid-template-columns: 176px minmax(0, 1fr); align-items: center;
+  border-top: 1px solid var(--line); background: #0b0e14; min-width: 0;
+}
+.time-scroll-label {
+  padding: 0 10px; color: var(--dim); font-size: 10.5px; white-space: nowrap; overflow: hidden;
+  font-variant-numeric: tabular-nums; font-family: Consolas, "SF Mono", monospace;
+}
+#timeScroll { width: calc(100% - 12px); margin: 0 12px 0 0; accent-color: var(--accent); cursor: ew-resize; }
 /* The crowd, under the tracks: a step line of how many performers are on the deck, on the
    same clock and the same gutter as the tracks above it. */
 #companyLine {

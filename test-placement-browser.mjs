@@ -9,7 +9,7 @@ try {
   await page.goto(`http://localhost:${process.env.APP_PORT || 3001}`);
   await page.waitForSelector('#btnMoves');
   await page.evaluate(async () => {
-    const { state } = await import('/src/model.js?v=step19');
+    const { state } = await import('/src/model.js');
     const dancer = state.show.cast[0];
     state.ui.selectedId = dancer.id;
     state.ui.stationIdx = dancer.keys.length - 1;
@@ -24,19 +24,19 @@ try {
   await page.fill('#phraseCounts', '3');
   await page.click('#btnStationGuide');
   const armed = await page.evaluate(async () => {
-    const { state } = await import('/src/model.js?v=step19');
+    const { state } = await import('/src/model.js');
     return { guide: state.ui.stationGuide, unchanged: JSON.stringify(state.show.cast[0].keys) === window.beforeGuide, placing: state.ui.placingStations };
   });
   assert(armed.unchanged && armed.placing);
   assert.equal(armed.guide.step, 'chasse');
   await page.keyboard.press('Escape');
-  assert.equal(await page.evaluate(async () => (await import('/src/model.js?v=step19')).state.ui.stationGuide), null);
+  assert.equal(await page.evaluate(async () => (await import('/src/model.js')).state.ui.stationGuide), null);
   await page.click('#btnMoves');
   await page.click('#btnStationGuide');
   // Call the real stage pointer handler at an empty, tilted floor point.
   const result = await page.evaluate(async () => {
-    const { state } = await import('/src/model.js?v=step19');
-    const { StageView } = await import('/src/stage.js?v=guide20');
+    const { state } = await import('/src/model.js');
+    const { StageView } = await import('/src/stage.js');
     const dancer = state.show.cast[0];
     const count = dancer.keys.length;
     const canvas = document.createElement('canvas');

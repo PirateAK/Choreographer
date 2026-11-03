@@ -19,12 +19,12 @@ import {
   POSE_LABEL, STEP_LABEL, LEVEL_LABEL, EASES, EASE_LABEL,
   plantsOf, plantProblem, footSkate, legOverreach, PLANT_LABEL, rolesOf, setRole,
   scanOverlaps, overlapFix, applyOverlapFix, pathsKey, CLEARANCE,
-  phraseShape, addPhrase, countGrid, localAtCount, phrasePlan,
+  phraseShape, addPhrase, countGrid, localAtCount, phrasePlan, timelineScrollRange,
 } from './model.js';
 import { StageView } from './stage.js';
 import { MoveSheet } from './cheatsheet.js';
 import { ElevationView } from './elevation.js';
-import { Timeline } from './timeline.js';
+import { Timeline, GUTTER } from './timeline.js';
 import { CompanyLine } from './company.js';
 import { fmtTime } from './draw.js';
 import { music, dropStored } from './music.js';
@@ -3288,7 +3288,38 @@ function render() {
   }
   app.timeline.draw();
   app.company.draw();
+  syncTimeScroll();
   updateTransport();
+}
+
+// The slider is a view of `scrollT`, not a second copy of it: wheel, zoom and the playhead
+// following playback all move the window, and the bar is brought into line every frame.
+function timeScrollView() {
+  const width = $('timeline').clientWidth - GUTTER;
+  return Math.max(1, width / Math.max(1, state.ui.pxPerSec));
+}
+
+function syncTimeScroll() {
+  const bar = $('timeScroll');
+  if (!bar) return;
+  const range = timelineScrollRange(state.show, timeScrollView(), state.ui.scrollT);
+  const max = range.max.toFixed(2);
+  if (bar.max !== max) bar.max = max;
+  // Writing value while the thumb is held would fight the hand moving it.
+  if (document.activeElement !== bar || !bar.matches(':active')) {
+    const v = String(Math.round(state.ui.scrollT * 100) / 100);
+    if (bar.value !== v) bar.value = v;
+  }
+  bar.disabled = range.max <= 0.01;
+  const from = state.ui.scrollT * 1000;
+  const label = `${fmtClock(from)}–${fmtClock(from + range.view * 1000)} of ${fmtClock(range.endSec * 1000)}`;
+  const el = $('timeScrollLabel');
+  if (el.textContent !== label) el.textContent = label;
+}
+
+function fmtClock(ms) {
+  const s = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
 let lastFrame = 0;
@@ -4113,6 +4144,10 @@ function boot() {
   $('btnEnd').addEventListener('click', addEnd);
   $('zoomIn').addEventListener('click', () => {
     state.ui.pxPerSec = Math.min(800, state.ui.pxPerSec * 1.35);
+  });
+  $('timeScroll').addEventListener('input', (e) => {
+    state.ui.scrollT = Math.max(0, Number(e.target.value) || 0);
+    app.timeline.closeMenu();
   });
   $('zoomOut').addEventListener('click', () => {
     state.ui.pxPerSec = Math.max(4, state.ui.pxPerSec / 1.35);

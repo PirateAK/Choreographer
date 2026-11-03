@@ -3189,6 +3189,20 @@ export function endDisplay(show) {
   return displayOfContent(show, endContent(show));
 }
 
+// How far the timeline window may be slid, in display seconds. It reaches everything already
+// placed — even work after an end marker, or music past the last act — plus room to keep
+// building past it, and never snaps back from a view the wheel already scrolled to.
+export function timelineScrollRange(show, viewSec, scrollT = 0) {
+  const view = Math.max(1, Number(viewSec) || 1);
+  let end = Math.max(endContent(show), lastContent(show), totalActLength(show));
+  for (const t of (show && show.musicTracks) || []) end = Math.max(end, (Number(t.start) || 0) + musicSpan(t));
+  for (const c of (show && show.narration) || []) end = Math.max(end, (Number(c.at) || 0) + (Number(c.length) || 0));
+  const endSec = displayOfContent(show, end) / 1000;
+  const room = Math.max(30, view * 0.5);
+  const max = Math.max(0, endSec + room - view, Number(scrollT) || 0);
+  return { endSec, max, view };
+}
+
 /* -------------------------------------------------------------- collision */
 
 // Two bodies need this much floor between them before it reads as a pass rather than a
