@@ -1,0 +1,32 @@
+[
+  {
+    "content": "[walk2-1] Review current single-interval generated-walk implementation and define destination contact/closure invariants without changing existing choreography",
+    "id": "walk2-1",
+    "status": "completed"
+  },
+  {
+    "content": "[walk2-2] Design a minimal multi-interval walk schedule that carries contact and support state continuously across adjacent intervals",
+    "id": "walk2-2",
+    "status": "completed"
+  },
+  {
+    "content": "[walk2-3] Add deterministic tests for start/end ankle positions, closure, support transfer, interval boundaries, and unreachable warnings",
+    "id": "walk2-3",
+    "status": "completed"
+  },
+  {
+    "content": "[walk2-4] Implement multi-step walk scheduling with no UI/new moves, preserving authored station locations and legacy fallback outside scheduled ranges",
+    "id": "walk2-4",
+    "status": "completed"
+  },
+  {
+    "content": "[walk2-5] Run engine regressions, browser smoke tests, and review the generated movement; keep reach warnings honest",
+    "id": "walk2-5",
+    "status": "completed"
+  },
+  {
+    "content": "[walk2-6] Commit the verified checkpoint and review any remaining foundation blockers before realistic avatars",
+    "id": "walk2-6",
+    "status": "in_progress"
+  }
+]

@@ -3070,62 +3070,106 @@ export function footPins(show, dancer, lt) {
 }
 
 
-// Generate one deliberately narrow prototype walk for a single adjacent station interval. The
-// starting support stays planted while carrying weight, then releases as the arriving foot lands.
-// Only the arriving ankle is guaranteed to meet the destination mark; trailing-foot closure is
-// outside this prototype, not technique certification.
+// Generate one explicitly limited generated walk interval. The departing support stays on its exact
+// mark through weight transfer; the arriving foot lands at its authored destination mark, accepts
+// support, and the trailing foot then swings closed onto its own destination mark. The walk is a
+// geometric prototype, not a technique-certified gait.
 export function generatedWalkSchedule(show, dancer, destinationIndex, opts = {}) {
   const keys = (dancer && dancer.keys) || [];
   const i = Number(destinationIndex);
-  const a = keys[i - 1], b = keys[i];
-  if (!Number.isInteger(i) || i < 1 || !a || !b || b.step !== 'walk') return null;
-  const duration = b.t - a.t;
-  if (!Number.isFinite(duration) || duration <= 0) return null;
+  const b = keys[i];
+  if (!Number.isInteger(i) || i < 1 || !b || b.step !== 'walk') return null;
+  let start = i;
+  while (start > 1 && keys[start - 1].step === 'walk') start--;
+  const base = keys[start - 1] || keys[start];
   const plants = plantsOf(dancer);
-  const startPlant = plants[i - 1] && plants[i - 1].name;
-  const endPlant = plants[i] && plants[i].name;
-  // A walk leaving a two-foot stance takes the right foot first, matching the existing phrase rule.
-  const side = startPlant === 'left' || startPlant === 'right'
-    ? startPlant
-    : startPlant === 'both' ? (opts.startSupport === 'right' ? 'right' : 'left') : null;
-  const arrival = endPlant === 'left' || endPlant === 'right' ? endPlant
-    : endPlant === 'both' && side ? otherFoot(side) : null;
-  if (!side || !arrival || side === arrival) return null;
-
-  const startTime = a.t;
-  const startFeet = Object.fromEntries(['left', 'right'].map((foot) => {
-    const mark = footAtLocal(show, dancer, startTime, foot);
-    return [foot, { x: mark.x, y: mark.y, h: mark.h, load: foot === side ? 1 : 0, follow: foot === side || foot === arrival ? 1 : 0 }];
+  const startPlant = plants[start - 1];
+  const initialSide = startPlant && (startPlant.name === 'left' || startPlant.name === 'right')
+    ? startPlant.name
+    : opts.startSupport === 'right' ? 'right' : 'left';
+  const initialMarkTime = base.t;
+  const initialFeet = Object.fromEntries(['left', 'right'].map((foot) => {
+    const mark = footAtLocal(show, dancer, initialMarkTime, foot);
+    return [foot, { x: mark.x, y: mark.y, h: mark.h, load: foot === initialSide ? 1 : 0, follow: 1 }];
   }));
-  const endFeet = Object.fromEntries(['left', 'right'].map((foot) => {
-    const mark = foot === side ? startFeet[foot] : footAtLocal(show, dancer, b.t, foot);
-    return [foot, { x: mark.x, y: mark.y, h: mark.h, load: foot === arrival ? 1 : 0, follow: foot === side ? 0 : 1 }];
-  }));
-  const transfer = Number.isFinite(opts.transfer) ? Math.max(0.2, Math.min(0.8, opts.transfer)) : 0.5;
-  const moving = otherFoot(side);
-  startFeet[moving].follow = 0;
-  const phases = [
-    {
-      name: 'walk-support-transfer', duration: duration * transfer,
-      feet: {
-        [side]: { to: { ...startFeet[side], load: 1 - transfer }, mode: 'hold' },
-        [moving]: { to: { ...startFeet[moving], load: transfer, follow: 0 }, mode: 'hold' },
+  let support = initialSide;
+  const tracks = { left: [], right: [] };
+  const intervalInfo = [];
+  for (let k = start; k <= i; k++) {
+    const from = keys[k - 1], to = keys[k];
+    if (!from) return null;
+    const duration = to.t - from.t;
+    if (to.step !== 'walk' || !Number.isFinite(duration) || duration <= 0) return null;
+    const startFeet = k === start
+      ? initialFeet
+      : Object.fromEntries(['left', 'right'].map((foot) => {
+          const mark = footAtLocal(show, dancer, from.t, foot);
+          return [foot, { x: mark.x, y: mark.y, h: mark.h, load: foot === support ? 1 : 0, follow: 1 }];
+        }));
+    const arrival = otherFoot(support);
+    const targetPlant = plants[k];
+    if (targetPlant && (targetPlant.name === 'left' || targetPlant.name === 'right') && targetPlant.name !== arrival) return null;
+    const endFeet = Object.fromEntries(['left', 'right'].map((foot) => {
+      const mark = footAtLocal(show, dancer, to.t, foot);
+      return [foot, { x: mark.x, y: mark.y, h: mark.h, load: foot === arrival ? 1 : 0, follow: 1 }];
+    }));
+    const moving = arrival;
+    const phases = [
+      {
+        name: 'walk-support-transfer', duration: duration * 0.25,
+        feet: {
+          [support]: { to: { ...startFeet[support], load: 0.5 }, mode: 'hold' },
+          [moving]: { to: { ...startFeet[moving], load: 0.5, follow: 1 }, mode: 'hold' },
+        },
       },
-    },
-    {
-      name: 'walk-swing-and-arrive', duration: duration * (1 - transfer),
-      feet: {
-        [side]: { to: { ...endFeet[side], load: 0 }, mode: 'hold' },
-        [moving]: { to: endFeet[moving], mode: 'swing', lift: Number.isFinite(opts.lift) && opts.lift >= 0 ? opts.lift : 0.1 },
+      {
+        name: 'walk-swing-and-arrive', duration: duration * 0.5,
+        feet: {
+          [support]: { to: { ...startFeet[support], load: 0 }, mode: 'hold' },
+          [moving]: { to: { ...endFeet[moving], load: 1, follow: 1 }, mode: 'swing', lift: Number.isFinite(opts.lift) && opts.lift >= 0 ? opts.lift : 0.1 },
+        },
       },
-    },
-  ];
-  const compiled = compileFootSchedule({ startTime, startFeet, phases });
-  return { ...compiled, startPlant: side, arrivalPlant: arrival, destinationIndex: i };
+      {
+        name: 'walk-trailing-foot-close', duration: duration * 0.25,
+        feet: {
+          [support]: { to: { ...endFeet[support], load: 0, follow: 1 }, mode: 'swing', lift: Number.isFinite(opts.closeLift) && opts.closeLift >= 0 ? opts.closeLift : 0.05 },
+          [moving]: { to: { ...endFeet[moving], load: 1, follow: 1 }, mode: 'hold' },
+        },
+      },
+    ];
+    const compiled = compileFootSchedule({ startTime: from.t, startFeet, phases });
+    if (!tracks.left.length) {
+      tracks.left.push({ ...startFeet.left, t: from.t });
+      tracks.right.push({ ...startFeet.right, t: from.t });
+    }
+    for (const foot of ['left', 'right']) {
+      const track = tracks[foot];
+      const localTrack = compiled.trajectory[foot];
+      if (track.length) {
+      track[track.length - 1].toNext = localTrack[0].toNext;
+      if (localTrack[0].lift != null) track[track.length - 1].lift = localTrack[0].lift;
+      else delete track[track.length - 1].lift;
+      }
+      track.push(...localTrack.slice(track.length ? 1 : 0).map((knot) => ({ ...knot })));
+    }
+    intervalInfo.push({ start: from.t, end: to.t, departure: support, arrival });
+    support = arrival;
+  }
+  const trajectory = { left: tracks.left, right: tracks.right };
+  validateFootTrajectory(trajectory);
+  return {
+    trajectory,
+    phases: intervalInfo,
+    start: base.t,
+    end: b.t,
+    startPlant: initialSide,
+    arrivalPlant: support,
+    destinationIndex: i,
+  };
 }
 
-// Return a shallow dancer copy with one generated interval schedule attached. The explicit range
-// keeps unrelated intervals on the legacy station-contact path; callers can inspect the schedule.
+// Return a shallow dancer copy with a contiguous generated walk run attached. The explicit range
+// keeps earlier/later intervals on the legacy station-contact path; callers can inspect the schedule.
 export function withGeneratedWalk(show, dancer, destinationIndex, opts = {}) {
   const schedule = generatedWalkSchedule(show, dancer, destinationIndex, opts);
   if (!schedule) return null;

@@ -130,6 +130,7 @@ const walkDancer = {
   keys: [
     { t: 0, x: 0, y: 3, pose: 'none', plant: 'left' },
     { t: 2000, x: 0.3, y: 3, pose: 'none', plant: 'right', step: 'walk' },
+    { t: 4000, x: 0.6, y: 3, pose: 'none', plant: 'left', step: 'walk' },
   ],
 };
 const generated = generatedWalkSchedule(walkShow, walkDancer, 1);
@@ -143,19 +144,59 @@ const expectedStartLeft = footPinsFromTrajectory(walkShow, walkDancer, 0,
 assert.equal(startLeft.x, footPins(walkShow, walkDancer, 0).left.sx);
 assert.equal(startLeft.y, footPins(walkShow, walkDancer, 0).left.sy);
 assert.equal(startLeft.follow, 1);
-assert.equal(startRight.follow, 0);
+assert.equal(startRight.follow, 1, 'both feet are anchored at the start of a generated walk interval');
 assert.equal(endRight.x, footAtLocal(walkShow, walkDancer, 2000, 'right').x);
 assert.equal(endRight.y, footAtLocal(walkShow, walkDancer, 2000, 'right').y);
 assert.equal(endRight.follow, 1, 'arriving ankle follows its authored station contact at landing');
 const endLeft = sampleFootTrajectory(generated.trajectory, 2000).left;
-const inTransfer = sampleFootTrajectory(generated.trajectory, 1000);
-assert.equal(endLeft.x, startLeft.x, 'the departure foot remains on its starting stage mark through the interval');
-assert.equal(endLeft.y, startLeft.y);
-assert.equal(endLeft.load, 0, 'the departure foot has released support at the endpoint');
-assert.equal(endLeft.follow, 0, 'the released departure foot is no longer position-pinned at landing');
+const inTransfer = sampleFootTrajectory(generated.trajectory, 500);
+const atArrival = sampleFootTrajectory(generated.trajectory, 1500);
+assert.equal(endLeft.x, footAtLocal(walkShow, walkDancer, 2000, 'left').x, 'trailing ankle closes onto its authored destination mark');
+assert.equal(endLeft.y, footAtLocal(walkShow, walkDancer, 2000, 'left').y);
+assert.equal(endLeft.load, 0, 'the trailing foot does not take support again during closure');
+assert.equal(endLeft.follow, 1, 'the closed foot is positioned at its destination mark');
 assert(inTransfer.left.load > 0 && inTransfer.left.load < 1);
 assert(inTransfer.right.load > 0 && inTransfer.right.load < 1);
-assert.equal(inTransfer.right.follow, 0, 'unweighted swing foot follows freely before lift-off');
+assert.equal(inTransfer.right.follow, 1, 'unloaded foot remains position-matched to its initial station contact before lift-off');
+assert.equal(atArrival.right.load, 1, 'arriving foot accepts support before trailing closure');
+assert.equal(atArrival.left.load, 0, 'trailing foot is unloaded during closure');
+assert.equal(atArrival.left.x, footAtLocal(walkShow, walkDancer, 0, 'left').x, 'support foot stays on departure mark through the swing');
+const multi = generatedWalkSchedule(walkShow, walkDancer, 2);
+assert(multi, 'second adjacent walk interval compiles');
+const multiAtStart = sampleFootTrajectory(multi.trajectory, 2000);
+assert.equal(multiAtStart.left.x, footAtLocal(walkShow, walkDancer, 2000, 'left').x,
+  'second interval begins from the first interval destination stance');
+const justBeforeBoundary = sampleFootTrajectory(multi.trajectory, 1999.999);
+const atBoundary = sampleFootTrajectory(multi.trajectory, 2000);
+const justAfterBoundary = sampleFootTrajectory(multi.trajectory, 2000.001);
+for (const side of ['left', 'right']) {
+  const before = justBeforeBoundary[side], exact = atBoundary[side], after = justAfterBoundary[side];
+  assert(Math.hypot(before.x - exact.x, before.y - exact.y, before.h - exact.h) < 1e-4,
+    `${side} has no positional jump into the shared station boundary`);
+  assert(Math.hypot(after.x - exact.x, after.y - exact.y, after.h - exact.h) < 1e-4,
+    `${side} has no positional jump out of the shared station boundary`);
+}
+assert.equal(atBoundary.right.load, 1, 'support transfer alternates to the right foot at station 2');
+assert.equal(atBoundary.left.load, 0, 'trailing left foot has closed without retaking support');
+for (const side of ['left', 'right']) {
+  const end = sampleFootTrajectory(multi.trajectory, 4000)[side];
+  const authored = footAtLocal(walkShow, walkDancer, 4000, side);
+  assert.equal(end.x, authored.x, `${side} reaches station 3 x contact`);
+  assert.equal(end.y, authored.y, `${side} reaches station 3 y contact`);
+}
+const fullWalk = withGeneratedWalk(walkShow, walkDancer, 2);
+assert(fullWalk, 'contiguous two-step walk attaches');
+assert.deepEqual(fullWalk.dancer.footTrajectoryRange, { start: 0, end: 4000 },
+  'attached schedule covers the complete pair of intervals');
+assert.deepEqual(footPins(walkShow, fullWalk.dancer, 2000),
+  footPinsFromTrajectory(walkShow, walkDancer, 2000, multi.trajectory),
+  'shared boundary evaluates one continuous trajectory');
+assert.deepEqual(footPins(walkShow, fullWalk.dancer, -1), footPins(walkShow, walkDancer, -1),
+  'earlier unscheduled movement uses legacy contacts before the contiguous run');
+assert.deepEqual(footPins(walkShow, fullWalk.dancer, 4500), footPins(walkShow, walkDancer, 4500),
+  'later unscheduled movement uses legacy contacts after the contiguous run');
+assert.equal(generatedWalkSchedule(walkShow, { ...walkDancer, keys: [walkDancer.keys[0], { ...walkDancer.keys[1], step: 'walk' }, { ...walkDancer.keys[2], t: 1900 }] }, 2), null,
+  'overlapping or non-increasing interval timing is rejected');
 const attachedWalk = withGeneratedWalk(walkShow, walkDancer, 1);
 assert.deepEqual(footPins(walkShow, attachedWalk.dancer, 1500),
   footPinsFromTrajectory(walkShow, walkDancer, 1500, generated.trajectory),
@@ -180,8 +221,21 @@ const longWalk = {
   ],
 };
 const longSchedule = generatedWalkSchedule(walkShow, longWalk, 1);
-assert(legOverreach(walkShow, { ...longWalk, footTrajectory: longSchedule.trajectory, footTrajectoryRange: { start: 0, end: 2000 } }, 1),
-  'very long generated step retains honest reach warning');
+assert(legOverreach(walkShow, withGeneratedWalk(walkShow, longWalk, 1).dancer, 1),
+  'very long generated interval retains honest reach warning');
+const longRun = {
+  id: 'long-walk-run',
+  keys: [
+    { t: 0, x: 0, y: 3, pose: 'first', plant: 'left' },
+    { t: 2000, x: 1.5, y: 3, pose: 'none', plant: 'right', step: 'walk' },
+    { t: 4000, x: 1.8, y: 3, pose: 'none', plant: 'left', step: 'walk' },
+  ],
+};
+const longRunAttachment = withGeneratedWalk(walkShow, longRun, 2);
+assert(legOverreach(walkShow, longRunAttachment.dancer, 1),
+  'multi-interval track retains an unreachable warning on its first interval');
+assert.equal(legOverreach(walkShow, longRunAttachment.dancer, 2), null,
+  'reachable following interval does not inherit the first interval reach warning');
 assert.equal(expectedStartLeft.w, 1);
 console.log('generated walk prototype: ok');
 
