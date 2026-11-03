@@ -170,42 +170,53 @@ export function joints(spec, facing = 1, turn = 0, pins = null) {
   // still be drawn square to the house. Zero at the front and the back, all of it in profile.
   const spin = Math.sin(angle) * (facing < 0 ? -1 : 1);
   const rise = spec.rise || 0;
-  const hipY = BODY.hip + rise;
   const leg = BODY.leg + rise / 2;
-  const shoulderY = BODY.shoulder + rise;
-  const headY = BODY.head + rise;
+  // A rock is the lower body tipped forward over the supporting foot: each leg turns rigidly about its
+  // hip so the feet go upstage of the pelvis, and the whole figure sinks by what that tipping lifts
+  // the lowest ankle, so the supporting foot stays on the floor at the length the leg already has.
+  const rockAngle = (Math.max(-30, Math.min(30, Number(spec.rock) || 0)) * Math.PI) / 180;
+  const rc = Math.cos(rockAngle);
+  const rs = Math.sin(rockAngle);
+  const tip = (base, p) => {
+    const dy = p[1] - base[1];
+    const dz = p[2] - base[2];
+    return [p[0], base[1] + dy * rc - dz * rs, base[2] + dz * rc + dy * rs];
+  };
+  const rockSink = (() => {
+    if (!rockAngle) return 0;
+    // Compare the lowest ankle before and after tipping, whichever leg each one is.
+    let before = Infinity, after = Infinity;
+    for (const [hip, knee, front = 0] of spec.legs) {
+      const swing = (Number(front) * Math.PI) / 180;
+      const flat = leg * Math.cos(swing);
+      const dy = -Math.cos((hip * Math.PI) / 180) * flat - Math.cos((knee * Math.PI) / 180) * flat;
+      const dz = 2 * Math.sin(swing) * leg;
+      before = Math.min(before, dy);
+      after = Math.min(after, dy * rc - dz * rs);
+    }
+    return after - before;
+  })();
+  const hipY = BODY.hip + rise - rockSink;
+  const shoulderY = BODY.shoulder + rise - rockSink;
+  const headY = BODY.head + rise - rockSink;
   const leanX = Math.sin((spec.lean * Math.PI) / 180) * (BODY.shoulder - BODY.hip);
   // Over the foot that carries her, and the free hip dropped below it: read from the pins, so it
   // follows the transfer of weight through a leg instead of being a constant of the position.
   const wt = weightOf(pins);
-  const stanceSide = wt.leg == null ? 0 : (wt.leg === 0 ? 1 : -1) * m;
-  const hipShift = stanceSide * HIP_SHIFT * wt.w;
   const hipDrop = wt.leg == null ? 0 : HIP_DROP * wt.w;
-  // A rock tips her weight line over her toes, so every foot ends up further upstage than the legs
-  // alone would put it. It is depth only — the house sees no change at the front, and a turned dancer
-  // sees it come back as width — so it lives in the base every leg is solved from, which is also what
-  // keeps a free foot's own mark (its home) agreeing with the plan's.
+  // A rock (see `tip` above) turns each leg about its own hip, so the feet go upstage of her without
+  // any bone changing length; the figure, its free foot's home and every contact read the same legs.
 
   const reach = (angle, len, side) => [
     Math.sin((angle * Math.PI) / 180) * len * side,
     -Math.cos((angle * Math.PI) / 180) * len,
   ];
 
-  const arms = spec.arms.map(([sh, el], i) => {
-    const side = (i === 0 ? 1 : -1) * m;
-    const shoulder = [side * BODY.shoulderW + leanX, shoulderY];
-    const [ex, ey] = reach(sh, BODY.upper, side);
-    const elbow = [shoulder[0] + ex, shoulder[1] + ey];
-    const [hx, hy] = reach(el, BODY.fore, side);
-    return [shoulder, elbow, [elbow[0] + hx, elbow[1] + hy]];
-  });
-
   // A leg in three dimensions: [x her left, y above the floor, z towards the house]. `front` swings the
   // whole leg fore and aft, which is the depth it has to spend, and the two frontal angles place it in
   // the other plane. The position's own answer and the solved one are both built here, so they can never
   // be measuring different figures.
-  const rockDeep = Math.sin(((Number(spec.rock) || 0) * Math.PI) / 180) * BODY.hip;
-  const squareBase = (i) => [(i === 0 ? 1 : -1) * m * BODY.hipW, hipY, -rockDeep];
+  const squareBase = (i) => [(i === 0 ? 1 : -1) * m * BODY.hipW, hipY, 0];
   const limbFrom = (i, base) => {
     const side = (i === 0 ? 1 : -1) * m;
     const [hip, knee, front = 0] = spec.legs[i];
@@ -214,8 +225,43 @@ export function joints(spec, facing = 1, turn = 0, pins = null) {
     const [kx, ky] = reach(hip, flat, side);
     const kneePoint = [base[0] + kx, base[1] + ky, base[2] + Math.sin(swing) * leg];
     const [ax, ay] = reach(knee, flat, side);
-    return [base, kneePoint, [kneePoint[0] + ax, kneePoint[1] + ay, kneePoint[2] + Math.sin(swing) * leg]];
+    const ankle = [kneePoint[0] + ax, kneePoint[1] + ay, kneePoint[2] + Math.sin(swing) * leg];
+    return [base, tip(base, kneePoint), tip(base, ankle)];
   };
+
+  // The hips travel towards the foot that carries her — outward for a foot under its own hip, inward for
+  // one crossed behind (a pas de bourrée) — never past it, and no further than HIP_SHIFT.
+  const hipShift = (() => {
+    if (wt.leg == null || !wt.w) return 0;
+    const footX = limbFrom(wt.leg, squareBase(wt.leg))[2][0];
+    return Math.sign(footX) * Math.min(HIP_SHIFT, 0.7 * Math.abs(footX)) * wt.w;
+  })();
+
+  // Carrying the hip out over a nearly straight standing leg moves the socket away from that leg's own
+  // foot, which no leg of fixed length can follow. The body settles by exactly the height that shift
+  // costs, measured against the position's own foot rather than any requested contact, so a standing
+  // foot stays down while a contact the body has travelled away from is still reported as missed.
+  const shiftSink = (() => {
+    if (wt.leg == null || !hipShift) return 0;
+    const square = squareBase(wt.leg);
+    const own = limbFrom(wt.leg, square)[2];
+    const across = own[0] - (square[0] + hipShift);
+    const r = Math.hypot(across, own[2] - square[2]);
+    const v = square[1] - own[1];
+    const L = 2 * leg;
+    if (!(v > 0) || r >= L || Math.hypot(r, v) <= L) return 0;
+    return v - Math.sqrt(L * L - r * r) + 1e-9;
+  })();
+  const pelvisY = hipY - shiftSink;
+
+  const arms = spec.arms.map(([sh, el], i) => {
+    const side = (i === 0 ? 1 : -1) * m;
+    const shoulder = [side * BODY.shoulderW + leanX, shoulderY - shiftSink];
+    const [ex, ey] = reach(sh, BODY.upper, side);
+    const elbow = [shoulder[0] + ex, shoulder[1] + ey];
+    const [hx, hy] = reach(el, BODY.fore, side);
+    return [shoulder, elbow, [elbow[0] + hx, elbow[1] + hy]];
+  });
 
   // Where a knee has to go for an ankle to be at a point in space. Two equal segments from a fixed hip
   // reach anything inside the leg's sphere, and there is a circle of knees for each of those; the one
@@ -263,7 +309,7 @@ export function joints(spec, facing = 1, turn = 0, pins = null) {
     // The stance socket goes out over the foot that carries her and the free one only sags: a pelvis
     // tilts, it does not slide, and moving the free socket would pull her extended leg out of reach
     // of a place the position already put it.
-    const base = [squareBase(i)[0] + (i === wt.leg ? hipShift : 0), hipY - (freeIdx === i ? hipDrop : 0), 0];
+    const base = [squareBase(i)[0] + (i === wt.leg ? hipShift : 0), pelvisY - (freeIdx === i ? hipDrop : 0), 0];
     const [root, kneePoint, ankle] = limbFrom(i, base);
     const pin = pins && pins[i === 0 ? 'left' : 'right'];
     // What the floor asks of this ankle: the pin, in all three axes, or — for a free leg under a dropped
@@ -306,15 +352,15 @@ export function joints(spec, facing = 1, turn = 0, pins = null) {
   return {
     // The pelvis travels with the weight and the torso follows less than half as far, which is what
     // keeps her standing over the path while her hips are over her foot.
-    pelvis: [hipShift * 0.6, hipY - hipDrop * 0.5],
-    chest: narrow([leanX + hipShift * 0.6, shoulderY]),
+    pelvis: [hipShift * 0.6, pelvisY - hipDrop * 0.5],
+    chest: narrow([leanX + hipShift * 0.6, shoulderY - shiftSink]),
     arms: arms.map((arm) => arm.map(narrow)),
     // The hip is the pivot and has no depth of its own; the knee and the ankle are solved in space and
     // then projected onto this plane.
     legs: legs3.map((leg) => leg.map(projected)),
     // Unprojected joints for the overhead plan; never reconstruct depth from elevation.
     legs3,
-    head: narrow([leanX * 1.05, headY]),
+    head: narrow([leanX * 1.05, headY - shiftSink]),
     headR: BODY.headR,
     rise,
     turn: Number(turn) || 0,
@@ -336,22 +382,15 @@ export function joints(spec, facing = 1, turn = 0, pins = null) {
 // A `rock` tips the weight line over the toes, so every foot ends up further upstage of the pelvis than
 // the legs alone would put it.
 export function feetPlaceOf(spec, facing = 1, turn = 0) {
-  const rise = spec.rise || 0;
-  const legLen = BODY.leg + rise / 2;
-  const hipY = BODY.hip + rise;
-  const rock = Math.sin((((Number(spec.rock) || 0) * Math.PI) / 180)) * BODY.hip;
+  // The figure's own unpinned ankles, square to the house: the same legs the views draw, so a contact
+  // taken from a position is exactly where that position's foot already is.
+  const own = joints(spec, 1, 0, null).legs3;
   const angle = ((Number(turn) || 0) * Math.PI) / 180;
   const c = Math.cos(angle);
   const s = Math.sin(angle);
   const mirror = facing < 0 ? -1 : 1;
   return [0, 1].map((i) => {
-    const [hip, knee, front = 0] = spec.legs[i];
-    const side = i === 0 ? 1 : -1;
-    const swing = (Number(front) * Math.PI) / 180;
-    const flat = legLen * Math.cos(swing);
-    const x = side * (BODY.hipW + Math.sin((hip * Math.PI) / 180) * flat + Math.sin((knee * Math.PI) / 180) * flat);
-    const y = hipY - Math.cos((hip * Math.PI) / 180) * flat - Math.cos((knee * Math.PI) / 180) * flat;
-    const z = Math.sin(swing) * legLen * 2 - rock;
+    const [x, y, z] = own[i][2];
     return { x: mirror * (x * c + z * s), y, z: z * c - x * s };
   });
 }

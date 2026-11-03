@@ -1,0 +1,31 @@
+[
+  {
+    "content": "[2-1] Make rock a rigid leg tip shared by figure and contacts (arabesque/attitude/chasse mismatch) [self]",
+    "id": "cal-1",
+    "status": "completed",
+    "result": "Rock rotates each leg about its own hip; figure sinks so lowest ankle stays on deck. feetPlaceOf now derives from joints() unpinned legs3, so contacts equal drawn ankles exactly."
+  },
+  {
+    "content": "[2-2] Lower pelvis by geometric amount weight shift needs so straight stance leg keeps own contact [self]",
+    "id": "cal-2",
+    "status": "completed",
+    "result": "shiftSink (<=1.4mm) measured against position's own foot, not requested contact, so displaced contacts are still reported. Hip shift now travels toward the supporting foot (pas de bourree crossed foot previously shifted away, needing 21mm settle), capped at HIP_SHIFT."
+  },
+  {
+    "content": "[2-3] Add stationary calibration regression; re-run diagnostics and all suites [self]",
+    "id": "cal-3",
+    "status": "completed",
+    "result": "test-pose-calibration.mjs. All stationary poses now 0mm in diagnostics (arabesque was 6mm). All 7 suites pass."
+  },
+  {
+    "content": "[2-4] Measure short walking transfer gaps; record cause, no threshold changes [self]",
+    "id": "cal-4",
+    "status": "completed",
+    "result": "Travel gaps unchanged (none 0.3m 11mm, first->second 0.1m 12mm). Cause: footPins holds both departure feet until 35% of leg while pelvis glides linearly, then arrival foot lands while pelvis is behind it. Needs real step/weight-transfer timing (pelvis-over-support), Phase 2/4. Not hidden."
+  },
+  {
+    "content": "[2-5] Browser check, bump import-map versions, commit checkpoint [self]",
+    "id": "cal-5",
+    "status": "completed"
+  }
+]
