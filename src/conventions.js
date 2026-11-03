@@ -3,17 +3,22 @@
 //   value                   the value the pose uses (a provisional preset, or null when unset)
 //   unit                    the unit the value is written in
 //   measurement_reference   what the number measures, and from which anatomical point
-//   status                  'provisional' (preview preset, needs school review),
-//                           'school-approved' (the school has signed off), or 'unset' (no value)
+//   status                  the default status: 'provisional' (preview preset, needs school review)
+//                           or 'unset' (no value). Approval is recorded separately (see statusOf).
 //   school_method           the system or syllabus the row is written against, if known
 //   applied                 whether the pose reads the value now. A row with applied: false is
 //                           recorded for the teacher and must not be presented as changing the drawing.
 //
+// Status shown in the table and in test output:
+//   unset             no value
+//   provisional       a value is in use (a preset, or a school-entered value not yet approved)
+//   school-approved   the school approved this exact value; a later change withdraws the approval
+//
 // Provisional values drive the preview only. Results built on them are not school-correct until the
-// school reviews them. Overrides are stored in browser storage under one versioned key; they are
-// never part of a show file, and no media is stored here.
+// school approves the row. Overrides, approvals, and the approver name are stored in browser storage
+// under one versioned key; they are never part of a show file, and no media is stored here.
 
-export const CONVENTIONS_KEY = 'choreographer.conventions.v1';
+export const CONVENTIONS_KEY = 'choreographer.conventions.v2';
 
 // kind 'rise'    a height in body units (1 = dancer height), read by specOf and the levels
 // kind 'measure' a number that is recorded and may be unset (null)
@@ -62,16 +67,16 @@ export const CONVENTIONS = [
     school_method: 'Pending the syllabus. Confirm value and whether demi-pointe or pointe.',
   },
   {
-    id: 'plie.depth', kind: 'measure', applied: false, value: 42.7, min: 0, max: 90, status: 'provisional',
-    label: 'Plié depth (demi preset)', unit: 'degrees from vertical',
+    id: 'plie.depth', kind: 'measure', applied: true, value: 42.68, min: 15, max: 90, status: 'provisional',
+    label: 'Plié hip depth (preview target)', unit: 'degrees from vertical',
     measurement_reference: 'thigh angle from vertical at the hip, hip joint to knee; thigh-to-floor = 90 − value',
-    school_method: 'Provisional demi-plié preset. The current 42.7 is the contact-constrained solution, not a depth chosen for ballet. Kept separate from floor contact. The solver does not read it yet.',
+    school_method: 'Preview target. 42.68 is the current contact-constrained baseline, not a school depth. The solver re-solves knee and body sink to keep flat feet on the floor. Below 15° the body would rise past the floor-contact rule, so the minimum is 15.',
   },
   {
     id: 'arabesque.elevation', kind: 'measure', applied: false, value: 90, min: 0, max: 180, status: 'provisional',
     label: 'Arabesque elevation (optional target)', unit: 'degrees from straight down',
     measurement_reference: 'working leg, hip joint to ankle, angle from straight down; 90 = horizontal behind',
-    school_method: 'Optional target, not the definition of every school’s arabesque. The solver does not read it yet.',
+    school_method: 'Optional provisional target, not the definition of every school’s arabesque. The solver does not read it yet.',
   },
   {
     id: 'arabesque.arms', kind: 'note', applied: false, value: 'Current preview arm set', status: 'provisional',
@@ -107,8 +112,10 @@ export const CONVENTIONS = [
 
 const BY_ID = Object.fromEntries(CONVENTIONS.map((c) => [c.id, c]));
 
-// Overrides only: an id present here is the school's value, anything else uses the default.
-let overrides = loadOverrides();
+// Overrides: `values` holds the school's entered values; `approvals` holds the approval record
+// { value, by, at } for a row, where `value` is the exact value approved. `approver` is the name
+// typed in the table, used for the next approval.
+let state = loadState();
 
 function storage() {
   try {
@@ -118,19 +125,26 @@ function storage() {
   }
 }
 
-function loadOverrides() {
+function loadState() {
+  const empty = { values: {}, approvals: {}, approver: '' };
   const store = storage();
-  if (!store) return {};
+  if (!store) return empty;
   try {
-    const saved = JSON.parse(store.getItem(CONVENTIONS_KEY) || '{}');
-    const clean = {};
-    for (const [id, value] of Object.entries(saved || {})) {
+    const saved = JSON.parse(store.getItem(CONVENTIONS_KEY) || '{}') || {};
+    const values = {};
+    for (const [id, value] of Object.entries(saved.values || {})) {
       const checked = validate(id, value);
-      if (checked.ok) clean[id] = checked.value;
+      if (checked.ok) values[id] = checked.value;
     }
-    return clean;
+    const approvals = {};
+    for (const [id, rec] of Object.entries(saved.approvals || {})) {
+      if (!BY_ID[id] || !rec || typeof rec.by !== 'string' || typeof rec.at !== 'string') continue;
+      approvals[id] = { value: rec.value, by: rec.by.slice(0, 80), at: rec.at };
+    }
+    const approver = typeof saved.approver === 'string' ? saved.approver.slice(0, 80) : '';
+    return { values, approvals, approver };
   } catch (e) {
-    return {};
+    return empty;
   }
 }
 
@@ -138,11 +152,13 @@ function persist() {
   const store = storage();
   if (!store) return;
   try {
-    store.setItem(CONVENTIONS_KEY, JSON.stringify(overrides));
+    store.setItem(CONVENTIONS_KEY, JSON.stringify(state));
   } catch (e) {
     /* storage full or blocked: the value still applies for this session */
   }
 }
+
+const has = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
 
 // A value is accepted only inside the range the entry declares. Nothing is clamped silently:
 // a value outside the range is refused with a reason the table can show.
@@ -161,9 +177,9 @@ export function validate(id, value) {
   return { ok: true, value: n };
 }
 
-// The value the pose uses: the school's override when set, otherwise the default recorded above.
+// The value the pose uses: the school's entry when set, otherwise the default recorded above.
 export function conventionValue(id) {
-  if (Object.prototype.hasOwnProperty.call(overrides, id)) return overrides[id];
+  if (has(state.values, id)) return state.values[id];
   return BY_ID[id] ? BY_ID[id].value : undefined;
 }
 
@@ -173,25 +189,89 @@ export function riseFor(poseId) {
   return entry ? conventionValue(entry.id) : undefined;
 }
 
+// unset: no value. school-approved: the approved value is the value in use. provisional: a value is
+// in use that the school has not approved (a preset, or an entry not yet approved, or an approval
+// withdrawn because the value changed).
+export function statusOf(id) {
+  const value = conventionValue(id);
+  if (value === null || value === undefined) return 'unset';
+  const rec = state.approvals[id];
+  if (rec && rec.value === value) return 'school-approved';
+  return 'provisional';
+}
+
 export function setConvention(id, value) {
   const checked = validate(id, value);
   if (!checked.ok) return checked;
-  overrides = { ...overrides, [id]: checked.value };
+  state = { ...state, values: { ...state.values, [id]: checked.value } };
   persist();
   return { ok: true, value: checked.value };
 }
 
 export function resetConvention(id) {
-  if (!Object.prototype.hasOwnProperty.call(overrides, id)) return;
-  const next = { ...overrides };
-  delete next[id];
-  overrides = next;
+  if (!has(state.values, id)) return;
+  const values = { ...state.values };
+  delete values[id];
+  state = { ...state, values };
+  persist();
+}
+
+export function getApprover() {
+  return state.approver;
+}
+
+export function setApprover(name) {
+  state = { ...state, approver: String(name ?? '').trim().slice(0, 80) };
+  persist();
+}
+
+// Approves the value in use for a row. The approval records that exact value, the approver's name,
+// and the time, so a later change to the value withdraws the approval.
+export function approveConvention(id, now = new Date()) {
+  if (!BY_ID[id]) return { ok: false, reason: 'Unknown convention' };
+  const value = conventionValue(id);
+  if (value === null || value === undefined) return { ok: false, reason: 'Set a value before approving' };
+  if (!state.approver) return { ok: false, reason: 'Enter the approver name first' };
+  const approvals = { ...state.approvals, [id]: { value, by: state.approver, at: now.toISOString() } };
+  state = { ...state, approvals };
+  persist();
+  return { ok: true };
+}
+
+export function revokeApproval(id) {
+  if (!has(state.approvals, id)) return;
+  const approvals = { ...state.approvals };
+  delete approvals[id];
+  state = { ...state, approvals };
   persist();
 }
 
 export function conventionRows() {
   return CONVENTIONS.map((c) => {
-    const school = Object.prototype.hasOwnProperty.call(overrides, c.id);
-    return { ...c, value: conventionValue(c.id), defaultValue: c.value, source: school ? 'school' : 'default' };
+    const school = has(state.values, c.id);
+    const value = conventionValue(c.id);
+    const rec = state.approvals[c.id] || null;
+    const stale = !!rec && rec.value !== value;
+    return {
+      ...c,
+      value,
+      defaultValue: c.value,
+      source: school ? 'school' : 'default',
+      status: statusOf(c.id),
+      approval: rec && !stale ? { by: rec.by, at: rec.at } : null,
+      approvalWithdrawn: stale,
+    };
   });
+}
+
+// What the preview is running on. Used by the table banner and by test output, so provisional and
+// school-approved values are never reported as one thing.
+export function previewSummary() {
+  const rows = conventionRows();
+  return {
+    provisionalInUse: rows.filter((r) => r.applied && r.status === 'provisional').map((r) => r.id),
+    approvedInUse: rows.filter((r) => r.applied && r.status === 'school-approved').map((r) => r.id),
+    recordedOnly: rows.filter((r) => !r.applied && r.status !== 'unset').map((r) => r.id),
+    unset: rows.filter((r) => r.status === 'unset').map((r) => r.id),
+  };
 }

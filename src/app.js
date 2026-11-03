@@ -23,7 +23,7 @@ import {
 } from './model.js';
 import { StageView } from './stage.js';
 import { MoveSheet } from './cheatsheet.js';
-import { conventionRows, setConvention, resetConvention } from './conventions.js';
+import { conventionRows, setConvention, resetConvention, getApprover, setApprover, approveConvention, revokeApproval, previewSummary } from './conventions.js';
 import { ElevationView } from './elevation.js';
 import { Timeline, GUTTER } from './timeline.js';
 import { CompanyLine } from './company.js';
@@ -3251,6 +3251,7 @@ function fitViews() {
 /* ------------------------------------------------------- school conventions */
 
 const STATUS_LABEL = { provisional: 'Provisional', 'school-approved': 'School-approved', unset: 'Unset' };
+const SCHOOL_DATE = new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 // One row per convention. The school's entry is applied on change; clearing it returns the row to
 // the default. A row the solver does not read yet says so, rather than looking like it works.
@@ -3267,14 +3268,31 @@ function closeSchool() {
 function paintSchool() {
   const body = $('schoolBody');
   body.replaceChildren();
+  const summary = previewSummary();
   const banner = document.createElement('p');
   banner.className = 'school-banner';
-  banner.textContent = 'Preview: provisional values are in use. Results built on them are not school-correct until the school reviews them.';
+  banner.textContent = `Preview is running on ${summary.provisionalInUse.length} provisional value${summary.provisionalInUse.length === 1 ? '' : 's'} and ${summary.approvedInUse.length} school-approved. Results built on provisional values are not school-correct until the school reviews them.`;
   body.appendChild(banner);
+
+  const approverRow = document.createElement('div');
+  approverRow.className = 'school-approver';
+  const approverLabel = document.createElement('label');
+  approverLabel.textContent = 'Approver name ';
+  const approver = document.createElement('input');
+  approver.type = 'text';
+  approver.maxLength = 80;
+  approver.value = getApprover();
+  approver.placeholder = 'Teacher or school name';
+  approver.setAttribute('aria-label', 'Approver name');
+  approver.addEventListener('change', () => setApprover(approver.value));
+  approverLabel.appendChild(approver);
+  approverRow.appendChild(approverLabel);
+  body.appendChild(approverRow);
+
   const table = document.createElement('table');
   table.className = 'school-table';
   const head = table.createTHead().insertRow();
-  for (const label of ['Position', 'School method', 'Default', 'School value', 'Status']) {
+  for (const label of ['Position', 'School method', 'Default', 'School value', 'Status', 'Approval']) {
     const th = document.createElement('th');
     th.textContent = label;
     head.appendChild(th);
@@ -3282,7 +3300,7 @@ function paintSchool() {
   const tbody = table.createTBody();
   for (const row of conventionRows()) {
     const tr = tbody.insertRow();
-    tr.className = row.source === 'school' ? 'school-row set' : 'school-row';
+    tr.className = row.status === 'school-approved' ? 'school-row approved' : row.source === 'school' ? 'school-row set' : 'school-row';
     const name = tr.insertCell();
     const title = document.createElement('strong');
     title.textContent = row.label;
@@ -3338,8 +3356,12 @@ function paintSchool() {
 
     const status = tr.insertCell();
     status.className = 'school-status';
-    const label = STATUS_LABEL[row.status] || row.status;
-    status.textContent = `${label} · ${row.applied ? 'read by the pose' : 'not read by the solver yet'}`;
+    const badge = document.createElement('span');
+    badge.className = `school-badge ${row.status}`;
+    badge.textContent = STATUS_LABEL[row.status] || row.status;
+    const applied = document.createElement('small');
+    applied.textContent = row.applied ? ' · read by the pose' : ' · not read by the solver';
+    status.append(badge, applied);
     if (row.source === 'school') {
       const reset = document.createElement('button');
       reset.className = 'ghost';
@@ -3349,6 +3371,46 @@ function paintSchool() {
         afterSchoolChange();
       });
       status.append(document.createElement('br'), reset);
+    }
+
+    const approval = tr.insertCell();
+    approval.className = 'school-approval';
+    if (row.status === 'school-approved' && row.approval) {
+      const when = new Date(row.approval.at);
+      const text = document.createElement('small');
+      text.textContent = `Approved by ${row.approval.by} · ${SCHOOL_DATE.format(when)}`;
+      approval.appendChild(text);
+      const revoke = document.createElement('button');
+      revoke.className = 'ghost';
+      revoke.textContent = 'Revoke';
+      revoke.addEventListener('click', () => {
+        revokeApproval(row.id);
+        afterSchoolChange();
+      });
+      approval.append(document.createElement('br'), revoke);
+    } else {
+      if (row.approvalWithdrawn) {
+        const note = document.createElement('small');
+        note.className = 'school-withdrawn';
+        note.textContent = 'Approval withdrawn: value changed';
+        approval.append(note, document.createElement('br'));
+      }
+      const approve = document.createElement('button');
+      approve.className = 'ghost';
+      approve.textContent = 'Approve';
+      approve.disabled = row.status === 'unset';
+      const reason = document.createElement('small');
+      reason.className = 'school-msg';
+      approve.addEventListener('click', () => {
+        setApprover(approver.value);
+        const result = approveConvention(row.id);
+        if (!result.ok) {
+          reason.textContent = result.reason;
+          return;
+        }
+        afterSchoolChange();
+      });
+      approval.append(approve, reason);
     }
   }
   body.appendChild(table);

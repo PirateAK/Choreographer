@@ -749,3 +749,15 @@ body.watch #stage { cursor: default; }
 .school-banner {
   margin: 0; padding: 10px 16px 0; color: var(--accent); font-size: 12px; line-height: 1.5;
 }
+.school-approver { padding: 8px 16px 0; font-size: 12px; color: var(--dim); }
+.school-approver input { width: 240px; margin-left: 6px; }
+.school-approval { white-space: nowrap; font-size: 11px; color: var(--dim); }
+.school-approval button { margin-top: 6px; }
+.school-withdrawn { color: var(--danger); }
+.school-badge {
+  display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px;
+  border: 1px solid var(--line); color: var(--dim);
+}
+.school-badge.provisional { color: var(--accent); border-color: var(--accent); }
+.school-badge.school-approved { color: var(--text); background: var(--accent); border-color: var(--accent); }
+.school-row.approved td { background: color-mix(in srgb, var(--accent) 8%, transparent); }

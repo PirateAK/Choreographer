@@ -1,0 +1,32 @@
+[
+  {
+    "content": "[approve-1] Plié preview: closed-form plieSpec(depth) solves knee and sink, baseline unchanged",
+    "id": "1",
+    "status": "pending"
+  },
+  {
+    "content": "[approve-2] conventions.js v2: approvals {value,by,at}, approver name, statusOf, previewSummary",
+    "id": "2",
+    "status": "pending"
+  },
+  {
+    "content": "[approve-3] app.js: approver field, Approve/Revoke control, badges, summary banner",
+    "id": "3",
+    "status": "pending"
+  },
+  {
+    "content": "[approve-4] Tests: plié re-solve contacts and baseline identity; approval lifecycle; summary output",
+    "id": "4",
+    "status": "pending"
+  },
+  {
+    "content": "[approve-5] Import map bumps, full suite, syntax, browser check",
+    "id": "5",
+    "status": "pending"
+  },
+  {
+    "content": "[approve-6] Notes and commit",
+    "id": "6",
+    "status": "pending"
+  }
+]

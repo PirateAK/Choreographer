@@ -134,3 +134,18 @@ Proposed order: (a) add shared `evaluateMovement` in model.js, (b) switch elevat
 - The table shows a preview banner and per-row status and "read by the pose" / "not read by the solver yet".
 - Import map: conv2, app scroll23, styles scroll23.
 - Verified: test-conventions.mjs (fields, statuses, unset holds null, plié depth separate from rise, unset numeric ranges), all 15 engine tests, syntax, `git diff --check`, browser check of the sheet.
+
+## Preview re-solve and approvals (conv3)
+
+- Storage moved to `choreographer.conventions.v2` with `{values, approvals, approver}`. v1 overrides are not migrated (dev data only).
+- Plié: `plie.depth` default is 42.68°, the contact-constrained baseline from the closed form (not a demi target). Status provisional. `plieSpec(depth)` (pose.js) re-solves shin angle and body sink to keep ankles at x 0.089 / y 0.025. Accepted range 15–90; 0 gives a positive rise, which triggers the ball-of-foot convention, so it is refused. Baseline `specOf('plie')` returns the shared spec unchanged.
+- Limit: `STEP_SINK_MAX` is still tied to the baseline plié rise. Deeper preview depths sink past that cap; the cap is not yet derived from the depth.
+- Arabesque 90° is kept as an optional provisional target; arm set is a provisional note. Not school-approved. Elevation is recorded, not read by the solver.
+- Attitude knee height stays unset. Solver does not infer it.
+- Fourth position: crossed, turned-out preset is provisional (text, not read). Turnout, spacing, and foot orientation remain unset or unapproved.
+- Approval: each row has Approve / Revoke. Approval needs an approver name (stored with the table) and a value in use; it records `{value, by, at}`. Changing the value withdraws approval ("Approval withdrawn: value changed"). Unset rows cannot be approved.
+- Statuses: `Provisional`, `School-approved`, `Unset`. Banner counts provisional values in use vs school-approved in use.
+- Tests: test-conventions.mjs prints the three-way summary (provisional in use / school-approved in use / unset) and checks plié re-solve contacts, baseline identity, approval lifecycle, and withdrawal.
+- Import map: pose load6, conventions conv3, app scroll24, styles scroll24.
+- Verified: conventions test; all engine tests (ankle-lift, contacts, conventions, foot-scheduler, foot-trajectory, movement-views, overlap, phrase-plants, placement-guide, pose-calibration, pose-contact-load, slides, timeline-scroll, transition-diagnostics, video); syntax checks; `git diff --check`; browser smoke of the School sheet (approve, refuse without name, withdraw on change, plié refusal, unset not approvable, Esc closes, no page errors).
+- Not run by the default loop: test-placement-browser.mjs and test-timeline-browser.mjs import bare `playwright`, which does not resolve from the project. They need the temporary Playwright path.

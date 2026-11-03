@@ -1,4 +1,4 @@
-import { riseFor } from './conventions.js';
+import { riseFor, conventionValue } from './conventions.js';
 
 // Ballet positions, drawn as a jointed figure rather than a symbol. A station has
 // always carried a position — first, arabesque, pirouette — but nothing drew it, so a
@@ -78,10 +78,35 @@ export const POSE_SPECS = {
   chasse: { arms: [[55, 50], [55, 50]], legs: [[25, 20], [-25, -15]], lean: 6, rise: 0, rock: 5 },
 };
 
+// The plié preview. The hip-depth target is solved into the knee angle and the body sink, with the foot
+// placement and flat-foot ankle height held at the baseline contact. Thigh and shin keep BODY.leg, and
+// the hips stay at hipW from the centre line, so the solution is closed-form: the knee follows from the
+// horizontal foot position, and the sink from the ankle height. At the baseline depth the result is the
+// POSE_SPECS.plie entry itself, so the default drawing is unchanged.
+export const PLIE_BASELINE_DEPTH = 42.68;
+const PLIE_FOOT_X = 0.089; // ankle distance from the centre line at the baseline contact
+const PLIE_ANKLE_Y = 0.025; // flat-foot ankle height above the floor at the baseline contact
+
+export function plieSpec(depth) {
+  const h = (Number(depth) * Math.PI) / 180;
+  const sinK = (PLIE_FOOT_X - BODY.hipW) / BODY.leg - Math.sin(h);
+  if (!Number.isFinite(sinK) || Math.abs(sinK) > 1) return null;
+  const k = Math.asin(sinK);
+  const kDeg = (k * 180) / Math.PI;
+  const rise = PLIE_ANKLE_Y - BODY.hip + BODY.leg * (Math.cos(h) + Math.cos(k));
+  return { ...POSE_SPECS.plie, legs: [[depth, kDeg], [depth, kDeg]], rise };
+}
+
 // The school's rise for a position replaces the built-in one when a school has set it (see
-// conventions.js). Without an override the shared table entry is returned, as before.
+// conventions.js). Without an override the shared table entry is returned, as before. A plié depth
+// other than the baseline is re-solved for the preview.
 export function specOf(id) {
   const base = POSE_SPECS[id] || NEUTRAL;
+  if (id === 'plie') {
+    const depth = conventionValue('plie.depth');
+    if (typeof depth === 'number' && depth !== PLIE_BASELINE_DEPTH) return plieSpec(depth) || base;
+    return base;
+  }
   const rise = riseFor(id);
   return rise === undefined || rise === base.rise ? base : { ...base, rise };
 }
