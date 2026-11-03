@@ -97,6 +97,11 @@ Proposed order: (a) add shared `evaluateMovement` in model.js, (b) switch elevat
 - Plié thigh 20° → 43°: the number alone does not show correctness. Specify the measurement convention (thigh-to-floor or thigh-to-vertical) and intended depth. Grand plié thighs are generally described as reaching horizontal. Needs a measurement convention before the change is judged.
 - Pas de bourrée rise 0.02: keep pending syllabus. Needs units and a reference point (floor, ball of foot, or heel) before it is actionable.
 - Relevé ball-of-foot height 0.010: define height from the floor to the ball of the foot, in body-height units. On demi-pointe the heel lifts while rising onto the balls of the feet. The floor convention must state which contact is the zero-height reference.
+- Plié convention (settled 2026-11-03 in notes; depth still open):
+  - Thigh angle = hip angle from vertical (`legs[i][0]`, the code's native measure). Thigh-to-floor = 90 − hip angle. Grand plié target (thigh horizontal) = hip 90, thigh-to-floor 0.
+  - Current `plie` legs [42.68, −30.57] = thigh 42.7° from vertical, 47.3° to floor, with body sink −0.09 (ankle on floor, shortfall none).
+  - HEAD legs [20, −8] at the same sink put the ankle at −0.062 (6 cm below floor) under fixed bone lengths. The 43° is what keeps the flat foot on the floor at this sink. It is not a chosen depth.
+  - Open: the target depth (demi vs grand). Reaching horizontal thighs with flat feet needs a much deeper body sink and a different shin angle than now. Teacher or school depth is needed before changing the sink or legs.
 - Principle: record angle or height, anatomical reference point, units, and school or syllabus convention separately. The same pose can otherwise be read differently.
 
 ### Not started
