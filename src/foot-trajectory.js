@@ -49,7 +49,10 @@ function sampleTrack(track, t) {
   if (t >= last.t) return { x: last.x, y: last.y, h: last.h, load: last.load, swing: false };
   let i = 0;
   while (i < track.length - 1 && t > track[i + 1].t) i++;
-  const a = track[i], b = track[i + 1], u = Math.max(0, Math.min(1, (t - a.t) / (b.t - a.t)));
+  const a = track[i], b = track[i + 1];
+  if (t === a.t) return { x: a.x, y: a.y, h: a.h, load: a.load, swing: false };
+  if (t === b.t) return { x: b.x, y: b.y, h: b.h, load: b.load, swing: false };
+  const u = Math.max(0, Math.min(1, (t - a.t) / (b.t - a.t)));
   const mode = a.toNext || 'linear', p = mode === 'swing' ? smooth(u) : u;
   const arc = mode === 'swing' ? (Number(a.lift) || 0) * Math.sin(Math.PI * p) : 0;
   const blend = (x, y) => x + (y - x) * p;

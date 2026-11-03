@@ -1241,6 +1241,14 @@ export function normalise(show) {
     .sort((a, b) => a.start - b.start);
   delete out.music;
   out.cast = Array.isArray(out.cast) ? out.cast : [];
+  out.cast.forEach((d) => {
+    if (!d || !d.footTrajectory) return;
+    try {
+      validateFootTrajectory(d.footTrajectory);
+    } catch {
+      delete d.footTrajectory;
+    }
+  });
   out.narration = Array.isArray(out.narration) ? out.narration : [];
   // Two minutes is the ceiling either way: a cue longer than that is a scene
   // change, not a move, and the field would be lying about what it sets.
@@ -2981,7 +2989,7 @@ export function footPinsFromTrajectory(show, dancer, lt, trajectory) {
   return Object.keys(out).length ? out : null;
 }
 
-export function footPins(show, dancer, lt) {
+function legacyFootPins(show, dancer, lt) {
   const keys = (dancer && dancer.keys) || [];
   if (!keys.length) return null;
   let idx = 0;
@@ -3033,6 +3041,15 @@ export function footPins(show, dancer, lt) {
     out[side] = { x: across, y, z, sx: spot.x, sy: spot.y, w };
   }
   return Object.keys(out).length ? out : null;
+}
+
+// Explicitly attached schedules opt into stage-space pins across the normal model/render path.
+// Dancers without a schedule retain the authored-station contact behavior.
+export function footPins(show, dancer, lt) {
+  if (dancer && dancer.footTrajectory) {
+    return footPinsFromTrajectory(show, dancer, lt, dancer.footTrajectory);
+  }
+  return legacyFootPins(show, dancer, lt);
 }
 
 // Where each foot is on the floor at a moment, for the two views that draw the deck: the foot she is
