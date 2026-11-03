@@ -128,17 +128,22 @@ revokeApproval('releve.rise');
 assert.equal(statusOf('releve.rise'), 'provisional', 'revoke returns the row to provisional');
 
 approveConvention('releve.rise');
+const approvedSummary = previewSummary();
+assert(approvedSummary.approvedInUse.includes('releve.rise'), 'approved releve is listed as approved in use');
+assert(approvedSummary.provisionalInUse.includes('pirouette.rise'), 'unapproved pirouette is listed as provisional in use');
+assert(!approvedSummary.provisionalInUse.includes('releve.rise'), 'approved releve is not counted as provisional');
+revokeApproval('releve.rise');
+setApprover('');
+
+// Printed summary is the real state: nothing approved by the school yet.
 const summary = previewSummary();
-assert(summary.approvedInUse.includes('releve.rise'), 'approved releve is listed as approved in use');
-assert(summary.provisionalInUse.includes('pirouette.rise'), 'unapproved pirouette is listed as provisional in use');
-assert(!summary.provisionalInUse.includes('releve.rise'), 'approved releve is not counted as provisional');
+assert.equal(summary.approvedInUse.length, 0, 'no school approvals are recorded in the default state');
 assert(summary.unset.includes('attitude.knee_height'), 'attitude knee height is listed as unset');
 assert(summary.provisionalInUse.includes('arabesque.elevation'), 'arabesque elevation preset is provisional and read by the pose');
 assert(summary.recordedOnly.includes('arabesque.arms'), 'arabesque arm set is recorded, not applied');
+assert(summary.recordedOnly.includes('fourth.foot_length'), 'fourth foot length is recorded, not applied');
 console.log(`provisional in use (${summary.provisionalInUse.length}): ${summary.provisionalInUse.join(', ')}`);
-console.log(`school-approved in use (${summary.approvedInUse.length}): ${summary.approvedInUse.join(', ')}`);
+console.log(`school-approved in use (${summary.approvedInUse.length}): ${summary.approvedInUse.join(', ') || 'none'}`);
 console.log(`unset (${summary.unset.length}): ${summary.unset.join(', ')}`);
-revokeApproval('releve.rise');
-setApprover('');
 
 console.log('conventions: ok');

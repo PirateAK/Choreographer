@@ -174,3 +174,14 @@ Proposed order: (a) add shared `evaluateMovement` in model.js, (b) switch elevat
 - Geometry: `toeDirection(spec, side)` in pose.js uses the same yaw as the limb; the point is transformed through `frame.toStage`. Length `TOE_LENGTH = 0.05` body units (matches the elevation toe; not anatomical foot length).
 - Limit: no knee-over-toe alignment; the toe is a direction indicator only.
 - Verified: test-fourth-turnout.mjs section 7 (toe vs turned leg) and section 8 (plan toe turns by 40° for both feet through overheadPoseAtLocal), full engine suite, syntax, `git diff --check`, School smoke. Plan render not visually inspected.
+
+## School answers, provisional defaults (conv7)
+
+- All values are provisional or unset. None is school-approved. Editable in the School table; approval is per row.
+- Arabesque arm set: current preview arm set, provisional, recorded only.
+- Attitude knee height: unset; not inferred from knee bend. Solver skips the constraint.
+- Fourth position: crossed, turned-out preview preset, provisional. Foot length 0.15 body units (≈25.5 cm at 1.7 m), provisional, recorded only. Spacing unset, recorded only: the solver does not yet turn spacing into a heel-to-toe distance.
+- Pas de bourrée rise 0.02, relevé rise 0.03: provisional, editable, with unit and measurement reference.
+- Plié: 42.68° is the current contact-constrained pose, provisional preview depth, not a school demi-plié depth.
+- test-conventions.mjs summary now reflects the default state (no approvals). Its previous approval fixture printed releve.rise as school-approved.
+- Not done: solver use of fourth.spacing and fourth.foot_length.
