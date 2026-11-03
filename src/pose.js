@@ -515,6 +515,16 @@ export function joints(spec, facing = 1, turn = 0, pins = null) {
 // floor keeps — a fourth position at a quarter turn stands side by side rather than front and back).
 // A `rock` tips the weight line over the toes, so every foot ends up further upstage of the pelvis than
 // the legs alone would put it.
+// Which way a toe points on the floor, in the body's frame (x her left, z towards the house): forward when
+// the feet are parallel, turned outward by the turnout for each foot. This is the same yaw joints() gives the
+// leg, so a foot's toe and its ankle always agree. side 0 is the dancer's left.
+export const TOE_LENGTH = 0.05; // body units, the length the elevation already draws
+export function toeDirection(spec, side) {
+  const t = ((Number(spec && spec.turnout) || 0) * Math.PI) / 180;
+  const s = side === 0 ? 1 : -1;
+  return [s * Math.sin(t), Math.cos(t)];
+}
+
 export function feetPlaceOf(spec, facing = 1, turn = 0) {
   // The figure's own unpinned ankles, square to the house: the same legs the views draw, so a contact
   // taken from a position is exactly where that position's foot already is.

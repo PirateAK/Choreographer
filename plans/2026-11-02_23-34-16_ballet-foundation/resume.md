@@ -162,8 +162,15 @@ Proposed order: (a) add shared `evaluateMovement` in model.js, (b) switch elevat
 
 - `fourth.turnout` is applied when entered. Unset (default) draws the existing preset unchanged.
 - Entered turnout turns each leg about its own hip by that angle, outward for both feet. The foot follows; bone lengths are unchanged (verified 0–180° in 1° steps). Contacts follow the turned ankles through feetPlaceOf.
-- Limit: knee-over-toe alignment is not modelled. The toe drawn from the ankle does not yet rotate in plan view; the toe segment stays as drawn.
+- Limit: knee-over-toe alignment is not modelled. Plan toe rotation is covered in the toe rotation section below.
 - `fourth.spacing` stays recorded only. Its measure is heel-to-toe, which needs a foot length the solver does not have. Needs a school value for foot length.
 - `fourth.feet` (crossed, turned-out) stays a provisional text preset. Its "turned out" label is not drawn until a turnout value is entered.
 - Blends carry `turnout` when either end sets it (blendSpecs). Blends without turnout are unchanged.
 - Verified: test-fourth-turnout.mjs, test-conventions.mjs, full engine suite, syntax, `git diff --check`, School smoke.
+
+## Toe rotation in plan view (pose load9, model trajectory10, guide21)
+
+- Each foot in the overhead (plan) view draws a toe line from the ankle dot. The toe points where the solver turns the foot: forward when parallel, outward by the turnout.
+- Geometry: `toeDirection(spec, side)` in pose.js uses the same yaw as the limb; the point is transformed through `frame.toStage`. Length `TOE_LENGTH = 0.05` body units (matches the elevation toe; not anatomical foot length).
+- Limit: no knee-over-toe alignment; the toe is a direction indicator only.
+- Verified: test-fourth-turnout.mjs section 7 (toe vs turned leg) and section 8 (plan toe turns by 40° for both feet through overheadPoseAtLocal), full engine suite, syntax, `git diff --check`, School smoke. Plan render not visually inspected.

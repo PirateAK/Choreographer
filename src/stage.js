@@ -820,6 +820,16 @@ export class StageView {
       // an arabesque should read as one foot down, not as two.
       const down = f.h <= 0.12;
       const held = f.held;
+      // The toe shows which way the foot points on the floor: forward when parallel, turned out with turnout.
+      if (f.toe) {
+        const tp = this.w2s(f.toe.x, f.toe.y, f.toe.h);
+        ctx.beginPath();
+        ctx.moveTo(sp.x, sp.y);
+        ctx.lineTo(tp.x, tp.y);
+        ctx.strokeStyle = this.alpha(d.color, down ? 0.85 : 0.3);
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+      }
       ctx.beginPath();
       ctx.arc(sp.x, sp.y, held && down ? R : R * 0.8, 0, Math.PI * 2);
       if (held && down) {

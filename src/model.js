@@ -2,7 +2,7 @@
 
 // The positions' geometry lives in pose.js — the angles, and therefore where the feet are — so
 // that a contact is measured from the same table the figures are drawn from.
-import { PLANT_BY_POSE, feetPlaceOf, joints, specOf, blendSpecs } from './pose.js';
+import { PLANT_BY_POSE, feetPlaceOf, joints, specOf, blendSpecs, toeDirection, TOE_LENGTH } from './pose.js';
 import { contactFrame } from './contact-frame.js';
 import { conventionValue } from './conventions.js';
 import { sampleFootTrajectory, validateFootTrajectory } from './foot-trajectory.js';
@@ -3243,7 +3243,12 @@ export function overheadPoseAtLocal(show, dancer, lt) {
   for (const [i, side] of ['left', 'right'].entries()) {
     const pin = pins && pins[side];
     const short = figure.shortfall[i];
-    feet[side] = { ...legs[i][2], held: !!(pin && pin.w > 0.5 && !short),
+    // The toe is the ankle carried along the foot's own direction, through the same frame, so the plan
+    // turns the foot exactly as the solver turned the leg.
+    const [dx, dz] = toeDirection(spec, i);
+    const [ax, ay, az] = figure.legs3[i][2];
+    const toe = frame.toStage([ax + dx * TOE_LENGTH, ay, az + dz * TOE_LENGTH]);
+    feet[side] = { ...legs[i][2], toe, held: !!(pin && pin.w > 0.5 && !short),
       unreachable: !!(short && pin), target: short && pin ? frame.toStage(short.target) : null,
       shortfall: short && pin ? short.over * h : 0 };
   }
