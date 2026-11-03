@@ -61,7 +61,7 @@ export const POSE_SPECS = {
   releve: { arms: [[60, 64], [60, 64]], legs: [[1, 1], [1, 1]], lean: 0, rise: 0.03 },
   // The long line: one leg carried back and up, one arm forward, one back — and the body tipped
   // forward over the standing foot, which is what a balance is.
-  arabesque: { arms: [[95, 70], [-60, -30]], legs: [[1, 0], [62, 78]], lean: -6, rise: 0.03, rock: 6 },
+  arabesque: { arms: [[95, 70], [-60, -30]], legs: [[1, 0], [180, 180, -60]], lean: -6, rise: 0.03, rock: 6 },
   // The same lifted leg, bent — the toe drawn up towards the standing knee.
   attitude: { arms: [[130, 190], [70, 66]], legs: [[1, 0], [45, -30]], lean: 3, rise: 0.03, rock: 3 },
   // Up on one pointe, the other foot at the knee, arms rounded to make a hoop.

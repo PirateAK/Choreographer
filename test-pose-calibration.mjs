@@ -49,7 +49,13 @@ for (const id of ids.filter((p) => POSE_SPECS[p].rock)) {
   const rocked = joints(spec).legs3;
   const low = (legs) => Math.min(...legs.map((l) => l[2][1]));
   near(low(rocked), low(flat), 1e-12, `${id} rock keeps support on floor`);
-  rocked.forEach((l, i) => assert(l[2][2] < flat[i][2][2], `${id} rock puts foot upstage`));
+  // Only planted feet are tipped behind her: a lifted working leg rides the tipped hip, so its own rear
+  // depth can shrink by the tip (arabesque: about 3 cm), which is a cost of the rock, not a contact.
+  const plant = PLANT_BY_POSE[id];
+  rocked.forEach((l, i) => {
+    if ((plant === 'left' && i !== 0) || (plant === 'right' && i !== 1)) return;
+    assert(l[2][2] < flat[i][2][2], `${id} rock puts foot upstage`);
+  });
 }
 
 // Weight shift keeps every standing foot on its own contact at any weight, with only a tiny settle.

@@ -67,3 +67,10 @@ Proposed order: (a) add shared `evaluateMovement` in model.js, (b) switch elevat
 - Tests: test-ankle-lift.mjs (new) plus the 13 existing engine tests pass; syntax and `git diff --check` clean; browser smoke loads with no page errors. Import map: pose load2, model trajectory7.
 - Open for the user: fourth-position shape, pas de bourrée rise per syllabus, plié shape (thigh 20° → 43°) for teacher review.
 
+## Status: arabesque rear depth (2026-11-03)
+- Arabesque working leg was `[62, 78]`: 28° below horizontal sideways, ankle at 0.35 height, no rear depth. Now `[180, 180, -60]`: straight, thigh 30° above horizontal behind. Ankle at height 0.86 (hip 0.56), rear depth −0.42 of body height. Support foot unchanged.
+- Trade-off: the 6° rock tips the lifted leg forward with the hip, so rear depth is about 0.39 once rocked. Teacher to confirm the 30° elevation (school-dependent; many syllabi use 90°).
+- Free feet are no longer reported as contact shortfalls: the overlap loop skips unpinned sides, and overhead `shortfall` follows the same pin condition as `unreachable`. Free-foot home is still held by the hip-drop rule, so a straight free leg can sit about 1 cm off its home.
+- Attitude has the same lowered-sideways working leg (`[45, -30]`, ankle 0.12). Not changed yet; needs the same review.
+- Import map: pose load3, model trajectory8. Engine suite passes (14 tests incl. rear-depth assertions in test-ankle-lift.mjs). Browser smoke: no page errors.
+

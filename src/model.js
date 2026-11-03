@@ -3239,7 +3239,7 @@ export function overheadPoseAtLocal(show, dancer, lt) {
     const short = figure.shortfall[i];
     feet[side] = { ...legs[i][2], held: !!(pin && pin.w > 0.5 && !short),
       unreachable: !!(short && pin), target: short && pin ? frame.toStage(short.target) : null,
-      shortfall: short ? short.over * h : 0 };
+      shortfall: short && pin ? short.over * h : 0 };
   }
   return { at, figure, frame, legs, feet };
 }
@@ -3292,7 +3292,7 @@ export function legOverreach(show, dancer, i) {
     const body = posAtLocal(dancer, lt);
     for (const side of ['left', 'right']) {
       const short = j.shortfall[side === 'right' ? 1 : 0];
-      if (!short || (worst && short.over <= worst.over) || !body) continue;
+      if (!pins[side] || !short || (worst && short.over <= worst.over) || !body) continue;
       // Both ends of the gap on the floor, for a plan to draw: the mark the foot is meant to be on,
       // and where the leg actually runs out — the contact pulled back along the leg towards her.
       worst = {

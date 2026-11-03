@@ -53,4 +53,13 @@ assert.equal(POSE_SPECS.arabesque.rise, 0.03, 'arabesque rise');
 assert.equal(POSE_SPECS.attitude.rise, 0.03, 'attitude rise');
 assert.equal(POSE_SPECS.pirouette.rise, 0.06, 'pirouette rise');
 
+// Arabesque: the working leg goes up and back (rear depth), not out to the side and down.
+{
+  const [, working] = joints(POSE_SPECS.arabesque).legs3;
+  const [hip, , ankle] = working;
+  assert(ankle[2] < -0.3, `arabesque working foot rear depth ${ankle[2]}`);
+  assert(ankle[1] > hip[1] + 0.2, `arabesque working foot lifted above hip`);
+  assert(Math.abs(ankle[0] - hip[0]) < 0.02, 'arabesque working leg in the sagittal plane');
+}
+
 console.log('ankle lift: ok');
