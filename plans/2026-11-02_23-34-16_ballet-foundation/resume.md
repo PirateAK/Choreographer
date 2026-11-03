@@ -56,3 +56,14 @@ Proposed order: (a) add shared `evaluateMovement` in model.js, (b) switch elevat
 - Verify with the engine suite (12 tests), `node --input-type=module --check`, `git diff --check`, and a browser smoke test at the preview.
 - Commit each verified checkpoint with `git -c user.name=Workshop -c user.email=workshop@local`.
 - Preserve untracked imported files; do not create new docs unless asked.
+
+## Status: ankle articulation checkpoint (ank-2..ank-5 done, ank-6 commit pending)
+- Bone lengths fixed at BODY.leg (no rise/2 lengthening). Contacts are ball-of-foot: `feetPlaceOf` y = ankle − max(0, rise); pinned ankle target = contact + max(0, rise) in `joints()` hold and `contactSink`.
+- Hip shift is measured from the socket it starts at (not the origin), so the hip never overshoots the support foot. This removed the 2 cm arabesque settle the fixed leg had created (HEAD 0.8 mm; now 0 mm at every weight).
+- Plié re-solved to legs [42.68, −30.57]; contacts match HEAD (y 0.025), was −0.062 (below floor).
+- Fourth re-solved to legs [[22.087, −13.04, 22.978], [4.483, −30.454, −21.077]]; contacts reproduce HEAD exactly. Angles change a lot: needs teacher review of the shape.
+- Rises: releve 0.03, pirouette 0.06, arabesque/attitude 0.03, LEVEL_RISE demi 0.03 / pointe 0.06, cheatsheet level rise matched. Pas de bourrée 0.02 kept pending the syllabus decision.
+- Fallout: relevé contact x 0.055 → 0.054 (1 mm, tolerance 2 mm in test-ankle-lift.mjs). Movement-views unreachable foot samples 17 → 14 (test asserts > 0).
+- Tests: test-ankle-lift.mjs (new) plus the 13 existing engine tests pass; syntax and `git diff --check` clean; browser smoke loads with no page errors. Import map: pose load2, model trajectory7.
+- Open for the user: fourth-position shape, pas de bourrée rise per syllabus, plié shape (thigh 20° → 43°) for teacher review.
+

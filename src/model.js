@@ -78,7 +78,7 @@ export const LEVEL_LABEL = Object.fromEntries(LEVELS);
 // legs and lifts the hips, which is what standing higher actually is. A half, then full
 // point for a 1.7 m dancer is about 3 cm and 8 cm. Fractions of the dancer's height, so a
 // small dancer rises a small amount.
-const LEVEL_RISE = { flat: 0, demi: 0.02, pointe: 0.045, air: 0 };
+const LEVEL_RISE = { flat: 0, demi: 0.03, pointe: 0.06, air: 0 };
 // A jump clears the deck rather than stretching upwards, so it is a height in metres. A
 // grand jeté's apex is around a third of a metre; a small sauté can be typed in smaller.
 export const AIR_LIFT = 0.35;

@@ -28,8 +28,9 @@ export const BODY = {
   fore: 0.19,
 };
 
-// Rising onto the pointes makes a dancer taller without lifting their feet off the
-// floor, so the legs lengthen by half the rise each and the ankles stay down.
+// Rising onto the pointes raises the body, not the legs: bone lengths are fixed, so a rise lifts the hips
+// and the ball of the supporting foot leaves the floor by the rise while the ankle stays a shoe's height up.
+// Contacts are taken at the ball (see feetPlaceOf), which keeps the legs at their true length.
 const NEUTRAL = { arms: [[8, 4], [8, 4]], legs: [[3, 2], [3, 2]], lean: 0, rise: 0 };
 
 // A leg is three numbers: the hip's angle, the knee's, and how far the whole leg swings forward or back
@@ -49,22 +50,22 @@ export const POSE_SPECS = {
   // As third, but the low arm reaches forward and the legs are split fore and aft: the whole point of
   // the position is the axis the elevation has never had. The hips come down to pay for it, which is
   // what a dancer does — a fore-and-aft split cannot be made with the legs at their length.
-  fourth: { arms: [[140, 200], [45, 30]], legs: [[6, 3, 24], [-10, -16, -22]], lean: 0, rise: -0.02 },
+  fourth: { arms: [[140, 200], [45, 30]], legs: [[22.087, -13.04, 22.978], [4.483, -30.454, -21.077]], lean: 0, rise: -0.02 },
   // Both arms rounded above the head, feet crossed tightly: the closed position.
   fifth: { arms: [[138, 196], [138, 196]], legs: [[2, 1], [-4, 8]], lean: 0, rise: 0 },
   // One foot stretched out to touch the floor, the other carrying the weight. Devant: the working leg
   // goes forward, out to the audience's side of her.
   tendu: { arms: [[40, 45], [40, 45]], legs: [[2, 1], [22, 20, 16]], lean: 0, rise: 0 },
   // Both knees out over the toes, the whole body a hand's width lower.
-  plie: { arms: [[30, -6], [30, -6]], legs: [[20, -8], [20, -8]], lean: 0, rise: -0.09 },
-  releve: { arms: [[60, 64], [60, 64]], legs: [[1, 1], [1, 1]], lean: 0, rise: 0.04 },
+  plie: { arms: [[30, -6], [30, -6]], legs: [[42.68, -30.57], [42.68, -30.57]], lean: 0, rise: -0.09 },
+  releve: { arms: [[60, 64], [60, 64]], legs: [[1, 1], [1, 1]], lean: 0, rise: 0.03 },
   // The long line: one leg carried back and up, one arm forward, one back — and the body tipped
   // forward over the standing foot, which is what a balance is.
-  arabesque: { arms: [[95, 70], [-60, -30]], legs: [[1, 0], [62, 78]], lean: -6, rise: 0.02, rock: 6 },
+  arabesque: { arms: [[95, 70], [-60, -30]], legs: [[1, 0], [62, 78]], lean: -6, rise: 0.03, rock: 6 },
   // The same lifted leg, bent — the toe drawn up towards the standing knee.
-  attitude: { arms: [[130, 190], [70, 66]], legs: [[1, 0], [45, -30]], lean: 3, rise: 0.02, rock: 3 },
+  attitude: { arms: [[130, 190], [70, 66]], legs: [[1, 0], [45, -30]], lean: 3, rise: 0.03, rock: 3 },
   // Up on one pointe, the other foot at the knee, arms rounded to make a hoop.
-  pirouette: { arms: [[35, -15], [35, -15]], legs: [[1, 0], [40, -35]], lean: 0, rise: 0.05 },
+  pirouette: { arms: [[35, -15], [35, -15]], legs: [[1, 0], [40, -35]], lean: 0, rise: 0.06 },
   // The travelling step that links two poses: crossed feet, one on the pointe behind.
   'pas-de-bourree': { arms: [[58, 62], [58, 62]], legs: [[-6, -10], [-16, -22]], lean: 0, rise: 0.02 },
   // A lunge carrying the dancer across the stage, leaning the way they travel, and the weight going
@@ -180,7 +181,7 @@ export function joints(spec, facing = 1, turn = 0, pins = null) {
   // still be drawn square to the house. Zero at the front and the back, all of it in profile.
   const spin = Math.sin(angle) * (facing < 0 ? -1 : 1);
   const rise = spec.rise || 0;
-  const leg = BODY.leg + rise / 2;
+  const leg = BODY.leg;
   // A rock is the lower body tipped forward over the supporting foot: each leg turns rigidly about its
   // hip so the feet go upstage of the pelvis, and the whole figure sinks by what that tipping lifts
   // the lowest ankle, so the supporting foot stays on the floor at the length the leg already has.
@@ -243,8 +244,11 @@ export function joints(spec, facing = 1, turn = 0, pins = null) {
   // one crossed behind (a pas de bourrée) — never past it, and no further than HIP_SHIFT.
   const hipShift = (() => {
     if (wt.leg == null || !wt.w) return 0;
-    const footX = limbFrom(wt.leg, squareBase(wt.leg))[2][0];
-    return Math.sign(footX) * Math.min(HIP_SHIFT, 0.7 * Math.abs(footX)) * wt.w;
+    // Measured from the socket it starts at, not the origin: a foot already under the hip has nothing to
+    // travel to, and an overshoot past it is what straightens a standing leg and sinks the body.
+    const start = squareBase(wt.leg)[0];
+    const delta = limbFrom(wt.leg, squareBase(wt.leg))[2][0] - start;
+    return Math.sign(delta) * Math.min(HIP_SHIFT, 0.7 * Math.abs(delta)) * wt.w;
   })();
 
   // Carrying the hip out over a nearly straight standing leg moves the socket away from that leg's own
@@ -290,7 +294,8 @@ export function joints(spec, facing = 1, turn = 0, pins = null) {
         const sag = wt.leg != null && i === 1 - wt.leg ? hipDrop : 0;
         const base = [squareBase(i)[0] + (i === wt.leg ? hipShift : 0), hipY - shiftSink - sink - sag, 0];
         const own = ownAnkle(i, base);
-        const t = [own[0] + (pin.x - own[0]) * pin.w, own[1] + (pin.y - own[1]) * pin.w, own[2] + ((pin.z || 0) - own[2]) * pin.w];
+        const lifted = pin.y + Math.max(0, spec.rise || 0);
+        const t = [own[0] + (pin.x - own[0]) * pin.w, own[1] + (lifted - own[1]) * pin.w, own[2] + ((pin.z || 0) - own[2]) * pin.w];
         const r = Math.hypot(t[0] - base[0], t[2] - base[2]);
         const v = base[1] - t[1];
         if (Math.hypot(r, v) <= L) continue;
@@ -375,7 +380,7 @@ export function joints(spec, facing = 1, turn = 0, pins = null) {
     const from = ownAnkle(i, base);
     const target = [
       from[0] + (hold.x - from[0]) * hold.w,
-      from[1] + (hold.y - from[1]) * hold.w,
+      from[1] + (hold.y + (pin ? Math.max(0, rise) : 0) - from[1]) * hold.w,
       from[2] + (heldZ - from[2]) * hold.w,
     ];
     let bend = kneeTo(root, target, kneePoint);
@@ -444,7 +449,7 @@ export function feetPlaceOf(spec, facing = 1, turn = 0) {
   const mirror = facing < 0 ? -1 : 1;
   return [0, 1].map((i) => {
     const [x, y, z] = own[i][2];
-    return { x: mirror * (x * c + z * s), y, z: z * c - x * s };
+    return { x: mirror * (x * c + z * s), y: y - Math.max(0, spec.rise || 0), z: z * c - x * s };
   });
 }
 

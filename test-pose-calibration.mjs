@@ -17,7 +17,8 @@ for (const id of ids) {
       feetPlaceOf(spec, facing, turn).forEach((place, i) => {
         const [x, y, z] = own[i][2];
         near(place.x, facing * (x * Math.cos(a) + z * Math.sin(a)), 1e-12, `${id} x`);
-        near(place.y, y, 1e-12, `${id} y`);
+        // A raised foot is contacted at the ball: the ankle sits above it by the positive rise.
+        near(place.y, y - Math.max(0, spec.rise || 0), 1e-12, `${id} y`);
         near(place.z, z * Math.cos(a) - x * Math.sin(a), 1e-12, `${id} z`);
       });
     }
@@ -27,7 +28,7 @@ for (const id of ids) {
 // Bones keep the solver's length whether pinned or not, including tipped (rocked) positions.
 for (const id of ids) {
   const spec = POSE_SPECS[id];
-  const len = BODY.leg + (spec.rise || 0) / 2;
+  const len = BODY.leg;
   const fp = feetPlaceOf(spec);
   const plant = PLANT_BY_POSE[id] || 'both';
   const pins = {};
@@ -61,7 +62,7 @@ for (const id of ids) {
   for (const w of [0.25, 0.5, 1]) {
     const j = joints(spec, 1, 0, { [plant]: { ...fp, w } });
     assert.equal(j.shortfall[i], null, `${id} stance holds at w=${w}`);
-    if (w === 1) near(dist(j.legs3[i][2], [fp.x, fp.y, fp.z]), 0, 1e-6, `${id} stance ankle on contact`);
+    if (w === 1) near(dist(j.legs3[i][2], [fp.x, fp.y + Math.max(0, spec.rise || 0), fp.z]), 0, 1e-6, `${id} stance ankle on contact`);
     const settle = joints(spec).legs3[i][0][1] - j.legs3[i][0][1];
     assert(settle >= 0 && settle < 0.001, `${id} weight-shift settle stays tiny (${settle})`);
     assert(Math.sign(j.pelvis[0]) === Math.sign(fp.x), `${id} hips travel towards the supporting foot`);

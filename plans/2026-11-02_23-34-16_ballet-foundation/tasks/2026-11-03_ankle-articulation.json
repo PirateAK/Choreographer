@@ -1,0 +1,32 @@
+[
+  {
+    "content": "[ank-1] Read feetPlaceOf, legacyFootPins, footPinsFromTrajectory and contact consumers to map every ankle-height assumption",
+    "id": "ank-1",
+    "status": "in_progress"
+  },
+  {
+    "content": "[ank-2] Fix leg length in joints(): thigh and shin constant; lift comes from ankle height above ball-of-foot contact",
+    "id": "ank-2",
+    "status": "pending"
+  },
+  {
+    "content": "[ank-3] Set realistic lifts: demi-pointe about 5 cm, full pointe about 10 cm; arabesque/attitude standing foot demi-pointe; pas de bourree per syllabus",
+    "id": "ank-3",
+    "status": "pending"
+  },
+  {
+    "content": "[ank-4] Update contacts (ball on floor) and pins so relevé feet are not reported as missed; update test-pose-calibration length assertion",
+    "id": "ank-4",
+    "status": "pending"
+  },
+  {
+    "content": "[ank-5] Run full engine suite, syntax checks, diff check, browser smoke; compare reach/contact fallout",
+    "id": "ank-5",
+    "status": "pending"
+  },
+  {
+    "content": "[ank-6] Commit checkpoint and record results in resume.md",
+    "id": "ank-6",
+    "status": "pending"
+  }
+]
