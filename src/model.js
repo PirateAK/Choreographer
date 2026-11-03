@@ -2996,7 +2996,7 @@ export function footPins(show, dancer, lt) {
     // floor: it leaves the old mark as the weight goes and comes down on the new one, lifting more
     // the further it has to step.
     let y = spot.h / h;
-    if (dep && arr && w < 0.999) {
+    if (dep && arr) {
       const moved = Math.hypot(dep.x - arr.x, dep.y - arr.y);
       if (moved > 0.02) y += (Math.min(0.12, moved * 0.35) * Math.sin(Math.PI * w)) / h;
     }

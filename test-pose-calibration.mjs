@@ -66,9 +66,12 @@ for (const id of ids) {
     assert(settle >= 0 && settle < 0.001, `${id} weight-shift settle stays tiny (${settle})`);
     assert(Math.sign(j.pelvis[0]) === Math.sign(fp.x), `${id} hips travel towards the supporting foot`);
   }
-  // Honesty: a contact moved away is still reported, not absorbed by the settle.
-  const far = joints(spec, 1, 0, { [plant]: { ...fp, x: fp.x + 0.08, w: 1 } });
+  // Honesty: a contact further than a demi-plié's worth of knee bend can reach is still reported,
+  // and the body never lowers more than that to chase it.
+  const far = joints(spec, 1, 0, { [plant]: { ...fp, x: fp.x + 0.4, w: 1 } });
   assert(far.shortfall[i] && far.shortfall[i].over > 0.001, `${id} displaced contact still reported`);
+  const sinkCap = Math.abs(POSE_SPECS.plie.rise) + 0.022 + 0.001;
+  assert(joints(spec).pelvis[1] - far.pelvis[1] <= sinkCap, `${id} body lowering capped`);
 }
 
 // Every stationary position, through the overhead evaluation, shows no missed contact.
@@ -80,6 +83,34 @@ for (const pose of ids) {
       assert(!foot.unreachable && foot.shortfall < 1e-6, `${pose} ${side} stationary contact`);
     }
   }
+}
+
+// Travelling steps: the body lowers through the transfer so short steps keep their contacts, the motion
+// stays continuous, and long distances are still honestly reported as missed.
+const walk = (a, b, dx) => ({ keys: [{ t: 0, x: 0, y: 3, pose: a }, { t: 2000, x: dx, y: 3, pose: b }] });
+const H = show.stage.dancerH;
+for (const [a, b] of [['none', 'none'], ['first', 'second'], ['tendu', 'tendu'], ['fifth', 'fifth'], ['arabesque', 'arabesque']]) {
+  for (const dx of [0.1, 0.3]) {
+    const d = walk(a, b, dx);
+    let prev = null;
+    for (let t = 0; t <= 2000; t += 1) {
+      const s = overheadPoseAtLocal(show, d, t);
+      for (const [side, foot] of Object.entries(s.feet)) {
+        assert(!(foot.target && foot.shortfall > 0.005), `${a}->${b} ${dx}m ${side} contact at ${t}`);
+        assert(foot.h >= -1e-9, `${a}->${b} ${dx}m ${side} above deck at ${t}`);
+      }
+      const y = s.figure.pelvis[1] * H;
+      if (prev != null) assert(Math.abs(y - prev) < 0.002, `${a}->${b} ${dx}m pelvis continuous at ${t}`);
+      prev = y;
+    }
+  }
+  let missed = false;
+  for (let t = 0; t <= 2000; t += 20) {
+    for (const foot of Object.values(overheadPoseAtLocal(show, walk(a, b, 4), t).feet)) {
+      if (foot.target && foot.shortfall > 0.3) missed = true;
+    }
+  }
+  assert(missed, `${a}->${b} 4m still reports a missed contact`);
 }
 
 console.log('pose calibration: ok');

@@ -144,12 +144,21 @@ export function blendSpecs(a, b, t) {
 // square — most of what "her weight is over here" looks like from the house is these two numbers.
 const HIP_SHIFT = 0.035;
 const HIP_DROP = 0.022;
+// The deepest the body lowers to keep weighted contacts through a travelling step: the gallery's own
+// demi-plié, so a step never asks for more bend than a position the table already accepts. It also
+// stands in for the foot and ankle articulation the figure does not have yet (Phase 2).
+const STEP_SINK_MAX = Math.abs(POSE_SPECS.plie.rise);
 
 // Which foot carries her, as a leg index, and how much: 0 is the left, 1 the right, `null` when both
 // are planted, because the weight is then between them and the hips stay square.
 function weightOf(pins) {
   if (!pins) return { leg: null, w: 0 };
-  if (pins.left && pins.right) return { leg: null, w: 0 };
+  // Two contacts share the weight by how firmly each is held, so the hips leave square gradually as
+  // one foot lets go instead of snapping across when its hold finally reaches zero.
+  if (pins.left && pins.right) {
+    const d = pins.left.w - pins.right.w;
+    return Math.abs(d) < 1e-9 ? { leg: null, w: 0 } : { leg: d > 0 ? 0 : 1, w: Math.abs(d) };
+  }
   if (pins.left) return { leg: 0, w: pins.left.w };
   if (pins.right) return { leg: 1, w: pins.right.w };
   return { leg: null, w: 0 };
@@ -252,11 +261,52 @@ export function joints(spec, facing = 1, turn = 0, pins = null) {
     if (!(v > 0) || r >= L || Math.hypot(r, v) <= L) return 0;
     return v - Math.sqrt(L * L - r * r) + 1e-9;
   })();
-  const pelvisY = hipY - shiftSink;
+
+  // The position's own ankle hung from a socket, carried down with a lowering body but never through the
+  // deck: a foot on the floor stays on it and its knee takes the bend, and a lifted foot can come down at
+  // most to the floor. Every hold blends from this, so no lowering can push a lightly held foot under.
+  const floorY = Math.min(...[0, 1].map((i) => limbFrom(i, squareBase(i))[2][1]));
+  const ownAnkle = (i, base) => {
+    const a = limbFrom(i, base)[2];
+    return [a[0], Math.max(a[1], floorY), a[2]];
+  };
+
+  // A travelling step spreads the feet the body is standing on, and a straight leg cannot reach a
+  // contact that is beside or behind the pelvis as well as below it: a dancer bends her knees and the
+  // whole body lowers through the transfer, rising again over the new foot. The body lowers by what
+  // the weighted contacts require, never more than the gallery's own demi-plié, so a contact still out
+  // of reach at that depth stays a reported miss rather than being absorbed. Stationary contacts on a
+  // position's own feet need none of it.
+  const contactSink = (() => {
+    if (!pins) return 0;
+    const L = 2 * leg;
+    let sink = 0;
+    for (let pass = 0; pass < 4; pass++) {
+      let more = 0;
+      for (const i of [0, 1]) {
+        const pin = pins[i === 0 ? 'left' : 'right'];
+        if (!pin || !(pin.w > 0)) continue;
+        const sag = wt.leg != null && i === 1 - wt.leg ? hipDrop : 0;
+        const base = [squareBase(i)[0] + (i === wt.leg ? hipShift : 0), hipY - shiftSink - sink - sag, 0];
+        const own = ownAnkle(i, base);
+        const t = [own[0] + (pin.x - own[0]) * pin.w, own[1] + (pin.y - own[1]) * pin.w, own[2] + ((pin.z || 0) - own[2]) * pin.w];
+        const r = Math.hypot(t[0] - base[0], t[2] - base[2]);
+        const v = base[1] - t[1];
+        if (Math.hypot(r, v) <= L) continue;
+        more = Math.max(more, r >= L ? STEP_SINK_MAX : v - Math.sqrt(L * L - r * r) + 1e-9);
+      }
+      if (more <= 1e-9) break;
+      sink = Math.min(STEP_SINK_MAX, sink + more);
+      if (sink >= STEP_SINK_MAX) break;
+    }
+    return sink;
+  })();
+  const bodySink = shiftSink + contactSink;
+  const pelvisY = hipY - bodySink;
 
   const arms = spec.arms.map(([sh, el], i) => {
     const side = (i === 0 ? 1 : -1) * m;
-    const shoulder = [side * BODY.shoulderW + leanX, shoulderY - shiftSink];
+    const shoulder = [side * BODY.shoulderW + leanX, shoulderY - bodySink];
     const [ex, ey] = reach(sh, BODY.upper, side);
     const elbow = [shoulder[0] + ex, shoulder[1] + ey];
     const [hx, hy] = reach(el, BODY.fore, side);
@@ -299,7 +349,8 @@ export function joints(spec, facing = 1, turn = 0, pins = null) {
   // The free leg's own place, read from a square pelvis: the mark it keeps when the hip above it
   // sags, so the drop bends that knee instead of pushing the foot through the deck.
   const freeIdx = wt.leg == null ? null : 1 - wt.leg;
-  const freeHome = freeIdx == null ? null : limbFrom(freeIdx, squareBase(freeIdx))[2];
+  // The free foot keeps the mark a square pelvis gives it, lowered with the body but not below the deck.
+  const freeHome = freeIdx == null ? null : ownAnkle(freeIdx, [squareBase(freeIdx)[0], pelvisY, 0]);
 
   // Which legs had to give up their contact to stay the length they are: `null` per leg, or how far
   // past its reach the foot was asked to be — `over` along the leg, `overX` across the floor — in
@@ -320,10 +371,11 @@ export function joints(spec, facing = 1, turn = 0, pins = null) {
     // Where the foot is asked to be: the hold, or a blend of it and where the position would have put
     // it. Everything here is in the body's own frame, before the turn projects it.
     const heldZ = hold.z || 0;
+    const from = ownAnkle(i, base);
     const target = [
-      ankle[0] + (hold.x - ankle[0]) * hold.w,
-      ankle[1] + (hold.y - ankle[1]) * hold.w,
-      ankle[2] + (heldZ - ankle[2]) * hold.w,
+      from[0] + (hold.x - from[0]) * hold.w,
+      from[1] + (hold.y - from[1]) * hold.w,
+      from[2] + (heldZ - from[2]) * hold.w,
     ];
     let bend = kneeTo(root, target, kneePoint);
     let toe = target;
@@ -353,14 +405,14 @@ export function joints(spec, facing = 1, turn = 0, pins = null) {
     // The pelvis travels with the weight and the torso follows less than half as far, which is what
     // keeps her standing over the path while her hips are over her foot.
     pelvis: [hipShift * 0.6, pelvisY - hipDrop * 0.5],
-    chest: narrow([leanX + hipShift * 0.6, shoulderY - shiftSink]),
+    chest: narrow([leanX + hipShift * 0.6, shoulderY - bodySink]),
     arms: arms.map((arm) => arm.map(narrow)),
     // The hip is the pivot and has no depth of its own; the knee and the ankle are solved in space and
     // then projected onto this plane.
     legs: legs3.map((leg) => leg.map(projected)),
     // Unprojected joints for the overhead plan; never reconstruct depth from elevation.
     legs3,
-    head: narrow([leanX * 1.05, headY - shiftSink]),
+    head: narrow([leanX * 1.05, headY - bodySink]),
     headR: BODY.headR,
     rise,
     turn: Number(turn) || 0,
