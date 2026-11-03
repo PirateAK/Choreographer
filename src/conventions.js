@@ -73,10 +73,10 @@ export const CONVENTIONS = [
     school_method: 'Preview target. 42.68 is the current contact-constrained baseline, not a school depth. The solver re-solves knee and body sink to keep flat feet on the floor. Below about 17.9° the solved body would lift the ankles onto the ball of the foot, so the minimum is 17.9 (the flat-foot limit is 17.86).',
   },
   {
-    id: 'arabesque.elevation', kind: 'measure', applied: false, value: 90, min: 0, max: 180, status: 'provisional',
+    id: 'arabesque.elevation', kind: 'measure', applied: true, value: 90, min: 0, max: 180, status: 'provisional',
     label: 'Arabesque elevation (optional target)', unit: 'degrees from straight down',
-    measurement_reference: 'working leg, hip joint to ankle, angle from straight down; 90 = horizontal behind',
-    school_method: 'Optional provisional target, not the definition of every school’s arabesque. The solver does not read it yet.',
+    measurement_reference: 'working leg, hip joint to ankle, angle from straight down, after the body tip; 90 = horizontal behind',
+    school_method: 'Optional provisional target, not the definition of every school’s arabesque. The default 90 reproduces the current pose; the solver re-solves the working leg for any other value.',
   },
   {
     id: 'arabesque.arms', kind: 'note', applied: false, value: 'Current preview arm set', status: 'provisional',

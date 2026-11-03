@@ -133,7 +133,8 @@ assert(summary.approvedInUse.includes('releve.rise'), 'approved releve is listed
 assert(summary.provisionalInUse.includes('pirouette.rise'), 'unapproved pirouette is listed as provisional in use');
 assert(!summary.provisionalInUse.includes('releve.rise'), 'approved releve is not counted as provisional');
 assert(summary.unset.includes('attitude.knee_height'), 'attitude knee height is listed as unset');
-assert(summary.recordedOnly.includes('arabesque.elevation'), 'arabesque elevation is recorded, not applied');
+assert(summary.provisionalInUse.includes('arabesque.elevation'), 'arabesque elevation preset is provisional and read by the pose');
+assert(summary.recordedOnly.includes('arabesque.arms'), 'arabesque arm set is recorded, not applied');
 console.log(`provisional in use (${summary.provisionalInUse.length}): ${summary.provisionalInUse.join(', ')}`);
 console.log(`school-approved in use (${summary.approvedInUse.length}): ${summary.approvedInUse.join(', ')}`);
 console.log(`unset (${summary.unset.length}): ${summary.unset.join(', ')}`);

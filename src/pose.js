@@ -97,6 +97,18 @@ export function plieSpec(depth) {
   return { ...POSE_SPECS.plie, legs: [[depth, kDeg], [depth, kDeg]], rise };
 }
 
+// Arabesque elevation: the working leg's angle from straight down as drawn, after the body's tip (rock)
+// is applied. 0 hangs, 90 is horizontal behind, 180 is straight up. Measured on the drawn leg
+// (front = elevation − 180 − rock, which gives 90 at the baseline −96). The baseline returns the shared entry.
+export const ARABESQUE_BASELINE_ELEVATION = 90;
+export function arabesqueSpec(elevation) {
+  const e = Number(elevation);
+  if (!Number.isFinite(e)) return null;
+  const base = POSE_SPECS.arabesque;
+  const front = e - 180 - (base.rock || 0);
+  return { ...base, legs: base.legs.map((leg, i) => (i === 1 ? [leg[0], leg[1], front] : leg)) };
+}
+
 // The school's rise for a position replaces the built-in one when a school has set it (see
 // conventions.js). Without an override the shared table entry is returned, as before. A plié depth
 // other than the baseline is re-solved for the preview.
@@ -107,8 +119,13 @@ export function specOf(id) {
     if (typeof depth === 'number' && depth !== PLIE_BASELINE_DEPTH) return plieSpec(depth) || base;
     return base;
   }
+  let shaped = base;
+  if (id === 'arabesque') {
+    const elevation = conventionValue('arabesque.elevation');
+    if (typeof elevation === 'number' && elevation !== ARABESQUE_BASELINE_ELEVATION) shaped = arabesqueSpec(elevation) || base;
+  }
   const rise = riseFor(id);
-  return rise === undefined || rise === base.rise ? base : { ...base, rise };
+  return rise === undefined || rise === shaped.rise ? shaped : { ...shaped, rise };
 }
 
 // Which foot carries the weight in each position, read off the angle table rather than

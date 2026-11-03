@@ -149,3 +149,11 @@ Proposed order: (a) add shared `evaluateMovement` in model.js, (b) switch elevat
 - Import map: pose load6, conventions conv3, app scroll24, styles scroll24.
 - Verified: conventions test; all engine tests (ankle-lift, contacts, conventions, foot-scheduler, foot-trajectory, movement-views, overlap, phrase-plants, placement-guide, pose-calibration, pose-contact-load, slides, timeline-scroll, transition-diagnostics, video); syntax checks; `git diff --check`; browser smoke of the School sheet (approve, refuse without name, withdraw on change, plié refusal, unset not approvable, Esc closes, no page errors).
 - Not run by the default loop: test-placement-browser.mjs and test-timeline-browser.mjs import bare `playwright`, which does not resolve from the project. They need the temporary Playwright path.
+
+## Arabesque elevation preview (load7, conv5)
+
+- `arabesque.elevation` is applied. Default 90 is the provisional preset and returns the shared POSE_SPECS entry, so the default drawing is unchanged.
+- Measure: working leg's angle from straight down as drawn, after the body tip (rock 6). 0 hangs, 90 horizontal behind, 180 straight up. `arabesqueSpec(e)` sets the working leg's fore-aft angle to `e − 180 − rock`. The drawn angle is verified at 0–180° in 1° steps.
+- Arm set and standing leg are unchanged. The arm set stays a provisional note, recorded, not applied.
+- Limit: a school arabesque may not match the 90° horizontal line. Elevation is a provisional target only.
+- Verified: test-arabesque-elevation.mjs, test-conventions.mjs (elevation provisional-in-use, arms recorded-only), full engine suite, syntax, `git diff --check`, School smoke.
