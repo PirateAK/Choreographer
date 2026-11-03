@@ -22,6 +22,10 @@ export function validateFootTrajectory(trajectory) {
       const knot = track[i];
       if (!finiteKnot(knot)) throw new TypeError(`${side} knot ${i} needs finite t/x/y/h and load in [0, 1]`);
       if (i && !(knot.t > track[i - 1].t)) throw new RangeError(`${side} knot times must increase strictly`);
+      if (knot.follow != null && (!Number.isFinite(knot.follow) || knot.follow < 0 || knot.follow > 1)) {
+        throw new RangeError(`${side} knot ${i} follow must be in [0, 1]`);
+      }
+
       if (i < track.length - 1) {
         const mode = knot.toNext || 'linear';
         if (!MODES.has(mode)) throw new TypeError(`${side} knot ${i} has unknown toNext mode`);
@@ -42,26 +46,37 @@ export function validateFootTrajectory(trajectory) {
 
 function smooth(u) { return u * u * (3 - 2 * u); }
 
+function knotPoint(knot, swing = false) {
+  const out = { x: knot.x, y: knot.y, h: knot.h, load: knot.load, swing };
+  if (Number.isFinite(knot.follow)) out.follow = knot.follow;
+  return out;
+}
+
 function sampleTrack(track, t) {
   if (!track || !track.length) return null;
-  if (t <= track[0].t) return { x: track[0].x, y: track[0].y, h: track[0].h, load: track[0].load, swing: false };
+  if (t <= track[0].t) return knotPoint(track[0]);
   const last = track[track.length - 1];
-  if (t >= last.t) return { x: last.x, y: last.y, h: last.h, load: last.load, swing: false };
+  if (t >= last.t) return knotPoint(last);
   let i = 0;
   while (i < track.length - 1 && t > track[i + 1].t) i++;
   const a = track[i], b = track[i + 1];
-  if (t === a.t) return { x: a.x, y: a.y, h: a.h, load: a.load, swing: false };
-  if (t === b.t) return { x: b.x, y: b.y, h: b.h, load: b.load, swing: false };
+  if (t === a.t) return knotPoint(a);
+  if (t === b.t) return knotPoint(b);
   const u = Math.max(0, Math.min(1, (t - a.t) / (b.t - a.t)));
   const mode = a.toNext || 'linear', p = mode === 'swing' ? smooth(u) : u;
   const arc = mode === 'swing' ? (Number(a.lift) || 0) * Math.sin(Math.PI * p) : 0;
   const blend = (x, y) => x + (y - x) * p;
+  const position = (from, to) => (a.follow === 0 && b.follow === 0)
+    ? from + (to - from) * u
+    : mode === 'hold' ? from : blend(from, to);
   return {
-    x: mode === 'hold' ? a.x : blend(a.x, b.x),
-    y: mode === 'hold' ? a.y : blend(a.y, b.y),
-    h: (mode === 'hold' ? a.h : blend(a.h, b.h)) + arc,
+    x: position(a.x, b.x),
+    y: position(a.y, b.y),
+    h: position(a.h, b.h) + arc,
     load: a.load + (b.load - a.load) * smooth(u),
     swing: mode === 'swing' && u > 0 && u < 1,
+    follow: (Number.isFinite(a.follow) ? a.follow : 1) +
+      ((Number.isFinite(b.follow) ? b.follow : 1) - (Number.isFinite(a.follow) ? a.follow : 1)) * smooth(u),
   };
 }
 

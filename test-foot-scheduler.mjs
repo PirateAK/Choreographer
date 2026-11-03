@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
+import { generatedWalkSchedule, withGeneratedWalk, createShow, footAtLocal, footPins, footPinsFromTrajectory, legOverreach, normalise, posAtLocal, poseAtLocal } from './src/model.js';
 import { compileFootSchedule } from './src/foot-scheduler.js';
 import { sampleFootTrajectory, validateFootTrajectory } from './src/foot-trajectory.js';
-import { createShow, footPins, footPinsFromTrajectory, legOverreach, normalise, posAtLocal, poseAtLocal } from './src/model.js';
 import { joints, specOf } from './src/pose.js';
 
 const initial = {
@@ -121,4 +121,67 @@ const attachedShow = normalise({ ...show, cast: [attached] });
 assert(attachedShow.cast[0].footTrajectory, 'valid attached tracks persist through show normalization');
 const invalidShow = normalise({ ...show, cast: [{ ...dancer, footTrajectory: { left: [] } }] });
 assert.equal(invalidShow.cast[0].footTrajectory, undefined, 'invalid attached tracks are discarded safely');
+
+// One generated walk keeps the start support's exact stage mark, transfers load before swing,
+// lands the arriving ankle on its destination station mark, and leaves a long miss diagnosable.
+const walkShow = createShow();
+const walkDancer = {
+  id: 'walk-prototype',
+  keys: [
+    { t: 0, x: 0, y: 3, pose: 'none', plant: 'left' },
+    { t: 2000, x: 0.3, y: 3, pose: 'none', plant: 'right', step: 'walk' },
+  ],
+};
+const generated = generatedWalkSchedule(walkShow, walkDancer, 1);
+assert(generated, 'ordinary single walk interval compiles');
+assert.deepEqual([generated.startPlant, generated.arrivalPlant], ['left', 'right']);
+const startLeft = sampleFootTrajectory(generated.trajectory, 0).left;
+const startRight = sampleFootTrajectory(generated.trajectory, 0).right;
+const endRight = sampleFootTrajectory(generated.trajectory, 2000).right;
+const expectedStartLeft = footPinsFromTrajectory(walkShow, walkDancer, 0,
+  { left: [{ t: 0, x: startLeft.x, y: startLeft.y, h: startLeft.h, load: 1 }] }).left;
+assert.equal(startLeft.x, footPins(walkShow, walkDancer, 0).left.sx);
+assert.equal(startLeft.y, footPins(walkShow, walkDancer, 0).left.sy);
+assert.equal(startLeft.follow, 1);
+assert.equal(startRight.follow, 0);
+assert.equal(endRight.x, footAtLocal(walkShow, walkDancer, 2000, 'right').x);
+assert.equal(endRight.y, footAtLocal(walkShow, walkDancer, 2000, 'right').y);
+assert.equal(endRight.follow, 1, 'arriving ankle follows its authored station contact at landing');
+const endLeft = sampleFootTrajectory(generated.trajectory, 2000).left;
+const inTransfer = sampleFootTrajectory(generated.trajectory, 1000);
+assert.equal(endLeft.x, startLeft.x, 'the departure foot remains on its starting stage mark through the interval');
+assert.equal(endLeft.y, startLeft.y);
+assert.equal(endLeft.load, 0, 'the departure foot has released support at the endpoint');
+assert.equal(endLeft.follow, 0, 'the released departure foot is no longer position-pinned at landing');
+assert(inTransfer.left.load > 0 && inTransfer.left.load < 1);
+assert(inTransfer.right.load > 0 && inTransfer.right.load < 1);
+assert.equal(inTransfer.right.follow, 0, 'unweighted swing foot follows freely before lift-off');
+const attachedWalk = withGeneratedWalk(walkShow, walkDancer, 1);
+assert.deepEqual(footPins(walkShow, attachedWalk.dancer, 1500),
+  footPinsFromTrajectory(walkShow, walkDancer, 1500, generated.trajectory),
+  'generated schedule is connected to normal foot pin evaluation inside its authored interval');
+assert.deepEqual(footPins(walkShow, attachedWalk.dancer, 2500), footPins(walkShow, walkDancer, 2500),
+  'the generated track does not clamp over later choreography');
+assert.deepEqual(footPins(walkShow, attachedWalk.dancer, -1), footPins(walkShow, walkDancer, -1),
+  'the generated track does not override choreography before its interval');
+assert.deepEqual(attachedWalk.dancer.footTrajectoryRange, { start: 0, end: 2000 });
+const normalizedWalk = normalise({ ...walkShow, cast: [attachedWalk.dancer] }).cast[0];
+assert.deepEqual(normalizedWalk.footTrajectoryRange, { start: 0, end: 2000 },
+  'the generated interval boundary survives show normalization');
+assert.equal(generatedWalkSchedule(walkShow, { keys: [{ t: 0 }, { t: 1000, step: 'chasse' }] }, 1), null,
+  'other named moves are not rewritten as generic walks');
+assert.equal(generatedWalkSchedule(walkShow, { keys: [{ t: 0 }, { t: 0, step: 'walk' }] }, 1), null,
+  'zero-duration interval is rejected');
+const longWalk = {
+  id: 'long-walk',
+  keys: [
+    { t: 0, x: 0, y: 3, pose: 'first', plant: 'left' },
+    { t: 2000, x: 2, y: 3, pose: 'none', plant: 'right', step: 'walk' },
+  ],
+};
+const longSchedule = generatedWalkSchedule(walkShow, longWalk, 1);
+assert(legOverreach(walkShow, { ...longWalk, footTrajectory: longSchedule.trajectory, footTrajectoryRange: { start: 0, end: 2000 } }, 1),
+  'very long generated step retains honest reach warning');
+assert.equal(expectedStartLeft.w, 1);
+console.log('generated walk prototype: ok');
 

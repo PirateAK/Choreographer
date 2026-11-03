@@ -9,7 +9,14 @@ function point(value, label) {
       !Number.isFinite(value.h) || !Number.isFinite(value.load) || value.load < 0 || value.load > 1) {
     throw new TypeError(`${label} must provide finite x/y/h and load in [0, 1]`);
   }
-  return { x: value.x, y: value.y, h: value.h, load: value.load };
+  const out = { x: value.x, y: value.y, h: value.h, load: value.load };
+  if (value.follow != null) {
+    if (!Number.isFinite(value.follow) || value.follow < 0 || value.follow > 1) {
+      throw new RangeError(`${label} follow must be in [0, 1]`);
+    }
+    out.follow = value.follow;
+  }
+  return out;
 }
 
 function samePosition(a, b) {
@@ -68,7 +75,7 @@ export function compileFootSchedule({ startTime = 0, startFeet, phases } = {}) {
       const fromKnot = tracks[side][tracks[side].length - 1];
       fromKnot.toNext = mode;
       if (movement.lift != null) fromKnot.lift = movement.lift;
-      tracks[side].push({ t: end, ...destination });
+      tracks[side].push({ t: end, ...destination, follow: destination.follow == null ? 1 : destination.follow });
       current[side] = destination;
       modes[side] = mode;
     }

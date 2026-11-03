@@ -5,6 +5,7 @@
 import { PLANT_BY_POSE, feetPlaceOf, joints, specOf, blendSpecs } from './pose.js';
 import { contactFrame } from './contact-frame.js';
 import { sampleFootTrajectory, validateFootTrajectory } from './foot-trajectory.js';
+import { compileFootSchedule } from './foot-scheduler.js';
 
 // The four things a station can stand on. Kept here rather than beside the contact code so a
 // show read from a file can be tidied before anything else in the module has been evaluated.
@@ -1242,11 +1243,20 @@ export function normalise(show) {
   delete out.music;
   out.cast = Array.isArray(out.cast) ? out.cast : [];
   out.cast.forEach((d) => {
-    if (!d || !d.footTrajectory) return;
-    try {
-      validateFootTrajectory(d.footTrajectory);
-    } catch {
-      delete d.footTrajectory;
+    if (!d) return;
+    if (d.footTrajectory) {
+      try {
+        validateFootTrajectory(d.footTrajectory);
+      } catch {
+        delete d.footTrajectory;
+        delete d.footTrajectoryRange;
+      }
+    }
+    if (d.footTrajectoryRange) {
+      const range = d.footTrajectoryRange;
+      if (!Number.isFinite(range.start) || !Number.isFinite(range.end) || !(range.end > range.start)) {
+        delete d.footTrajectoryRange;
+      }
     }
   });
   out.narration = Array.isArray(out.narration) ? out.narration : [];
@@ -2984,7 +2994,8 @@ export function footPinsFromTrajectory(show, dancer, lt, trajectory) {
     const target = sample[side];
     if (!target) continue;
     const [x, y, z] = frame.toLocal({ x: target.x, y: target.y, h: target.h });
-    out[side] = { x, y, z, sx: target.x, sy: target.y, w: 1, load: target.load, swing: target.swing };
+    const follow = Number.isFinite(target.follow) ? target.follow : 1;
+    out[side] = { x, y, z, sx: target.x, sy: target.y, w: follow, load: target.load, swing: target.swing };
   }
   return Object.keys(out).length ? out : null;
 }
@@ -3001,6 +3012,7 @@ function legacyFootPins(show, dancer, lt) {
   const plants = plantsOf(dancer);
   const u = b ? Math.max(0, Math.min(1, (lt - a.t) / (b.t - a.t || 1))) : 1;
   // Weight is on the departure foot for the first third of the leg and on the arrival foot for the
+
   // last third, changing over in between: the same place a step's transfer sits.
   const cross = b ? Math.max(0, Math.min(1, (u - 0.35) / 0.3)) : 0;
   const out = {};
@@ -3047,9 +3059,77 @@ function legacyFootPins(show, dancer, lt) {
 // Dancers without a schedule retain the authored-station contact behavior.
 export function footPins(show, dancer, lt) {
   if (dancer && dancer.footTrajectory) {
-    return footPinsFromTrajectory(show, dancer, lt, dancer.footTrajectory);
+    const range = dancer.footTrajectoryRange;
+    // Generated station intervals are opt-in only across their authored duration. Outside it,
+    // retain the existing station contact path rather than clamping this step over the whole show.
+    if (!range || (lt >= range.start && lt <= range.end)) {
+      return footPinsFromTrajectory(show, dancer, lt, dancer.footTrajectory);
+    }
   }
   return legacyFootPins(show, dancer, lt);
+}
+
+
+// Generate one deliberately narrow prototype walk for a single adjacent station interval. The
+// starting support stays planted while carrying weight, then releases as the arriving foot lands.
+// Only the arriving ankle is guaranteed to meet the destination mark; trailing-foot closure is
+// outside this prototype, not technique certification.
+export function generatedWalkSchedule(show, dancer, destinationIndex, opts = {}) {
+  const keys = (dancer && dancer.keys) || [];
+  const i = Number(destinationIndex);
+  const a = keys[i - 1], b = keys[i];
+  if (!Number.isInteger(i) || i < 1 || !a || !b || b.step !== 'walk') return null;
+  const duration = b.t - a.t;
+  if (!Number.isFinite(duration) || duration <= 0) return null;
+  const plants = plantsOf(dancer);
+  const startPlant = plants[i - 1] && plants[i - 1].name;
+  const endPlant = plants[i] && plants[i].name;
+  // A walk leaving a two-foot stance takes the right foot first, matching the existing phrase rule.
+  const side = startPlant === 'left' || startPlant === 'right'
+    ? startPlant
+    : startPlant === 'both' ? (opts.startSupport === 'right' ? 'right' : 'left') : null;
+  const arrival = endPlant === 'left' || endPlant === 'right' ? endPlant
+    : endPlant === 'both' && side ? otherFoot(side) : null;
+  if (!side || !arrival || side === arrival) return null;
+
+  const startTime = a.t;
+  const startFeet = Object.fromEntries(['left', 'right'].map((foot) => {
+    const mark = footAtLocal(show, dancer, startTime, foot);
+    return [foot, { x: mark.x, y: mark.y, h: mark.h, load: foot === side ? 1 : 0, follow: foot === side || foot === arrival ? 1 : 0 }];
+  }));
+  const endFeet = Object.fromEntries(['left', 'right'].map((foot) => {
+    const mark = foot === side ? startFeet[foot] : footAtLocal(show, dancer, b.t, foot);
+    return [foot, { x: mark.x, y: mark.y, h: mark.h, load: foot === arrival ? 1 : 0, follow: foot === side ? 0 : 1 }];
+  }));
+  const transfer = Number.isFinite(opts.transfer) ? Math.max(0.2, Math.min(0.8, opts.transfer)) : 0.5;
+  const moving = otherFoot(side);
+  startFeet[moving].follow = 0;
+  const phases = [
+    {
+      name: 'walk-support-transfer', duration: duration * transfer,
+      feet: {
+        [side]: { to: { ...startFeet[side], load: 1 - transfer }, mode: 'hold' },
+        [moving]: { to: { ...startFeet[moving], load: transfer, follow: 0 }, mode: 'hold' },
+      },
+    },
+    {
+      name: 'walk-swing-and-arrive', duration: duration * (1 - transfer),
+      feet: {
+        [side]: { to: { ...endFeet[side], load: 0 }, mode: 'hold' },
+        [moving]: { to: endFeet[moving], mode: 'swing', lift: Number.isFinite(opts.lift) && opts.lift >= 0 ? opts.lift : 0.1 },
+      },
+    },
+  ];
+  const compiled = compileFootSchedule({ startTime, startFeet, phases });
+  return { ...compiled, startPlant: side, arrivalPlant: arrival, destinationIndex: i };
+}
+
+// Return a shallow dancer copy with one generated interval schedule attached. The explicit range
+// keeps unrelated intervals on the legacy station-contact path; callers can inspect the schedule.
+export function withGeneratedWalk(show, dancer, destinationIndex, opts = {}) {
+  const schedule = generatedWalkSchedule(show, dancer, destinationIndex, opts);
+  if (!schedule) return null;
+  return { dancer: { ...dancer, footTrajectory: schedule.trajectory, footTrajectoryRange: { start: schedule.start, end: schedule.end } }, schedule };
 }
 
 // Where each foot is on the floor at a moment, for the two views that draw the deck: the foot she is
