@@ -19,7 +19,7 @@ assert.equal(conventionValue('plie.depth') === undefined, false, 'plié row exis
 
 // 2. Every row has the fields the table needs, and notes are not applied silently.
 for (const c of CONVENTIONS) {
-  assert(c.id && c.label && c.unit && c.reference, `${c.id} has label, unit, reference`);
+  assert(c.id && c.label && c.unit && (c.measurement_reference || c.kind === 'note'), `${c.id} has label, unit, measurement reference`);
   if (c.kind === 'note') assert.equal(c.applied, false, `${c.id} note is recorded, not applied`);
 }
 assert.equal(conventionRows().length, CONVENTIONS.length, 'rows cover every convention');
@@ -46,19 +46,41 @@ assert.equal(setConvention('releve.rise', 'abc').ok, false, 'non-numeric rise re
 assert.equal(setConvention('releve.rise', '').ok, false, 'empty rise refused by setConvention (reset is separate)');
 assert.equal(setConvention('no.such.id', 1).ok, false, 'unknown id refused');
 assert.equal(conventionValue('releve.rise'), 0.05, 'a refused value leaves the previous school value');
-assert.equal(setConvention('fourth.geometry', 'Turnout 90°, parallel feet, 2 ft spacing').ok, true, 'note accepted');
-assert.equal(setConvention('fourth.geometry', 'x'.repeat(501)).ok, false, 'note over 500 characters refused');
+assert.equal(setConvention('fourth.feet', 'Parallel, turned out').ok, true, 'note accepted');
+assert.equal(setConvention('fourth.feet', 'x'.repeat(501)).ok, false, 'note over 500 characters refused');
 
 // 6. A reset returns the row to the default and the pose to the built-in rise.
 resetConvention('releve.rise');
 resetConvention('pirouette.rise');
 resetConvention('level.demi');
-resetConvention('fourth.geometry');
+resetConvention('fourth.feet');
 assert.equal(specOf('releve').rise, 0.03, 'reset releve returns to the default');
 assert.equal(specOf('pirouette').rise, 0.06, 'reset pirouette returns to the default');
 assert.equal(conventionValue('level.demi'), 0.03, 'reset level returns to the default');
 const row = conventionRows().find((r) => r.id === 'releve.rise');
 assert.equal(row.source, 'default', 'reset row reports default source');
 assert.equal(row.defaultValue, 0.03, 'row carries the default for the table');
+
+// 7. Status and measurement fields: every row declares them, and unset rows hold no value.
+const STATUSES = new Set(['provisional', 'school-approved', 'unset']);
+for (const c of CONVENTIONS) {
+  assert(STATUSES.has(c.status), `${c.id} has a valid status`);
+  assert(typeof c.measurement_reference === 'string' || c.kind === 'note', `${c.id} states its measurement reference`);
+  assert(typeof c.school_method === 'string', `${c.id} states its school/method`);
+  if (c.status === 'unset') assert.equal(c.value, null, `${c.id} unset holds no value`);
+}
+assert.equal(conventionValue('attitude.knee_height'), null, 'attitude knee height stays unset by default');
+assert.equal(conventionValue('fourth.turnout'), null, 'fourth turnout stays unset by default');
+assert.equal(conventionValue('plie.depth'), 42.7, 'plié depth preset is separate, not read by the solver');
+assert.equal(setConvention('plie.depth', 60).ok, true, 'plié depth can be set separately');
+assert.equal(specOf('plie').rise, POSE_SPECS.plie.rise, 'changing plié depth does not change its sink or rise');
+resetConvention('plie.depth');
+
+// 8. Unset numeric rows accept a school value within range and reset to unset.
+assert.equal(setConvention('attitude.knee_height', -0.1).ok, true, 'knee height below the hip accepted');
+assert.equal(conventionValue('attitude.knee_height'), -0.1, 'school knee height read back');
+resetConvention('attitude.knee_height');
+assert.equal(conventionValue('attitude.knee_height'), null, 'knee height returns to unset');
+assert.equal(setConvention('fourth.turnout', 200).ok, false, 'turnout over 180 refused');
 
 console.log('conventions: ok');

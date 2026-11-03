@@ -123,3 +123,14 @@ Proposed order: (a) add shared `evaluateMovement` in model.js, (b) switch elevat
 - Meaning: vertical distance from the floor to the ball-of-foot contact point during relevé, both feet. Zero is the floor contact. Unit: fraction of dancer height.
 - Prior value: 0.010 at HEAD, kept here as a prior value. It is not used and was not silently replaced.
 - Open: the school to confirm or replace the value, and whether it is demi-pointe or pointe for the relevé step.
+
+## Decision: provisional presets and row schema (2026-11-03, per Luna)
+- Every row carries `value`, `unit`, `measurement_reference`, `status` (`provisional` | `school-approved` | `unset`), `school_method`, and `applied`. No row is `school-approved` yet.
+- Provisional and applied in preview: demi, pointe, releve (0.03), pirouette, arabesque, attitude, pas de bourrée rises. Results using them are not school-correct until the school reviews.
+- Plié: `plie.depth` is a separate provisional demi-plié preset (42.7, thigh from vertical). It is not derived from floor contact; the solver does not read it yet (`applied: false`). Changing it leaves the plié's sink and rise unchanged.
+- Arabesque: `arabesque.elevation` (90, optional target, degrees from straight down, 90 = horizontal behind) and `arabesque.arms` (text) are separate fields. `applied: false`.
+- Attitude: `attitude.knee_height` is `unset` (null). Not inferred from the knee bend.
+- Fourth position: `fourth.turnout` and `fourth.spacing` are `unset`; `fourth.feet` is a provisional crossed, turned-out preview preset (text). None read by the solver.
+- The table shows a preview banner and per-row status and "read by the pose" / "not read by the solver yet".
+- Import map: conv2, app scroll23, styles scroll23.
+- Verified: test-conventions.mjs (fields, statuses, unset holds null, plié depth separate from rise, unset numeric ranges), all 15 engine tests, syntax, `git diff --check`, browser check of the sheet.

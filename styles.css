@@ -745,3 +745,7 @@ body.watch #stage { cursor: default; }
 .school-status { color: var(--dim); white-space: nowrap; }
 .school-row.set .school-status { color: var(--accent); }
 .school-status button { margin-top: 6px; }
+
+.school-banner {
+  margin: 0; padding: 10px 16px 0; color: var(--accent); font-size: 12px; line-height: 1.5;
+}

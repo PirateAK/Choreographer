@@ -3250,6 +3250,8 @@ function fitViews() {
 
 /* ------------------------------------------------------- school conventions */
 
+const STATUS_LABEL = { provisional: 'Provisional', 'school-approved': 'School-approved', unset: 'Unset' };
+
 // One row per convention. The school's entry is applied on change; clearing it returns the row to
 // the default. A row the solver does not read yet says so, rather than looking like it works.
 function openSchool() {
@@ -3265,10 +3267,14 @@ function closeSchool() {
 function paintSchool() {
   const body = $('schoolBody');
   body.replaceChildren();
+  const banner = document.createElement('p');
+  banner.className = 'school-banner';
+  banner.textContent = 'Preview: provisional values are in use. Results built on them are not school-correct until the school reviews them.';
+  body.appendChild(banner);
   const table = document.createElement('table');
   table.className = 'school-table';
   const head = table.createTHead().insertRow();
-  for (const label of ['Position', 'Convention', 'Default', 'School value', 'Status']) {
+  for (const label of ['Position', 'School method', 'Default', 'School value', 'Status']) {
     const th = document.createElement('th');
     th.textContent = label;
     head.appendChild(th);
@@ -3281,31 +3287,31 @@ function paintSchool() {
     const title = document.createElement('strong');
     title.textContent = row.label;
     const ref = document.createElement('small');
-    ref.textContent = `${row.unit} · ${row.reference}`;
+    ref.textContent = `${row.unit} · ${row.measurement_reference}`;
     name.append(title, document.createElement('br'), ref);
 
-    const note = tr.insertCell();
-    note.className = 'school-note';
-    note.textContent = row.note;
+    const method = tr.insertCell();
+    method.className = 'school-note';
+    method.textContent = row.school_method;
 
     const def = tr.insertCell();
     def.className = 'school-default';
-    def.textContent = String(row.defaultValue);
+    def.textContent = row.defaultValue === null ? 'unset' : String(row.defaultValue);
 
     const cell = tr.insertCell();
     const input = document.createElement('input');
     input.setAttribute('aria-label', `School value: ${row.label}`);
-    if (row.kind === 'rise') {
+    if (row.kind !== 'note') {
       input.type = 'number';
-      input.step = '0.005';
+      input.step = row.kind === 'rise' ? '0.005' : 'any';
       input.min = String(row.min);
       input.max = String(row.max);
-      input.placeholder = String(row.defaultValue);
+      input.placeholder = row.defaultValue === null ? 'unset' : String(row.defaultValue);
       input.value = row.source === 'school' ? String(row.value) : '';
     } else {
       input.type = 'text';
       input.maxLength = 500;
-      input.placeholder = row.defaultValue;
+      input.placeholder = String(row.defaultValue);
       input.value = row.source === 'school' ? row.value : '';
     }
     const msg = document.createElement('div');
@@ -3332,8 +3338,8 @@ function paintSchool() {
 
     const status = tr.insertCell();
     status.className = 'school-status';
-    const applied = row.applied;
-    status.textContent = applied ? 'Applied to the pose' : 'Recorded, not applied yet';
+    const label = STATUS_LABEL[row.status] || row.status;
+    status.textContent = `${label} · ${row.applied ? 'read by the pose' : 'not read by the solver yet'}`;
     if (row.source === 'school') {
       const reset = document.createElement('button');
       reset.className = 'ghost';
