@@ -337,7 +337,7 @@ export class NarrationEngine {
       source.buffer = audio;
       gain = ctx.createGain();
       source.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(music.bus);
       source.start(0, offset / 1000);
     } catch (e) {
       return;

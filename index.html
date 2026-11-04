@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Choreographer</title>
 <link rel="icon" type="image/png" href="favicon.png" />
-<link rel="stylesheet" href="styles.css?v=scroll27" />
+<link rel="stylesheet" href="styles.css?v=scroll28" />
 </head>
 <body>
 <header>
@@ -22,6 +22,12 @@
   <button id="btnTopDown" class="ghost" title="Open the overhead stage plan">Top-down</button>
   <button id="btnWatch" class="ghost watch-link" title="Watch the show: the stage alone, with its music, from the top">▶ Watch</button>
   <a id="btnPrint" class="ghost print-link" href="print.html" target="_blank" rel="noopener" title="Open the printable stage plot, paths and cue sheet in a new tab">Print plan</a>
+  <select id="captureMode" aria-label="What to record" title="What the recording shows">
+    <option value="house">House (performance)</option>
+    <option value="app">Whole app (demonstration)</option>
+  </select>
+  <button id="btnCaptureRec" class="ghost rec" title="Start recording to a WebM file. Press again to stop and download it">● Record</button>
+  <span id="recStatus" class="rec-status" hidden></span>
   <input id="fileImport" type="file" accept="application/json" hidden />
   <input id="fileMusic" type="file" accept="audio/*" hidden />
   <input id="fileNarration" type="file" accept="audio/*" hidden />
@@ -266,13 +272,15 @@
 
 <script type="importmap">
 {"imports": {
-  "./src/app.js": "./src/app.js?v=scroll33",
+  "./src/app.js": "./src/app.js?v=scroll36",
+  "./src/capture.js": "./src/capture.js?v=cap2",
+  "./src/music.js": "./src/music.js?v=cap1",
   "./src/stage.js": "./src/stage.js?v=guide22",
   "./src/cheatsheet.js": "./src/cheatsheet.js?v=guide23",
   "./src/placement-guide.js": "./src/placement-guide.js?v=guide20",
   "./src/pose.js": "./src/pose.js?v=load15",
   "./src/model.js": "./src/model.js?v=trajectory13",
-  "./src/narration.js": "./src/narration.js?v=narr2",
+  "./src/narration.js": "./src/narration.js?v=narr3",
   "./src/narration-bundle.js": "./src/narration-bundle.js?v=narr2",
   "./src/conventions.js": "./src/conventions.js?v=conv14",
   "./src/chasse-phases.js": "./src/chasse-phases.js?v=chasse1",

@@ -85,10 +85,32 @@ export class MusicEngine {
     const Ctor = window.AudioContext || window.webkitAudioContext;
     if (!Ctor) return null;
     this.ctx = new Ctor();
+    // Every piece of show sound (music, narration) goes through this bus, so a recording
+    // can take the whole mix from one place without re-routing the speakers.
+    this.bus = this.ctx.createGain();
+    this.bus.connect(this.ctx.destination);
     this.gain = this.ctx.createGain();
     this.gain.gain.value = this.effectiveGain();
-    this.gain.connect(this.ctx.destination);
+    this.gain.connect(this.bus);
     return this.ctx;
+  }
+
+  // A MediaStream audio track carrying exactly what the speakers hear. Calling it again
+  // returns the same track; stopCaptureAudio() detaches the tap so nothing is kept open.
+  captureAudio() {
+    if (!this.ensure() || typeof this.ctx.createMediaStreamDestination !== 'function') return null;
+    if (!this.captureNode) {
+      this.captureNode = this.ctx.createMediaStreamDestination();
+      this.bus.connect(this.captureNode);
+    }
+    const tracks = this.captureNode.stream.getAudioTracks();
+    return tracks[0] || null;
+  }
+
+  stopCaptureAudio() {
+    if (!this.captureNode) return;
+    try { this.bus.disconnect(this.captureNode); } catch (_) { /* already detached */ }
+    this.captureNode = null;
   }
 
   // Decode from the store, or take it from the cache. Resolves true only when

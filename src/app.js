@@ -35,6 +35,7 @@ import { narration } from './narration.js';
 import { storeAudio, readAudio } from './audiostore.js';
 import { buildBundle, bundleFileName, checkBundle, applyBundle } from './narration-bundle.js';
 import { HouseView } from './house.js';
+import { Recorder, CAPTURE_MODES } from './capture.js';
 import { VideoEngine } from './video.js';
 import { addVideo, removeVideo, videoSpan, videoAt, addImage, addSlideCue, removeSlideCue, projectionAt, slideLayersAt } from './model.js';
 import { SlideEngine } from './slides.js';
@@ -42,6 +43,7 @@ const slides = new SlideEngine();
 const video = new VideoEngine();
 let pendingVideoAt = 0;
 let pendingVideoId = null;
+let recorder = null;
 
 const $ = (id) => document.getElementById(id);
 const SEL_KEY = 'choreographer.sel.v1';
@@ -3043,6 +3045,9 @@ function paintView() {
 // the plan can be worked on at twice the size and put back with the same click.
 // Only one can be full, because the point of filling is having the room to yourself.
 function setFill(which) {
+  if (recorder?.recording && recorder.mode === 'house' && (which !== 'house' || state.ui.fill === 'house')) {
+    recorder.stop();
+  }
   state.ui.fill = state.ui.fill === which ? null : which;
   paintView();
   saveView();
@@ -3050,6 +3055,35 @@ function setFill(which) {
   fitKey = '';
   fitViews();
   render();
+}
+
+// The record control shows what is being taken and for how long; a failed start says why
+// for a few seconds, then gets out of the way.
+let recStatusTimer = 0;
+function paintRecorder(s) {
+  const btn = $('btnCaptureRec');
+  const status = $('recStatus');
+  const label = $('captureMode');
+  label.disabled = s.recording || s.starting === true;
+  btn.disabled = s.starting === true;
+  btn.classList.toggle('on', s.recording);
+  btn.textContent = s.starting ? 'Starting…' : s.recording ? '■ Stop' : '● Record';
+  clearTimeout(recStatusTimer);
+  status.hidden = !s.recording && !s.starting;
+  status.removeAttribute('role');
+  if (s.starting) status.textContent = `Starting ${CAPTURE_MODES[s.mode].label}…`;
+  if (s.recording) {
+    const clock = `${String(Math.floor(s.seconds / 60)).padStart(2, '0')}:${String(s.seconds % 60).padStart(2, '0')}`;
+    status.textContent = `${CAPTURE_MODES[s.mode].label} · ${clock}`;
+  }
+}
+function flashRecStatus(message) {
+  const status = $('recStatus');
+  status.hidden = false;
+  status.setAttribute('role', 'status');
+  status.textContent = message;
+  clearTimeout(recStatusTimer);
+  recStatusTimer = setTimeout(() => { status.hidden = true; }, 6000);
 }
 
 function setDepth(on) {
@@ -4506,6 +4540,25 @@ function boot() {
 
   // watch mode: the stage alone, playing, with a bar that can end it
   $('btnWatch').addEventListener('click', () => setWatch(true));
+
+  // Recording. House mode switches to the House view first, so the picture being taken
+  // is the audience's; whole-app mode asks the browser to share this window.
+  recorder = new Recorder({ onState: paintRecorder });
+  $('btnCaptureRec').addEventListener('click', async () => {
+    if (recorder.recording) {
+      recorder.stop();
+      return;
+    }
+    const mode = $('captureMode').value;
+    try {
+      if (mode === 'house' && state.ui.fill !== 'house') setFill('house');
+      if (mode === 'app') flashRecStatus('Choose this window in the sharing prompt…');
+      await recorder.start(mode, { houseCanvas: $('house') });
+    } catch (err) {
+      const cancelled = err && err.name === 'NotAllowedError';
+      flashRecStatus(cancelled ? 'Screen sharing was cancelled' : err && err.message ? err.message : 'Recording did not start');
+    }
+  });
   $('wPlay').addEventListener('click', togglePlay);
   $('wRestart').addEventListener('click', () => {
     stop();

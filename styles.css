@@ -102,6 +102,13 @@ header a.print-link {
   cursor: pointer;
 }
 header a.print-link:hover { background: #24303f; border-color: #33435a; }
+/* Recording: the mode choice, the record control, and the elapsed time while it runs. */
+header select#captureMode { font: inherit; background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: 5px; padding: 4px 6px; }
+header select#captureMode:disabled { opacity: .6; }
+header button.rec { color: #e5484d; border-color: #4a2427; }
+header button.rec.on { background: #3a1417; border-color: #e5484d; color: #ff8a8e; }
+.rec-status { font-variant-numeric: tabular-nums; color: var(--muted, #9aa3b2); white-space: nowrap; align-self: center; }
+
 
 /* ---------- main ---------- */
 main {
