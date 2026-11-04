@@ -118,7 +118,7 @@ export class HouseView {
     ctx.rect(left, stageTop, openingW, floorFront - stageTop);
     ctx.clip();
     const scenery = Array.isArray(show.scenery) ? show.scenery : [];
-    const cloth = scenery.filter((item) => item && item.kind !== 'prop')
+    const cloth = scenery.filter((item) => item && item.kind !== 'prop' && item.visible !== false)
       .slice().sort((a, b) => clothDepth(b) - clothDepth(a));
     for (const item of cloth) this._drawScenery(item, contentTimeMs, videoElement, {
       ctx, show, stageW, stageD, openingH, scale, half, xAt, floorAt, zScale,

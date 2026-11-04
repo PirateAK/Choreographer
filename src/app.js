@@ -1055,9 +1055,7 @@ function rebuildPanels() {
            ${baseRow}
            ${s.kind === 'prop' ? '' : `<div class="row live-row" title="Where this piece is at the playhead"><span class="label">now</span><span class="tag live" data-live="${s.id}">${liveLabel(s)}</span></div>`}`;
     // Props can be hidden the way performers can; curtains and drops cannot.
-    const eye = s.kind === 'prop'
-      ? `<button class="eye ${s.visible === false ? 'off' : ''}" data-act="eye" title="Show or hide this prop on the stage">${s.visible === false ? '○' : '◉'}</button>`
-      : '';
+    const eye = `<button class="eye ${s.visible === false ? 'off' : ''}" data-act="eye" title="Show or hide this ${s.kind} on the stage, in every view">${s.visible === false ? '○' : '◉'}</button>`;
     const cues = s.cues || [];
     const cueBlock = s.kind === 'prop' ? '' : cueEditorHTML(s, cues);
     const stackNote = s.kind === 'drop' ? dropStackNote(s) : '';
@@ -1775,8 +1773,8 @@ function bindPanelEvents() {
         return;
       }
 
-      if (item.kind !== 'prop') return;
       if (e.target.closest('button[data-act="eye"]')) {
+        commit();
         item.visible = item.visible === false;
         if (!item.visible && state.ui.selectedId === item.id) {
           state.ui.selectedId = null;
@@ -1786,6 +1784,7 @@ function bindPanelEvents() {
         app.select(state.ui.selectedId);
         return;
       }
+      if (item.kind !== 'prop') return;
       // Props are editable objects, so clicking one focuses it.
       app.select(item.id);
     });

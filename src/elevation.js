@@ -184,7 +184,7 @@ export class ElevationView {
     const show = state.show;
     const items = [];
     for (const s of show.scenery) {
-      if (s.kind === 'prop') continue;
+      if (s.kind === 'prop' || s.visible === false) continue;
       items.push({ kind: 'cloth', item: s, depth: this.layerDepth(s) });
     }
     for (const d of show.cast) {

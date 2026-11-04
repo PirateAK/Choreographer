@@ -196,7 +196,7 @@ export class StageView {
     this.drawWingLegs();
 
     // scenery, back to front
-    const ordered = show.scenery.slice().sort((a, b) => this.sceneryY(b) - this.sceneryY(a));
+    const ordered = show.scenery.filter((item) => item.visible !== false).slice().sort((a, b) => this.sceneryY(b) - this.sceneryY(a));
     for (const item of ordered) this.drawScenery(item);
 
     // paths: dancers, plus any prop that has stations
