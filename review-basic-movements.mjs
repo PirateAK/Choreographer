@@ -2,7 +2,7 @@
 // Covers balance, foot contact, joint continuity across pose blends, and stationary transitions.
 // Values are measured on the preview's provisional presets. Fourth-position spacing is unset and is not
 // scored here. Every number printed is provisional unless a school value has been approved.
-import { PLANT_BY_POSE, specOf, blendSpecs, joints, feetPlaceOf, toeDirection } from './src/pose.js';
+import { PLANT_BY_POSE, specOf, blendSpecs, joints, feetPlaceOf, toeDirection, FLOOR_REF as FLOOR_REF_SHARED } from './src/pose.js';
 import { createShow, overheadPoseAtLocal } from './src/model.js';
 import { conventionValue, previewSummary } from './src/conventions.js';
 
@@ -12,8 +12,8 @@ const HALF_WIDTH = 0.05; // half foot width, body units (provisional)
 const JUMP = 0.03; // a joint point moving more than this in one sample step is reported as a jump
 const SAMPLES = 200;
 const CONTACT_TOL = 0.002; // 2 mm, body units ~3.4 mm at 1.7 m
-// Floor reference: the standing flat-foot ankle height in first position (the model's own neutral).
-const FLOOR_REF = Math.min(...feetPlaceOf(specOf('first'), 1, 0).map((p) => p.y));
+// Floor reference: the shared flat-foot ankle height above the deck (pose.js FLOOR_REF = first-position ankle).
+const FLOOR_REF = FLOOR_REF_SHARED;
 
 const basic = ['first', 'second', 'third', 'fourth', 'fifth', 'tendu', 'plie', 'releve', 'arabesque', 'attitude', 'pirouette', 'chasse', 'pas-de-bourree'];
 const scored = basic; // fourth is scored for balance/contact/continuity; only spacing checks are excluded

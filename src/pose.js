@@ -56,12 +56,13 @@ export const POSE_SPECS = {
   // Provisional preview (Root A): rise −0.0648006 and back knee −28.53349 level both feet at the 0.010198 floor reference. Balance −2 mm stays a provisional warning. Not school-approved.
   fourth: { arms: [[140, 200], [45, 30]], legs: [[22.087, -13.04, 22.978], [4.483, -28.53349, -21.077]], lean: 0, rise: -0.0648006 },
   // Both arms rounded above the head, feet crossed tightly: the closed position.
-  fifth: { arms: [[138, 196], [138, 196]], legs: [[2, 1], [-4, 8]], lean: 0, rise: 0 },
+  // Provisional preview: near-mirror legs (hip −2/−1.9, knee 1.5/1.6) bring both ankles within 0.05 mm of FLOOR_REF. Not school-approved.
+  fifth: { arms: [[138, 196], [138, 196]], legs: [[-2, 1.5], [-1.9, 1.6]], lean: 0, rise: 0 },
   // One foot stretched out to touch the floor, the other carrying the weight. Devant: the working leg
   // goes forward, out to the audience's side of her.
   tendu: { arms: [[40, 45], [40, 45]], legs: [[2, 1], [22, 20, 16]], lean: 0, rise: 0 },
   // Both knees out over the toes, the whole body a hand's width lower.
-  plie: { arms: [[30, -6], [30, -6]], legs: [[42.68, -30.57], [42.68, -30.57]], lean: 0, rise: -0.105011 },
+  plie: { arms: [[30, -6], [30, -6]], legs: [[42.68, -30.5754], [42.68, -30.5754]], lean: 0, rise: -0.104813 },
   releve: { arms: [[60, 64], [60, 64]], legs: [[1, 1], [1, 1]], lean: 0, rise: 0.03 },
   // The long line: one leg carried back at hip height, one arm forward, one back — and the body tipped
   // forward over the standing foot, which is what a balance is. The working leg is straight and reads as
@@ -86,8 +87,11 @@ export const POSE_SPECS = {
 // horizontal foot position, and the sink from the ankle height. At the baseline depth the result is the
 // POSE_SPECS.plie entry itself, so the default drawing is unchanged.
 export const PLIE_BASELINE_DEPTH = 42.68;
+// Flat-foot ankle-height reference above the deck, body units. It is the first-position ankle height
+// (specOf('first') in this rig), not the floor plane, which is y = 0. Plié, second, fourth, and the review
+// all use this one constant; test-ankle-lift.mjs checks it against first position.
+export const FLOOR_REF = 0.010198;
 const PLIE_FOOT_X = 0.089; // ankle distance from the centre line at the baseline contact
-const PLIE_ANKLE_Y = 0.010; // shared flat-foot floor reference (same as first position), body units
 
 export function plieSpec(depth) {
   const h = (Number(depth) * Math.PI) / 180;
@@ -95,7 +99,7 @@ export function plieSpec(depth) {
   if (!Number.isFinite(sinK) || Math.abs(sinK) > 1) return null;
   const k = Math.asin(sinK);
   const kDeg = (k * 180) / Math.PI;
-  const rise = PLIE_ANKLE_Y - BODY.hip + BODY.leg * (Math.cos(h) + Math.cos(k));
+  const rise = FLOOR_REF - BODY.hip + BODY.leg * (Math.cos(h) + Math.cos(k));
   return { ...POSE_SPECS.plie, legs: [[depth, kDeg], [depth, kDeg]], rise };
 }
 

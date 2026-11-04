@@ -1,7 +1,7 @@
 // Ankle articulation checks: fixed bone lengths, ball-of-foot contacts, and contact heights that keep the
 // HEAD baseline for positions whose floor convention was not changed. Engine checks, not ballet certification.
 import assert from 'node:assert/strict';
-import { BODY, POSE_SPECS, PLANT_BY_POSE, joints, feetPlaceOf } from './src/pose.js';
+import { BODY, POSE_SPECS, PLANT_BY_POSE, joints, feetPlaceOf, specOf, FLOOR_REF } from './src/pose.js';
 
 const near = (a, b, eps, msg) => assert(Math.abs(a - b) <= eps, `${msg}: ${a} vs ${b}`);
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
@@ -10,9 +10,16 @@ const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 // Relevé x moved 1 mm with the fixed leg length (HEAD 0.055); its tolerance is widened to 2 mm, named here.
 const HEAD_CONTACT = {
   fourth: [[0.081, 0.010, 0.203], [0.052, 0.010, -0.187]], // Root A provisional level feet (was 0.055 / 0.059 with rise -0.02)
-  plie: [[0.089, 0.010, 0], [-0.089, 0.010, 0]], // reconciled to the shared flat-foot reference (was 0.025)
+  plie: [[0.089, 0.010198, 0], [-0.089, 0.010198, 0]], // reconciled to the shared FLOOR_REF (was 0.010, then 0.025)
   releve: [[0.055, 0.010, 0], [-0.055, 0.010, 0]],
 };
+
+// The shared floor reference is first position's flat-foot ankle height (one constant, one source).
+{
+  const firstY = feetPlaceOf(specOf('first'), 1, 0).map((p) => p.y);
+  near(firstY[0], FLOOR_REF, 1e-6, 'FLOOR_REF equals first-position ankle height');
+  near(firstY[1], FLOOR_REF, 1e-6, 'FLOOR_REF equals first-position ankle height (right)');
+}
 
 // Every leg keeps its bone lengths, rise or not, unpinned or pinned.
 for (const [id, spec] of Object.entries(POSE_SPECS)) {

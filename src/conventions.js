@@ -114,6 +114,12 @@ export const CONVENTIONS = [
     measurement_reference: 'whether the feet are crossed or parallel to the line of travel, each foot',
     school_method: 'Provisional conventional preview preset. Label kept until the school defines the shape.',
   },
+  {
+    id: 'floor.reference', kind: 'note', applied: false, value: '0.010198 body units: flat-foot ankle height above the deck', status: 'provisional',
+    label: 'Flat-foot ankle reference (not the floor plane)', unit: 'body height above the deck (1 = dancer height); the floor plane is y = 0',
+    measurement_reference: 'ankle height (ball of the foot when risen) above the deck, the contact landmark for flat-foot poses',
+    school_method: 'Provisional. The first-position ankle height in this rig, shared by plié, second, fourth, and the basic review (pose.js FLOOR_REF). Not a measured shoe or sole height.',
+  },
 ];
 
 const BY_ID = Object.fromEntries(CONVENTIONS.map((c) => [c.id, c]));

@@ -2,7 +2,7 @@
 // invalid values are refused, and a reset returns the pose to the default. Engine checks only.
 import assert from 'node:assert/strict';
 import { CONVENTIONS, conventionValue, conventionRows, setConvention, resetConvention, riseFor, validate, statusOf, setApprover, getApprover, approveConvention, revokeApproval, previewSummary } from './src/conventions.js';
-import { POSE_SPECS, specOf, joints, feetPlaceOf, plieSpec } from './src/pose.js';
+import { POSE_SPECS, specOf, joints, feetPlaceOf, plieSpec, FLOOR_REF } from './src/pose.js';
 
 const near = (a, b, tol, msg) => assert(Math.abs(a - b) <= tol, `${msg}: ${a} vs ${b}`);
 
@@ -83,7 +83,7 @@ for (const depth of [20, 42.68, 60, 90]) {
   const [l, r] = feetPlaceOf(s, 1, 0);
   near(Math.abs(l.x), 0.089, 1e-6, `plié ${depth} left ankle x holds`);
   near(Math.abs(r.x), 0.089, 1e-6, `plié ${depth} right ankle x holds`);
-  near(l.y, 0.010, 1e-6, `plié ${depth} ankle height holds`);
+  near(l.y, FLOOR_REF, 1e-6, `plié ${depth} ankle height holds`);
   assert.equal(s.rise < 0, true, `plié ${depth} sinks the body`);
 }
 near(plieSpec(42.68).rise, POSE_SPECS.plie.rise, 1e-4, 'closed form at the baseline matches the table rise to rounding');
