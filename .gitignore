@@ -1,0 +1,3 @@
+# Local browser-test dependency (Playwright), installed by scripts/run-browser-tests.sh. The app itself has no dependencies.
+.browser-tests/
+node_modules/
