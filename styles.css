@@ -738,8 +738,9 @@ body.watch #stage { cursor: default; }
 .school-table small { color: var(--dim); font-size: 11px; line-height: 1.4; }
 .school-note { color: var(--dim); line-height: 1.45; max-width: 340px; }
 .school-default { color: var(--dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.school-table input { width: 130px; font-variant-numeric: tabular-nums; }
+.school-table input, .school-table select { width: 130px; font-variant-numeric: tabular-nums; }
 .school-table input[type="text"] { width: 200px; }
+.school-table select { min-height: 32px; }
 .school-row.set td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
 .school-msg { color: var(--danger); font-size: 11px; margin-top: 4px; min-height: 0; }
 .school-status { color: var(--dim); white-space: nowrap; }

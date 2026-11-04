@@ -4,16 +4,16 @@
 // scored here. Every number printed is provisional unless a school value has been approved.
 // Units: "review mm" = body units × 1000 (the review's own scale); "phys mm" = body units × 1.7 × 1000 (1.7 m dancer).
 // Margins are printed in body units (bu). No threshold or geometry depends on these labels.
-import { PLANT_BY_POSE, specOf, blendSpecs, joints, feetPlaceOf, toeDirection, FLOOR_REF as FLOOR_REF_SHARED } from './src/pose.js';
+import { PLANT_BY_POSE, specOf, blendSpecs, joints, feetPlaceOf, FLOOR_REF as FLOOR_REF_SHARED } from './src/pose.js';
+import { stationaryBalanceDiagnostic, BALANCE_DIAGNOSTIC_STATUS } from './src/balance-diagnostic.js';
 import { createShow, overheadPoseAtLocal } from './src/model.js';
 import { conventionValue, previewSummary } from './src/conventions.js';
 import { chassePhaseReadings, CHASSE_STATUS } from './src/chasse-phases.js';
 import { jointRangeWarnings, jointRangeLimits } from './src/joint-ranges.js';
 import { raisedFootReading } from './src/raised-foot.js';
 
-const FOOT_ANKLE_FROM_HEEL = 0.3; // solver assumption shared with pose.js spacing (not school-measured)
-const FOOT_LENGTH = 0.15; // provisional foot length from conventions.js
-const HALF_WIDTH = 0.05; // half foot width, body units (provisional)
+// Geometry-only foot constants for contact checking. Balance diagnostic assumptions live separately in
+// src/balance-diagnostic.js and are configurable there; neither set changes pose geometry.
 const JUMP = 0.03; // a joint point moving more than this in one sample step is reported as a jump
 const SAMPLES = 200;
 const CONTACT_TOL = 0.002; // 2 review mm (3.4 physical mm at 1.7 m), in body units
@@ -21,18 +21,19 @@ const CONTACT_TOL = 0.002; // 2 review mm (3.4 physical mm at 1.7 m), in body un
 const FLOOR_REF = FLOOR_REF_SHARED;
 
 const basic = ['first', 'second', 'third', 'fourth', 'fifth', 'tendu', 'plie', 'releve', 'arabesque', 'attitude', 'pirouette', 'chasse', 'pas-de-bourree'];
-const scored = basic; // fourth is scored for balance/contact/continuity; only spacing checks are excluded
-// Travelling steps: their static balance and contact are shown as n/a until support phases are defined (see the chassé review).
+const scored = basic; // continuity and transitions are scored; balance is displayed separately and never scored
+// Travelling steps: contact and static balance are shown as n/a/diagnostic until support phases are validated.
 const travelling = new Set(['chasse']);
-const findings = { balance: [], contact: [], raised: [], continuity: [], transitions: [] };
+const findings = { contact: [], raised: [], continuity: [], transitions: [] };
 // Raised-foot targets are separate from floor contact. The back ball of pas de bourrée (index 1) is measured
 // against FLOOR_REF + the provisional lift target (convention pas-de-bourree.back_ball_lift) via src/raised-foot.js;
 // it is not a flat-foot contact. Not school-approved: the warning stays visible in the output.
 const RAISED = { 'pas-de-bourree': { foot: 1, label: 'back-ball lift' } };
 const provisional = previewSummary().provisionalInUse;
 
-// Support feet from the pose's table entry (both, left, right, or none).
-const supportIdx = (id) => {
+// Support feet for floor-contact checking from the pose's separate plant table (both, left, right, or none).
+// This mapping is not reused for the configurable balance diagnostic.
+const contactSupportIdx = (id) => {
   const p = PLANT_BY_POSE[id];
   if (p === 'both') return [0, 1];
   if (p === 'left') return [0];
@@ -40,31 +41,11 @@ const supportIdx = (id) => {
   return [];
 };
 
-// Balance: the centre (pelvis x, z = 0) lies inside the support base, with heel and toe allowance.
-function balanceOf(spec, id, supOverride = null) {
-  const sup = supOverride || supportIdx(id);
-  if (!sup.length) return { ok: true, margin: null, note: 'no support table entry' };
-  const ank = feetPlaceOf(spec, 1, 0);
-  const cx = joints(spec, 1, 0, null).pelvis[0];
-  let xmin = Infinity, xmax = -Infinity, zmin = Infinity, zmax = -Infinity;
-  for (const i of sup) {
-    const [dx, dz] = toeDirection(spec, i);
-    const heel = FOOT_ANKLE_FROM_HEEL * FOOT_LENGTH;
-    const toe = (1 - FOOT_ANKLE_FROM_HEEL) * FOOT_LENGTH;
-    xmin = Math.min(xmin, ank[i].x - HALF_WIDTH); xmax = Math.max(xmax, ank[i].x + HALF_WIDTH);
-    zmin = Math.min(zmin, ank[i].z - heel * dz, ank[i].z + toe * dz);
-    zmax = Math.max(zmax, ank[i].z - heel * dz, ank[i].z + toe * dz);
-  }
-  const cz = 0;
-  const margin = Math.min(cx - xmin, xmax - cx, cz - zmin, zmax - cz);
-  return { ok: margin >= 0, margin, cx, base: [xmin, xmax] };
-}
-
 // Contact: the floor reference is the standing flat-foot ankle height the model draws in first position.
 // A support foot must sit on that reference (2 review mm tolerance); no foot may go below it.
 function contactOf(spec, id) {
   const ank = feetPlaceOf(spec, 1, 0);
-  const sup = supportIdx(id).filter((i) => !(RAISED[id] && i === RAISED[id].foot));
+  const sup = contactSupportIdx(id).filter((i) => !(RAISED[id] && i === RAISED[id].foot));
   const gaps = sup.map((i) => ank[i].y - FLOOR_REF);
   const below = ank.filter((p) => p.y < FLOOR_REF - CONTACT_TOL).length;
   const ok = below === 0 && gaps.every((g) => Math.abs(g) <= CONTACT_TOL);
@@ -97,19 +78,14 @@ function continuityOf(a, b) {
 }
 
 console.log('provisional values in use:', provisional.join(', '));
-console.log('---- stationary balance and contact (provisional)');
+console.log('---- stationary balance/contact diagnostics (provisional, diagnostic only, not school-approved; balance unscored)');
 for (const id of scored) {
   const spec = specOf(id);
-  const bal = balanceOf(spec, id);
+  const bal = stationaryBalanceDiagnostic(spec, id);
   const con = contactOf(spec, id);
   if (travelling.has(id)) {
-    // Travelling step: support changes over time. Static numbers are shown but not scored; chassé is support scheduling only.
-    findings.balance.push({ id, ok: true, margin: bal.margin, na: true });
-    findings.contact.push({ id, ok: true, below: con.below, gaps: con.gaps, na: true });
-    console.log(`${id.padEnd(15)} balance n/a (${CHASSE_STATUS}) static margin ${bal.margin == null ? '-' : bal.margin.toFixed(3)} bu   contact n/a support gap review mm ${con.gaps.map((g) => (g * 1000).toFixed(1)).join(',') || '-'} below ${con.below}`);
-    // Provisional phase readings (src/chasse-phases.js). Shown, not scored; timing and contact states are provisional.
-    // Per phase: foot contact, free-foot clearance, pelvis x against the support base, height and transition.
-    // Pelvis-vs-base is a diagnostic reading (the static balance margin), not a pass/fail criterion.
+    // Chassé phase support is fixed in CHASSE_PHASES; the stationary margin is a separate legacy diagnostic.
+    console.log(`${id.padEnd(15)} ${CHASSE_STATUS}; balance diagnostic only (${BALANCE_DIAGNOSTIC_STATUS}) static margin ${bal.margin == null ? '-' : bal.margin.toFixed(3)} bu   contact n/a support gap review mm ${con.gaps.map((g) => (g * 1000).toFixed(1)).join(',') || '-'} below ${con.below}`);
     const mm = (v) => `${(v * 1000).toFixed(1)} review mm`;
     const pm = (v) => `${(v * 1.7 * 1000).toFixed(1)} phys mm`;
     for (const r of chassePhaseReadings(spec)) {
@@ -123,19 +99,18 @@ for (const id of scored) {
       console.log(`    ${baseTxt}; ${offTxt}; margin ${pb.margin.toFixed(3)} bu (diagnostic, unscored)   pelvis height ${pb.pelvisY.toFixed(3)} bu${trTxt}`);
     }
     continue;
-
   }
-  findings.balance.push({ id, ok: bal.ok, margin: bal.margin });
+  const balanceLabel = bal.margin == null ? 'no diagnostic support base' : `${bal.margin.toFixed(3)} bu (${(bal.margin * 1000).toFixed(1)} review mm; ${(bal.margin * 1.7 * 1000).toFixed(1)} phys mm) ${bal.inside ? 'inside' : 'outside'} base`;
+  console.log(`${id.padEnd(15)} balance diagnostic only (${BALANCE_DIAGNOSTIC_STATUS}) margin ${balanceLabel}`);
   if (RAISED[id]) {
     // Raised-foot target (provisional, not school-approved). Not a flat-foot contact row.
     const rt = raisedOf(spec, id);
     findings.raised.push({ id, ok: rt.ok, gap: rt.gap });
-    console.log(`${id.padEnd(15)} balance ${bal.ok ? 'pass' : 'FAIL'} margin ${bal.margin == null ? '-' : bal.margin.toFixed(3)} bu   raised-foot back-ball proxy (ankle endpoint) ${rt.ok ? 'pass' : 'FAIL'}   height ${(rt.height * 1000).toFixed(1)} review mm (${(rt.height * 1.7 * 1000).toFixed(1)} phys mm) above reference vs provisional target ${(rt.target * 1000).toFixed(1)} review mm (${(rt.target * 1.7 * 1000).toFixed(1)} phys mm), gap ${(rt.gap * 1000).toFixed(2)} review mm — PROVISIONAL, not school-approved; working foot not contact-checked`);
+    console.log(`${id.padEnd(15)} raised-foot back-ball proxy (ankle endpoint) ${rt.ok ? 'pass' : 'FAIL'}   height ${(rt.height * 1000).toFixed(1)} review mm (${(rt.height * 1.7 * 1000).toFixed(1)} phys mm) above reference vs provisional target ${(rt.target * 1000).toFixed(1)} review mm (${(rt.target * 1.7 * 1000).toFixed(1)} phys mm), gap ${(rt.gap * 1000).toFixed(2)} review mm — PROVISIONAL, not school-approved; working foot not contact-checked`);
     continue;
   }
   findings.contact.push({ id, ok: con.ok, below: con.below, gaps: con.gaps });
-
-  console.log(`${id.padEnd(15)} balance ${bal.ok ? 'pass' : 'FAIL'} margin ${bal.margin == null ? '-' : bal.margin.toFixed(3)} bu   contact ${con.ok ? 'pass' : 'FAIL'} support gap review mm ${con.gaps.map((g) => (g * 1000).toFixed(1)).join(',') || '-'} below ${con.below}`);
+  console.log(`${id.padEnd(15)} contact ${con.ok ? 'pass' : 'FAIL'} support gap review mm ${con.gaps.map((g) => (g * 1000).toFixed(1)).join(',') || '-'} below ${con.below}`);
 }
 
 console.log('---- joint continuity across consecutive basic blends (provisional)');
@@ -175,15 +150,15 @@ console.log('---- joint-range placeholders (warnings only, not scored)');
   }
 }
 
-// Score: balance, contact, continuity, and the stationary transitions. A failing row is reported, not hidden.
+// Score only contact, raised-foot targets, continuity, and stationary transitions. Balance is diagnostic-only.
 const failed = [
-  ...findings.balance.filter((r) => !r.ok).map((r) => `balance ${r.id}`),
   ...findings.contact.filter((r) => !r.ok).map((r) => `contact ${r.id}`),
   ...findings.raised.filter((r) => !r.ok).map((r) => `raised-foot target ${r.id}`),
   ...findings.continuity.filter((r) => !r.ok).map((r) => `continuity ${r.from}->${r.to}`),
 ];
 console.log(`scored checks failing: ${failed.length}${failed.length ? ` (${failed.join('; ')})` : ''}`);
+console.log(`balance diagnostics: ${basic.filter((id) => !travelling.has(id)).length} stationary readings; all unscored; settings and support selectors are provisional and not school-approved`);
 console.log(`fourth-position spacing: ${conventionValue('fourth.spacing') === null ? 'unset, not scored' : 'entered, not scored here'}`);
-// The review's pass/fail is reported; the script exits non-zero when any scored row fails.
+// The review's pass/fail is reported; balance never contributes to the failure list.
 if (failed.length) process.exitCode = 1;
 else console.log('basic-movement-review: ok');

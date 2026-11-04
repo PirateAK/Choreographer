@@ -3270,6 +3270,10 @@ function paintSchool() {
   const body = $('schoolBody');
   body.replaceChildren();
   const summary = previewSummary();
+  const diagnosticBanner = document.createElement('p');
+  diagnosticBanner.className = 'school-banner';
+  diagnosticBanner.textContent = 'Balance settings below are provisional diagnostic assumptions only, not school-approved and never used for pass/fail, pose geometry, or contact checks. Chassé phase supports remain fixed by CHASSE_PHASES.';
+  body.appendChild(diagnosticBanner);
   const banner = document.createElement('p');
   banner.className = 'school-banner';
   banner.textContent = `Preview is running on ${summary.provisionalInUse.length} provisional value${summary.provisionalInUse.length === 1 ? '' : 's'} and ${summary.approvedInUse.length} school-approved. Results built on provisional values are not school-correct until the school reviews them.`;
@@ -3323,44 +3327,86 @@ function paintSchool() {
     const def = tr.insertCell();
     def.className = 'school-default';
     def.textContent = row.defaultValue === null ? 'unset' : String(row.defaultValue);
-
     const cell = tr.insertCell();
-    const input = document.createElement('input');
-    input.setAttribute('aria-label', `School value: ${row.label}`);
-    if (row.kind !== 'note') {
+    const isChoice = row.kind === 'note' && row.choices;
+    const input = isChoice ? document.createElement('select') : document.createElement('input');
+    input.setAttribute('aria-label', `${row.diagnosticOnly ? 'Provisional diagnostic setting' : 'School value'}: ${row.label}`);
+
+    if (isChoice) {
+      const defaultOption = document.createElement('option');
+      defaultOption.value = '';
+      defaultOption.textContent = `Default (${row.defaultValue})`;
+      input.appendChild(defaultOption);
+      for (const choice of row.choices) {
+        const option = document.createElement('option');
+        option.value = choice;
+        option.textContent = choice;
+        input.appendChild(option);
+      }
+      input.value = row.source === 'school' ? String(row.value) : '';
+      const msg = document.createElement('div');
+      msg.className = 'school-msg';
+      input.addEventListener('change', () => {
+        if (!input.value) resetConvention(row.id);
+        else {
+          const result = setConvention(row.id, input.value);
+          if (!result.ok) { msg.textContent = result.reason; return; }
+        }
+        setTimeout(afterSchoolChange, 0);
+      });
+      cell.append(input, msg);
+    } else if (row.kind !== 'note') {
       input.type = 'number';
       input.step = row.kind === 'rise' ? '0.005' : 'any';
       input.min = String(row.min);
       input.max = String(row.max);
       input.placeholder = row.defaultValue === null ? 'unset' : String(row.defaultValue);
       input.value = row.source === 'school' ? String(row.value) : '';
+      if (row.diagnosticOnly) input.title = 'Provisional diagnostic-only setting; not school-approved; does not change pose geometry or contact checks.';
+      const msg = document.createElement('div');
+      msg.className = 'school-msg';
+      input.addEventListener('change', () => {
+        const text = input.value.trim();
+        if (text === '') {
+          resetConvention(row.id);
+          msg.textContent = '';
+          setTimeout(afterSchoolChange, 0);
+          return;
+        }
+        const result = setConvention(row.id, text);
+        if (!result.ok) {
+          msg.textContent = result.reason;
+          input.focus();
+          return;
+        }
+        setTimeout(afterSchoolChange, 0);
+      });
+      cell.append(input, msg);
     } else {
       input.type = 'text';
       input.maxLength = 500;
       input.placeholder = String(row.defaultValue);
       input.value = row.source === 'school' ? row.value : '';
-    }
-    const msg = document.createElement('div');
-    msg.className = 'school-msg';
-    input.addEventListener('change', () => {
-      const text = input.value.trim();
-      if (text === '') {
-        resetConvention(row.id);
-        msg.textContent = '';
-        // Repaint after the blur that fired this change has finished; repainting inside it removes
-        // the node the browser is still blurring.
+      const msg = document.createElement('div');
+      msg.className = 'school-msg';
+      input.addEventListener('change', () => {
+        const text = input.value.trim();
+        if (text === '') {
+          resetConvention(row.id);
+          msg.textContent = '';
+          setTimeout(afterSchoolChange, 0);
+          return;
+        }
+        const result = setConvention(row.id, text);
+        if (!result.ok) {
+          msg.textContent = result.reason;
+          input.focus();
+          return;
+        }
         setTimeout(afterSchoolChange, 0);
-        return;
-      }
-      const result = setConvention(row.id, text);
-      if (!result.ok) {
-        msg.textContent = result.reason;
-        input.focus();
-        return;
-      }
-      setTimeout(afterSchoolChange, 0);
-    });
-    cell.append(input, msg);
+      });
+      cell.append(input, msg);
+    }
 
     const status = tr.insertCell();
     status.className = 'school-status';
@@ -3368,7 +3414,7 @@ function paintSchool() {
     badge.className = `school-badge ${row.status}`;
     badge.textContent = STATUS_LABEL[row.status] || row.status;
     const applied = document.createElement('small');
-    applied.textContent = row.applied ? ' · read by the pose' : ' · not read by the solver';
+    applied.textContent = row.diagnosticOnly ? ' · diagnostic only; not read by pose/solver' : row.applied ? ' · read by the pose' : ' · not read by the solver';
     status.append(badge, applied);
     if (row.source === 'school') {
       const reset = document.createElement('button');
@@ -3383,7 +3429,11 @@ function paintSchool() {
 
     const approval = tr.insertCell();
     approval.className = 'school-approval';
-    if (row.status === 'school-approved' && row.approval) {
+    if (row.diagnosticOnly) {
+      const note = document.createElement('small');
+      note.textContent = 'Diagnostic-only; not eligible for school approval';
+      approval.appendChild(note);
+    } else if (row.status === 'school-approved' && row.approval) {
       const when = new Date(row.approval.at);
       const text = document.createElement('small');
       text.textContent = `Approved by ${row.approval.by} · ${SCHOOL_DATE.format(when)}`;

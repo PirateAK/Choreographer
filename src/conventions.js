@@ -13,6 +13,9 @@
 //   unset             no value
 //   provisional       a value is in use (a preset, or a school-entered value not yet approved)
 //   school-approved   the school approved this exact value; a later change withdraws the approval
+// Balance diagnostic settings are explicitly provisional and diagnostic-only. They do not feed pose geometry,
+// floor contact, or choreography; diagnosticOnly rows are not listed as applied-to-pose in the modal.
+
 //
 // Provisional values drive the preview only. Results built on them are not school-correct until the
 // school approves the row. Overrides, approvals, and the approver name are stored in browser storage
@@ -127,6 +130,96 @@ export const CONVENTIONS = [
     school_method: 'Provisional. The first-position ankle height in this rig, shared by plié, second, fourth, and the basic review (pose.js FLOOR_REF). Not a measured shoe or sole height.',
   },
   {
+    id: 'balance.diagnostic_foot_length', kind: 'measure', applied: false, diagnosticOnly: true, value: 0.15, min: 0.05, max: 0.3, status: 'provisional',
+    label: 'Balance diagnostic foot length (PLACEHOLDER)', unit: 'body height (1 = dancer height)',
+    measurement_reference: 'heel to toe length used only to build the provisional axis-aligned support-base bounds',
+    school_method: 'Provisional diagnostic-only assumption, not school-approved. At 0.15 bu and ankle-to-heel fraction 0.30, the current base extends 0.045 bu heelward and 0.105 bu toeward from the ankle. Does not affect pose geometry or contact checks.',
+  },
+  {
+    id: 'balance.ankle_heel_fraction', kind: 'measure', applied: false, diagnosticOnly: true, value: 0.30, min: 0, max: 1, status: 'provisional',
+    label: 'Balance diagnostic ankle-to-heel fraction (PLACEHOLDER)', unit: 'fraction of diagnostic foot length (0–1)',
+    measurement_reference: 'fraction of foot length from ankle toward heel; remaining length extends toward toe',
+    school_method: 'Provisional diagnostic-only assumption, not school-approved. Current value 0.30 derives 0.045 bu heelward and 0.105 bu toeward extents. Does not affect pose geometry or contact checks.',
+  },
+  {
+    id: 'balance.diagnostic_half_width', kind: 'measure', applied: false, diagnosticOnly: true, value: 0.05, min: 0.01, max: 0.15, status: 'provisional',
+    label: 'Balance diagnostic half-width (PLACEHOLDER)', unit: 'body height, each side of ankle',
+    measurement_reference: 'x half-width of the provisional axis-aligned support-base bounds',
+    school_method: 'Provisional diagnostic-only assumption, not school-approved. Current x extent is ankle x ±0.05 bu. Does not affect pose geometry or contact checks.',
+  },
+  {
+    id: 'balance.support.first', kind: 'note', applied: false, diagnosticOnly: true, value: 'both', choices: ['none', 'left', 'right', 'both'], status: 'provisional',
+    label: 'Balance diagnostic support — first (PLACEHOLDER)', unit: 'support-foot selector',
+    measurement_reference: 'which modeled foot or feet contribute to the stationary diagnostic support base',
+    school_method: 'Provisional diagnostic-only selector, not school-approved. Current baseline is both; does not affect geometry or contact checks.',
+  },
+  {
+    id: 'balance.support.second', kind: 'note', applied: false, diagnosticOnly: true, value: 'both', choices: ['none', 'left', 'right', 'both'], status: 'provisional',
+    label: 'Balance diagnostic support — second (PLACEHOLDER)', unit: 'support-foot selector',
+    measurement_reference: 'which modeled foot or feet contribute to the stationary diagnostic support base',
+    school_method: 'Provisional diagnostic-only selector, not school-approved. Current baseline is both; does not affect geometry or contact checks.',
+  },
+  {
+    id: 'balance.support.third', kind: 'note', applied: false, diagnosticOnly: true, value: 'both', choices: ['none', 'left', 'right', 'both'], status: 'provisional',
+    label: 'Balance diagnostic support — third (PLACEHOLDER)', unit: 'support-foot selector',
+    measurement_reference: 'which modeled foot or feet contribute to the stationary diagnostic support base',
+    school_method: 'Provisional diagnostic-only selector, not school-approved. Current baseline is both; does not affect geometry or contact checks.',
+  },
+  {
+    id: 'balance.support.fourth', kind: 'note', applied: false, diagnosticOnly: true, value: 'both', choices: ['none', 'left', 'right', 'both'], status: 'provisional',
+    label: 'Balance diagnostic support — fourth (PLACEHOLDER)', unit: 'support-foot selector',
+    measurement_reference: 'which modeled foot or feet contribute to the stationary diagnostic support base',
+    school_method: 'Provisional diagnostic-only selector, not school-approved. Current baseline is both; does not affect geometry or contact checks.',
+  },
+  {
+    id: 'balance.support.fifth', kind: 'note', applied: false, diagnosticOnly: true, value: 'both', choices: ['none', 'left', 'right', 'both'], status: 'provisional',
+    label: 'Balance diagnostic support — fifth (PLACEHOLDER)', unit: 'support-foot selector',
+    measurement_reference: 'which modeled foot or feet contribute to the stationary diagnostic support base',
+    school_method: 'Provisional diagnostic-only selector, not school-approved. Current baseline is both; does not affect geometry or contact checks.',
+  },
+  {
+    id: 'balance.support.tendu', kind: 'note', applied: false, diagnosticOnly: true, value: 'left', choices: ['none', 'left', 'right', 'both'], status: 'provisional',
+    label: 'Balance diagnostic support — tendu (PLACEHOLDER)', unit: 'support-foot selector',
+    measurement_reference: 'which modeled foot or feet contribute to the stationary diagnostic support base',
+    school_method: 'Provisional diagnostic-only selector, not school-approved. Current baseline is left; does not affect geometry or contact checks.',
+  },
+  {
+    id: 'balance.support.plie', kind: 'note', applied: false, diagnosticOnly: true, value: 'both', choices: ['none', 'left', 'right', 'both'], status: 'provisional',
+    label: 'Balance diagnostic support — plié (PLACEHOLDER)', unit: 'support-foot selector',
+    measurement_reference: 'which modeled foot or feet contribute to the stationary diagnostic support base',
+    school_method: 'Provisional diagnostic-only selector, not school-approved. Current baseline is both; does not affect geometry or contact checks.',
+  },
+  {
+    id: 'balance.support.releve', kind: 'note', applied: false, diagnosticOnly: true, value: 'both', choices: ['none', 'left', 'right', 'both'], status: 'provisional',
+    label: 'Balance diagnostic support — relevé (PLACEHOLDER)', unit: 'support-foot selector',
+    measurement_reference: 'which modeled foot or feet contribute to the stationary diagnostic support base',
+    school_method: 'Provisional diagnostic-only selector, not school-approved. Current baseline is both; does not affect geometry or contact checks.',
+  },
+  {
+    id: 'balance.support.arabesque', kind: 'note', applied: false, diagnosticOnly: true, value: 'left', choices: ['none', 'left', 'right', 'both'], status: 'provisional',
+    label: 'Balance diagnostic support — arabesque (PLACEHOLDER)', unit: 'support-foot selector',
+    measurement_reference: 'which modeled foot or feet contribute to the stationary diagnostic support base',
+    school_method: 'Provisional diagnostic-only selector, not school-approved. Current baseline is left; does not affect geometry or contact checks.',
+  },
+  {
+    id: 'balance.support.attitude', kind: 'note', applied: false, diagnosticOnly: true, value: 'left', choices: ['none', 'left', 'right', 'both'], status: 'provisional',
+    label: 'Balance diagnostic support — attitude (PLACEHOLDER)', unit: 'support-foot selector',
+    measurement_reference: 'which modeled foot or feet contribute to the stationary diagnostic support base',
+    school_method: 'Provisional diagnostic-only selector, not school-approved. Current baseline is left; does not affect geometry or contact checks.',
+  },
+  {
+    id: 'balance.support.pirouette', kind: 'note', applied: false, diagnosticOnly: true, value: 'left', choices: ['none', 'left', 'right', 'both'], status: 'provisional',
+    label: 'Balance diagnostic support — pirouette (PLACEHOLDER)', unit: 'support-foot selector',
+    measurement_reference: 'which modeled foot or feet contribute to the stationary diagnostic support base',
+    school_method: 'Provisional diagnostic-only selector, not school-approved. Current baseline is left; does not affect geometry or contact checks.',
+  },
+  {
+    id: 'balance.support.pas-de-bourree', kind: 'note', applied: false, diagnosticOnly: true, value: 'right', choices: ['none', 'left', 'right', 'both'], status: 'provisional',
+    label: 'Balance diagnostic support — pas de bourrée (PLACEHOLDER)', unit: 'support-foot selector',
+    measurement_reference: 'which modeled foot or feet contribute to the stationary diagnostic support base',
+    school_method: 'Provisional diagnostic-only selector, not school-approved. Current baseline is right; static support uses the ankle-endpoint model and is not an anatomical validation.',
+  },
+  {
     id: 'chasse.lunge_depth', kind: 'note', applied: false, value: null, status: 'unset',
     label: 'Chassé lunge depth (school decision to revisit)', unit: 'text',
     measurement_reference: 'depth of the lunge in the chassé pose: the hip and knee angles of each leg, named by the school',
@@ -210,6 +303,7 @@ export function validate(id, value) {
   if (entry.kind === 'note') {
     const text = String(value ?? '').trim();
     if (text.length > 500) return { ok: false, reason: 'Keep notes under 500 characters' };
+    if (entry.choices && !entry.choices.includes(text)) return { ok: false, reason: `Choose one of: ${entry.choices.join(', ')}` };
     return { ok: true, value: text };
   }
   if (value === '' || value === null || value === undefined) return { ok: false, reason: 'Enter a number' };

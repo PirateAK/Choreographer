@@ -9,48 +9,36 @@
 // support phase both feet are in contact and the load moves from left to right (the two loads sum to 1).
 // Track values are body units (1 = dancer height), local to the pose; conversion to stage metres is required
 // before attaching the track to a dancer.
-import { feetPlaceOf, FLOOR_REF, joints, toeDirection } from './pose.js';
+import { feetPlaceOf, FLOOR_REF, joints } from './pose.js';
 import { compileFootSchedule } from './foot-scheduler.js';
 import { sampleFootTrajectory } from './foot-trajectory.js';
+import { balanceDiagnosticOf, balanceDiagnosticSettings } from './balance-diagnostic.js';
 
 export const CHASSE_STATUS = 'support analysis only; not motion, not a validated chassé (feet float above the floor reference)';
 export const CHASSE_PHASE_MS = 400; // provisional duration of each phase, milliseconds
 export const CHASSE_CONTACT_TOL = 0.002; // body units, same tolerance as the basic-movement review
-// Base geometry, same solver assumptions as the basic-movement review (not school-measured).
-const FOOT_ANKLE_FROM_HEEL = 0.3;
-const FOOT_LENGTH = 0.15;
-const HALF_WIDTH = 0.05;
+// Base geometry is read from provisional diagnostic settings; support sets still come only from CHASSE_PHASES.
 const PHYSICAL_HEIGHT_M = 1.7; // body units to metres (1 = dancer height)
 
-// Diagnostic only: the pelvis centre (z = 0, as in the review) against the support base of the given feet.
+// Diagnostic only: the pelvis centre (z = 0, as in the review) against a phase's fixed support set from CHASSE_PHASES.
 // `offsetX` is the signed distance from the nearest x-edge of the base (0 when inside in x); `margin` is the
-// minimum of the four edge distances, identical to the review's static balance margin. Not a pass/fail gate.
-export function pelvisAgainstBase(spec, supportIdx) {
-  const ank = feetPlaceOf(spec, 1, 0);
-  const j = joints(spec, 1, 0, null);
-  const cx = j.pelvis[0];
-  const cy = j.pelvis[1];
-  let xmin = Infinity, xmax = -Infinity, zmin = Infinity, zmax = -Infinity;
-  for (const i of supportIdx) {
-    const [dx, dz] = toeDirection(spec, i);
-    const heel = FOOT_ANKLE_FROM_HEEL * FOOT_LENGTH;
-    const toe = (1 - FOOT_ANKLE_FROM_HEEL) * FOOT_LENGTH;
-    xmin = Math.min(xmin, ank[i].x - HALF_WIDTH); xmax = Math.max(xmax, ank[i].x + HALF_WIDTH);
-    zmin = Math.min(zmin, ank[i].z - heel * dz, ank[i].z + toe * dz);
-    zmax = Math.max(zmax, ank[i].z - heel * dz, ank[i].z + toe * dz);
-  }
-  const margin = Math.min(cx - xmin, xmax - cx, 0 - zmin, zmax - 0);
+// minimum of the four edge distances. Not a pass/fail gate, school-approved criterion, or choreography validation.
+export function pelvisAgainstBase(spec, supportIdx, settings = balanceDiagnosticSettings()) {
+  const reading = balanceDiagnosticOf(spec, supportIdx, settings);
+  if (!reading.hasSupport) return { ...reading, pelvisY: joints(spec, 1, 0, null).pelvis[1] };
+  const { pelvisX, pelvisZ, pelvisY: _unused, baseX, baseZ, margin } = reading;
+  const cx = pelvisX;
+  const cy = joints(spec, 1, 0, null).pelvis[1];
+  const [xmin, xmax] = baseX;
+  const [zmin, zmax] = baseZ;
   const offsetX = cx < xmin ? cx - xmin : cx > xmax ? cx - xmax : 0;
   return {
-    pelvisX: cx,
+    ...reading,
     pelvisY: cy,
     pelvisYPhysicalMm: cy * PHYSICAL_HEIGHT_M * 1000,
-    baseX: [xmin, xmax],
-    baseZ: [zmin, zmax],
     offsetX,
     offsetXPhysicalMm: offsetX * PHYSICAL_HEIGHT_M * 1000,
     inside: margin >= 0,
-    margin,
   };
 }
 

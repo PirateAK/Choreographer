@@ -1,0 +1,22 @@
+[
+  {
+    "content": "[balance-1] Extract a shared balance diagnostic with current defaults and explicit provisional settings (self)",
+    "id": "balance-1",
+    "status": "completed"
+  },
+  {
+    "content": "[balance-2] Keep chassé phase supports fixed and remove all balance from pass/fail while preserving readings (self)",
+    "id": "balance-2",
+    "status": "completed"
+  },
+  {
+    "content": "[balance-3] Add School modal editors for diagnostic assumptions and stationary support selectors (self)",
+    "id": "balance-3",
+    "status": "completed"
+  },
+  {
+    "content": "[balance-4] Add baseline/override/isolation regressions and run full engine/browser checks (self)",
+    "id": "balance-4",
+    "status": "completed"
+  }
+]

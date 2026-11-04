@@ -20,7 +20,10 @@ assert.equal(conventionValue('plie.depth') === undefined, false, 'plié row exis
 // 2. Every row has the fields the table needs, and notes are not applied silently.
 for (const c of CONVENTIONS) {
   assert(c.id && c.label && c.unit && (c.measurement_reference || c.kind === 'note'), `${c.id} has label, unit, measurement reference`);
-  if (c.kind === 'note') assert.equal(c.applied, false, `${c.id} note is recorded, not applied`);
+  if (c.kind === 'note') {
+    assert.equal(c.applied, false, `${c.id} note is recorded, not applied`);
+    if (c.choices) assert(c.choices.includes(c.value), `${c.id} default is one of its choices`);
+  }
 }
 assert.equal(conventionRows().length, CONVENTIONS.length, 'rows cover every convention');
 

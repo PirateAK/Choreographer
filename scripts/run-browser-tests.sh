@@ -11,7 +11,7 @@ if [ ! -f "$PW_ENTRY" ]; then
 fi
 
 export PLAYWRIGHT_MODULE="file://$PW_ENTRY"
-for t in test-placement-browser.mjs test-timeline-browser.mjs; do
+for t in test-placement-browser.mjs test-timeline-browser.mjs test-balance-browser.mjs; do
   echo "== $t"
   node "$t"
 done
