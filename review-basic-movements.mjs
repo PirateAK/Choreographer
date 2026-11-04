@@ -6,6 +6,7 @@ import { PLANT_BY_POSE, specOf, blendSpecs, joints, feetPlaceOf, toeDirection, F
 import { createShow, overheadPoseAtLocal } from './src/model.js';
 import { conventionValue, previewSummary } from './src/conventions.js';
 import { chassePhaseReadings, CHASSE_STATUS } from './src/chasse-phases.js';
+import { jointRangeWarnings, jointRangeLimits } from './src/joint-ranges.js';
 
 const FOOT_ANKLE_FROM_HEEL = 0.3; // solver assumption shared with pose.js spacing (not school-measured)
 const FOOT_LENGTH = 0.15; // provisional foot length from conventions.js
@@ -157,6 +158,18 @@ for (const [start, finish] of [['first', 'second'], ['second', 'third'], ['fifth
   }
   findings.transitions.push({ start, finish, maxGapMm: Math.round(maxGap * 1000) });
   console.log(`${start.padEnd(8)} -> ${finish.padEnd(8)} max target shortfall ${Math.round(maxGap * 1000)} mm`);
+}
+
+// Placeholder joint-range warnings (src/joint-ranges.js). Shown, not scored: the ranges are placeholders, not
+// school values or safe limits, and nothing is clamped.
+console.log('---- joint-range placeholders (warnings only, not scored)');
+{
+  const lim = jointRangeLimits();
+  console.log(`limits: thigh ${lim.thighMax}° from straight down, knee bend ${lim.kneeBendMax}° (PLACEHOLDER)`);
+  for (const id of basic) {
+    const w = jointRangeWarnings(specOf(id), lim);
+    if (w.length) console.log(`${id.padEnd(15)} ${w.map((x) => `leg ${x.leg} ${x.metric} ${x.value.toFixed(1)}° > ${x.limit}°`).join('; ')}`);
+  }
 }
 
 // Score: balance, contact, continuity, and the stationary transitions. A failing row is reported, not hidden.

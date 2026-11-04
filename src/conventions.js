@@ -138,6 +138,18 @@ export const CONVENTIONS = [
     measurement_reference: 'where the pelvis is expected relative to the support base in each chassé phase (inside the base, or allowed to travel beyond it)',
     school_method: 'Unset: school decision to revisit. Static balance is a diagnostic reading for the chassé, not a pass/fail criterion, until the school defines the expectation for each phase.',
   },
+  {
+    id: 'range.thigh_max', kind: 'measure', applied: false, value: 120, min: 0, max: 180, status: 'provisional',
+    label: 'PLACEHOLDER thigh range (warning only)', unit: 'degrees from straight down',
+    measurement_reference: 'angle of the thigh (hip to knee) from straight down, each leg',
+    school_method: 'Placeholder, not a school value and not a safe limit. The review shows a warning above it; the solver does not clamp or reject poses.',
+  },
+  {
+    id: 'range.knee_bend_max', kind: 'measure', applied: false, value: 150, min: 0, max: 180, status: 'provisional',
+    label: 'PLACEHOLDER knee bend range (warning only)', unit: 'degrees of knee bend (0 = straight)',
+    measurement_reference: 'knee bend: 180 minus the angle between thigh and shin at the knee, each leg',
+    school_method: 'Placeholder, not a school value and not a safe limit. The review shows a warning above it; the solver does not clamp or reject poses.',
+  },
 ];
 
 const BY_ID = Object.fromEntries(CONVENTIONS.map((c) => [c.id, c]));
