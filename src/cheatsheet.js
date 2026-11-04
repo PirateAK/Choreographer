@@ -76,8 +76,12 @@ function drawCell(cell, ms) {
     cv.width = Math.round(w * dpr);
     cv.height = Math.round(h * dpr);
   }
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, w, h);
+  // A pan (the enlarged view's Ctrl-drag) moves the figure inside the canvas; the clear covers
+  // the whole canvas, so a moved figure leaves no trail at the edges.
+  const pan = cell.pan || { x: 0, y: 0 };
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.setTransform(dpr, 0, 0, dpr, pan.x * dpr, pan.y * dpr);
 
   // Room at the top for a jump: the tallest a dancer gets here is a head at the apex, and a
   // figure that gains 0.35 m at this size would go out of the top of the cell.
@@ -213,6 +217,7 @@ export class MoveSheet {
           .map(
             (m) => `<button class="move" data-kind="${g.kind}" data-value="${m.value}">
           <canvas width="84" height="104" aria-hidden="true"></canvas>
+          <span class="move-zoom" role="button" tabindex="0" aria-label="Enlarge ${m.label}" title="Enlarge: Ctrl-drag to pan, double-click to re-centre">⤢</span>
           <span class="move-name">${m.label}</span>
           <span class="move-note">${m.note}</span>
         </button>`
@@ -232,9 +237,23 @@ export class MoveSheet {
       phase: t0 + (i % 4) * 90,
     }));
     body.addEventListener('click', (e) => {
+      const zoom = e.target.closest('.move-zoom');
+      if (zoom) {
+        this.enlarge(zoom.closest('.move'));
+        return;
+      }
       const btn = e.target.closest('.move');
       if (btn) this.pick(btn.dataset.kind, btn.dataset.value);
     });
+    body.addEventListener('keydown', (e) => {
+      const zoom = e.target.closest?.('.move-zoom');
+      if (zoom && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        this.enlarge(zoom.closest('.move'));
+      }
+    });
+    this.buildZoom();
+
 
     const stepSel = body.querySelector('#phraseStep');
     const countsIn = body.querySelector('#phraseCounts');
@@ -334,7 +353,90 @@ export class MoveSheet {
     if (line.textContent !== text) line.textContent = text;
   }
 
+  // The enlarged view: one move, drawn at twice a tile's width and height, over a dimmed sheet.
+  // Ctrl-drag pans the figure; double-click re-centres it. It is a view only, so picking the
+  // move still happens from the tile.
+  buildZoom() {
+    this.root.insertAdjacentHTML(
+      'beforeend',
+      `<div class="move-zoom-view" hidden>
+        <div class="move-zoom-box" role="dialog" aria-label="Enlarged move">
+          <canvas aria-hidden="true"></canvas>
+          <span class="move-zoom-name"></span>
+          <button class="ghost move-zoom-close">Close</button>
+        </div>
+      </div>`
+    );
+    this.zoomEl = this.root.querySelector('.move-zoom-view');
+    this.zoomBox = this.root.querySelector('.move-zoom-box');
+    this.zoomCanvas = this.zoomBox.querySelector('canvas');
+    this.zoomName = this.root.querySelector('.move-zoom-name');
+    this.zoom = null;
+    this.drag = null;
+    this.zoomEl.addEventListener('click', (e) => {
+      if (e.target === this.zoomEl || e.target.closest('.move-zoom-close')) this.closeZoom();
+    });
+    this.zoomCanvas.addEventListener('pointerdown', (e) => {
+      if (!this.zoom || !(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      this.drag = { x: e.clientX, y: e.clientY, pan: { ...this.zoom.pan } };
+      this.zoomCanvas.setPointerCapture(e.pointerId);
+    });
+    this.zoomCanvas.addEventListener('pointermove', (e) => {
+      if (!this.drag) return;
+      this.zoom.pan = { x: this.drag.pan.x + e.clientX - this.drag.x, y: this.drag.pan.y + e.clientY - this.drag.y };
+    });
+    const endDrag = () => {
+      this.drag = null;
+    };
+    this.zoomCanvas.addEventListener('pointerup', endDrag);
+    this.zoomCanvas.addEventListener('pointercancel', endDrag);
+    this.zoomCanvas.addEventListener('dblclick', () => {
+      if (this.zoom) this.zoom.pan = { x: 0, y: 0 };
+    });
+    // Escape closes the enlarged view first; a second Escape reaches the sheet as before.
+    window.addEventListener(
+      'keydown',
+      (e) => {
+        if (e.key === 'Escape' && this.zoom) {
+          e.stopImmediatePropagation();
+          this.closeZoom();
+        }
+      },
+      true
+    );
+  }
+
+  enlarge(el) {
+    const cell = this.cells.find((c) => c.el === el);
+    if (!cell) return;
+    const r = el.getBoundingClientRect();
+    const margin = 12;
+    const nameH = 22;
+    const pad = 12;
+    // Twice the tile in both directions, unless the window is too small: then it fits the window.
+    const W = Math.min(r.width * 2, window.innerWidth - margin * 2);
+    const H = Math.min(r.height * 2, window.innerHeight - margin * 2);
+    const left = Math.max(margin, Math.min(window.innerWidth - W - margin, r.left + r.width / 2 - W / 2));
+    const top = Math.max(margin, Math.min(window.innerHeight - H - margin, r.top + r.height / 2 - H / 2));
+    Object.assign(this.zoomBox.style, { left: `${left}px`, top: `${top}px`, width: `${W}px`, height: `${H}px` });
+    this.zoomCanvas.style.width = `${W - pad * 2}px`;
+    this.zoomCanvas.style.height = `${H - pad * 2 - nameH - 6}px`;
+    this.zoomName.textContent = el.querySelector('.move-name')?.textContent || '';
+    // The enlarged figure keeps the tile's phase, so it is the same moment, only larger.
+    this.zoom = { kind: cell.kind, value: cell.value, canvas: this.zoomCanvas, phase: cell.phase, pan: { x: 0, y: 0 } };
+    this.zoomEl.hidden = false;
+    this.zoomBox.querySelector('.move-zoom-close').focus();
+  }
+
+  closeZoom() {
+    this.zoomEl.hidden = true;
+    this.zoom = null;
+    this.drag = null;
+  }
+
   open(current) {
+
     this.build();
     this.root.hidden = false;
     this.current = current || null;
@@ -347,6 +449,7 @@ export class MoveSheet {
 
   close() {
     this.root.hidden = true;
+    this.closeZoom();
     this.stop();
   }
 
@@ -374,6 +477,7 @@ export class MoveSheet {
     const tick = () => {
       const now = performance.now();
       for (const cell of this.cells) drawCell(cell, now);
+      if (this.zoom && !this.zoomEl.hidden) drawCell(this.zoom, now);
       this.raf = requestAnimationFrame(tick);
     };
     this.raf = requestAnimationFrame(tick);
