@@ -157,7 +157,7 @@ export class HouseView {
       const costume = costumeOf(show, d);
       const body = costume && costume.body || d.color || '#f0d4b8';
       const hair = costume && costume.hair || darker(body, 0.42);
-      const skirt = costume && costume.skirt ? { style: costume.skirt, color: costume.skirtColor || body } : null;
+      const skirt = costume && costume.style ? { style: costume.style, color: costume.skirt || body } : null;
       drawPose(ctx, {
         spec: ev.spec, x: xAt(p.x, p.y), y: groundY - (Number.isFinite(air) ? air : 0) * s, h: dancerH * s,
         facing: at.facing || 1, turn: at.turn || 0, headTurn: at.headTurn || at.turn || 0,
