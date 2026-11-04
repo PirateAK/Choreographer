@@ -1098,6 +1098,10 @@ export function createShow() {
   const stage = { width: 12, depth: 8, wingDepth: 4, grid: 0.5, openingH: 7.5, dancerH: 1.7 };
   return {
     name: 'Untitled show',
+    // Identifies this show's voice bundle: a narration file is only loaded back
+    // into the show it was made for, and an old show gets one the first time it is
+    // saved.
+    showId: uid('show'),
     stage,
     cast: [],
     // The wardrobe: costumes are named here and worn by performers, so a show with
@@ -1137,6 +1141,7 @@ export function createShow() {
 export function normalise(show) {
   const base = createShow();
   const out = Object.assign(base, show || {});
+  out.showId = show && show.showId ? String(show.showId) : base.showId;
   out.stage = Object.assign(base.stage, (show && show.stage) || {});
   const opening = Number(out.stage.openingH);
   out.stage.openingH = Number.isFinite(opening) ? Math.max(2.5, Math.min(20, opening)) : 7.5;

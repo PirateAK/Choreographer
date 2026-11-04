@@ -81,6 +81,16 @@ export class NarrationEngine {
     }
   }
 
+  // Drops what was known about these keys, so the next probe reads them again. Used
+  // after a voice file is loaded, when clips that were missing may now have audio.
+  forget(keys) {
+    for (const k of keys || []) {
+      if (this.cache.has(k)) continue;
+      this.status.delete(k);
+      this.storedPeaks.delete(k);
+    }
+  }
+
   /* ------------------------------------------------------------ recording */
 
   get canRecord() {

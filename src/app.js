@@ -32,6 +32,8 @@ import { CompanyLine } from './company.js';
 import { fmtTime } from './draw.js';
 import { music, dropStored } from './music.js';
 import { narration } from './narration.js';
+import { storeAudio, readAudio } from './audiostore.js';
+import { buildBundle, bundleFileName, checkBundle, applyBundle } from './narration-bundle.js';
 import { HouseView } from './house.js';
 import { VideoEngine } from './video.js';
 import { addVideo, removeVideo, videoSpan, videoAt, addImage, addSlideCue, removeSlideCue, projectionAt, slideLayersAt } from './model.js';
@@ -4306,6 +4308,68 @@ function boot() {
   });
 
   $('btnVoiceFolder').addEventListener('click', () => $('folderNarration').click());
+
+  // The voice for this show, as one file. It is named after the show and carries the
+  // show's ID, so loading it into a different show asks first.
+  $('btnVoiceSave').addEventListener('click', async () => {
+    state.ui.hint = 'Gathering the voice…';
+    state.ui.dirtyPanels = true;
+    commit();
+    try {
+      const bundle = await buildBundle(state.show, readAudio);
+      const json = JSON.stringify(bundle);
+      const blob = new Blob([json], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = bundleFileName(state.show);
+      a.click();
+      URL.revokeObjectURL(a.href);
+      const missing = bundle.missing.length ? ` · ${bundle.missing.length} clip(s) had no audio in this browser` : '';
+      state.ui.hint = `Saved ${bundle.audio.length} voice clip(s)${missing}`;
+    } catch {
+      state.ui.hint = 'The voice could not be saved';
+    }
+    state.ui.dirtyPanels = true;
+    app.rebuild();
+  });
+  $('btnVoiceLoad').addEventListener('click', () => $('fileVoiceLoad').click());
+  $('fileVoiceLoad').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      let bundle = null;
+      try {
+        bundle = JSON.parse(String(reader.result));
+      } catch {
+        bundle = null;
+      }
+      const check = checkBundle(bundle, state.show);
+      if (check.verdict === 'invalid') {
+        state.ui.hint = 'That file is not a narration voice file';
+        app.rebuild();
+        return;
+      }
+      if (check.verdict === 'other') {
+        const go = window.confirm(
+          `This voice was saved for "${check.showName}", not the open show "${state.show.name}". Load it anyway?`
+        );
+        if (!go) {
+          state.ui.hint = 'Voice not loaded';
+          app.rebuild();
+          return;
+        }
+      }
+      const result = await applyBundle(bundle, storeAudio);
+      narration.forget(bundle.audio.map((a) => a.key));
+      await narration.probe(state.show.narration);
+      state.ui.hint = `Loaded ${result.stored} of ${result.total} voice clip(s)`;
+      state.ui.dirtyPanels = true;
+      app.rebuild();
+    };
+    reader.readAsText(file);
+  });
   // A folder of numbered recordings: taken in file-name order (01, 02, … 10), one after
   // another from the end of the narration already in the show, unattached until a speaker is chosen.
   $('folderNarration').addEventListener('change', async (e) => {

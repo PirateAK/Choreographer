@@ -190,7 +190,10 @@
         <button id="btnRecord" title="Record a voice piece with the microphone, starting at the playhead">◉ Record</button>
         <button id="btnVoiceFile" title="Attach a voice recording from disk, at the playhead">+ Voice file</button>
         <button id="btnVoiceFolder" title="Import a folder of numbered recordings (01, 02, …) in order, after the narration already in the show. Each starts unattached until you choose its speaker">+ Folder</button>
+        <button id="btnVoiceSave" title="Save this show's voice audio to one file, tied to the show's name and ID">Save voice</button>
+        <button id="btnVoiceLoad" title="Load a saved voice file back into this show, if it belongs to this show">Load voice</button>
       </div>
+      <input id="fileVoiceLoad" type="file" accept="application/json,.json" hidden />
       <p class="hint" id="voiceHint">A line lands <b>where the playhead is</b> when you start recording, so put the playhead where the narrator speaks. Several pieces sit on one row, and a line plays whenever its moment comes round — in a run-through too.</p>
     </section>
 
@@ -263,13 +266,14 @@
 
 <script type="importmap">
 {"imports": {
-  "./src/app.js": "./src/app.js?v=scroll28",
+  "./src/app.js": "./src/app.js?v=scroll29",
   "./src/stage.js": "./src/stage.js?v=guide21",
   "./src/cheatsheet.js": "./src/cheatsheet.js?v=guide23",
   "./src/placement-guide.js": "./src/placement-guide.js?v=guide20",
   "./src/pose.js": "./src/pose.js?v=load15",
-  "./src/model.js": "./src/model.js?v=trajectory11",
-  "./src/narration.js": "./src/narration.js?v=narr1",
+  "./src/model.js": "./src/model.js?v=trajectory12",
+  "./src/narration.js": "./src/narration.js?v=narr2",
+  "./src/narration-bundle.js": "./src/narration-bundle.js?v=narr2",
   "./src/conventions.js": "./src/conventions.js?v=conv14",
   "./src/chasse-phases.js": "./src/chasse-phases.js?v=chasse1",
   "./src/elevation.js": "./src/elevation.js?v=move1",
