@@ -1415,7 +1415,7 @@ export function normalise(show) {
       // Span and across apply to both curtains and drops.
       const sp = Number(s.span);
       s.span = Number.isFinite(sp)
-        ? Math.max(0.5, Math.min(out.stage.width, sp))
+        ? Math.max(0.5, Math.min(maxClothSpan(out.stage), sp))
         : s.kind === 'card'
           ? Math.min(CARD_SPAN, out.stage.width)
           : out.stage.width;
@@ -1579,7 +1579,17 @@ export function clothSpan(item) {
   const st = state.show && state.show.stage;
   const width = Number.isFinite(st && st.width) ? st.width : 12;
   const sp = Number(item && item.span);
-  return Math.max(0.5, Math.min(width, Number.isFinite(sp) ? sp : width));
+  return Math.max(0.5, Math.min(maxClothSpan(st), Number.isFinite(sp) ? sp : width));
+}
+
+// Upstage cloth is drawn narrower than the opening: the house view shrinks x by
+// 0.88 at the front to 1.0 at the back. A piece may therefore be wider than the
+// stage by 1/0.88 so its edges still meet the frame at its shallowest depth. This
+// is the widest any piece needs to be; wider than that only adds hidden width.
+export const CLOTH_FRONT_SCALE = 0.88;
+export function maxClothSpan(stage) {
+  const width = stage && Number.isFinite(stage.width) ? stage.width : 12;
+  return width / CLOTH_FRONT_SCALE;
 }
 
 // Cloth stays inside the opening: it may sit anywhere its own width allows, so a

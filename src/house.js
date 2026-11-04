@@ -2,7 +2,7 @@
 // perspective; all drawing stays on the supplied canvas.
 import {
   sceneryStateAt, posOfContent, evaluateMovement, localOfContent, feetOnFloor,
-  propPosOfContent, objectShown, costumeOf, dancerHeight, clothDepth,
+  propPosOfContent, objectShown, costumeOf, dancerHeight, clothDepth, maxClothSpan,
 } from './model.js';
 import { drawPose, darker } from './pose.js';
 
@@ -194,8 +194,9 @@ export class HouseView {
   _drawScenery(item, time, video, g) {
     const { ctx, stageW, stageD, openingH, scale, half, xAt, floorAt, zScale, stageTop } = g;
     const state = sceneryStateAt(item, time);
-    const span = clamp(num(item.span, stageW), 0.5, stageW);
-    const cx = clamp(num(item.x, 0), -half + span / 2, half - span / 2);
+    const span = clamp(num(item.span, stageW), 0.5, maxClothSpan(g.show.stage));
+    const lim = Math.max(0, (stageW - span) / 2);
+    const cx = clamp(num(item.x, 0), -lim, lim);
     const depth = clamp(clothDepth(item), 0, stageD);
     const px = xAt(cx, depth);
     const pw = span * zScale(depth);

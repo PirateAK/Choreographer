@@ -6,7 +6,7 @@ import {
   endMarker, setEnd,
   removeFromStation, truncateAfter, addWingLeg, removeWingLeg, canAddWingLeg,
   findObject, isProp, propPosOfContent, CARRY_OFFSET, carrierOf, carrierIdOf,
-  addCarryHandoff, removeCarryHandoff, addSceneryCue, removeSceneryCue, clothSpan, clampClothX,
+  addCarryHandoff, removeCarryHandoff, addSceneryCue, removeSceneryCue, clothSpan, clampClothX, maxClothSpan,
   musicLevelAt, addMusicCue, removeMusicCue, updateMusicCue, audibleLevel,
   clothDepth, dropStack, actRanges, actAt, addAct, removeAct, actHasWork, ACT_MIN_MS, ACT_MAX_MS, sceneryStateAt, totalActLength,
   activeMusicAt, addMusicTrack, removeMusicTrack, setMusicStart, musicSpan,
@@ -1045,11 +1045,11 @@ function rebuildPanels() {
         : `<div class="row">${s.kind === 'card' ? '' : `<select data-f="layer">${layerOpts}</select>`}
              <input type="color" data-f="color" value="${s.color}" /></div>
            <div class="row"><span class="label">Width</span>
-             <input type="number" data-f="span" min="0.5" max="${state.show.stage.width}" step="0.5" value="${s.span ?? state.show.stage.width}" style="max-width:58px" title="How much of the opening this ${s.kind} masks, in metres" />
+             <input type="number" data-f="span" min="0.5" max="${maxClothSpan(state.show.stage).toFixed(1)}" step="0.5" value="${s.span ?? state.show.stage.width}" style="max-width:58px" title="How much of the opening this ${s.kind} masks, in metres. Up to a little over the stage width, so a piece reaches the frame at the back" />
              <span class="label">Height</span>
              <input type="number" data-f="h" min="0.5" max="20" step="0.5" value="${s.h ?? ''}" style="max-width:58px" title="How high this ${s.kind} hangs, in metres" /></div>
            <div class="row"><span class="label">Across</span>
-             <input type="number" data-f="x" min="${-((state.show.stage.width - (s.span ?? state.show.stage.width)) / 2)}" max="${(state.show.stage.width - (s.span ?? state.show.stage.width)) / 2}" step="0.5" value="${s.x ?? 0}" style="max-width:52px" title="Where it sits across the stage; a full-width piece cannot move" />
+             <input type="number" data-f="x" min="${-Math.max(0, (state.show.stage.width - (s.span ?? state.show.stage.width)) / 2)}" max="${Math.max(0, (state.show.stage.width - (s.span ?? state.show.stage.width)) / 2)}" step="0.5" value="${s.x ?? 0}" style="max-width:52px" title="Where it sits across the stage; a piece as wide as the stage cannot move" />
              <span class="label">Depth</span>
              <input type="number" data-f="depth" min="0.2" max="${state.show.stage.depth - 0.2}" step="0.1" value="${clothDepth(s).toFixed(1)}" style="max-width:52px" title="How far upstage; typing a number pins it, choosing a layer releases it" /></div>
            ${baseRow}
@@ -1831,7 +1831,7 @@ function bindPanelEvents() {
         const lim = item.kind === 'prop' ? 6 : 20;
         item.h = Math.max(0.2, Math.min(lim, Number(e.target.value) || 0.8));
       } else if (f === 'span') {
-        item.span = Math.max(0.5, Math.min(state.show.stage.width, Number(e.target.value) || state.show.stage.width));
+        item.span = Math.max(0.5, Math.min(maxClothSpan(state.show.stage), Number(e.target.value) || state.show.stage.width));
         // Narrowing frees it to move, widening squeezes it back to the middle.
         item.x = clampClothX(item.x, item.span);
         // The Across field's limits and value depend on the width, so refresh it
@@ -4048,7 +4048,7 @@ function boot() {
       if (key === 'width') {
         state.show.scenery.forEach((s) => {
           if (s.kind !== 'curtain' && s.kind !== 'drop') return;
-          s.span = Math.min(clothSpan(s), state.show.stage.width);
+          s.span = Math.min(clothSpan(s), maxClothSpan(state.show.stage));
           s.x = clampClothX(s.x, s.span);
         });
       }
