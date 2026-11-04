@@ -5,6 +5,7 @@
 import { PLANT_BY_POSE, specOf, blendSpecs, joints, feetPlaceOf, toeDirection, FLOOR_REF as FLOOR_REF_SHARED } from './src/pose.js';
 import { createShow, overheadPoseAtLocal } from './src/model.js';
 import { conventionValue, previewSummary } from './src/conventions.js';
+import { chassePhaseReadings } from './src/chasse-phases.js';
 
 const FOOT_ANKLE_FROM_HEEL = 0.3; // solver assumption shared with pose.js spacing (not school-measured)
 const FOOT_LENGTH = 0.15; // provisional foot length from conventions.js
@@ -32,8 +33,8 @@ const supportIdx = (id) => {
 };
 
 // Balance: the centre (pelvis x, z = 0) lies inside the support base, with heel and toe allowance.
-function balanceOf(spec, id) {
-  const sup = supportIdx(id);
+function balanceOf(spec, id, supOverride = null) {
+  const sup = supOverride || supportIdx(id);
   if (!sup.length) return { ok: true, margin: null, note: 'no support table entry' };
   const ank = feetPlaceOf(spec, 1, 0);
   const cx = joints(spec, 1, 0, null).pelvis[0];
@@ -91,6 +92,12 @@ for (const id of scored) {
     findings.balance.push({ id, ok: true, margin: bal.margin, na: true });
     findings.contact.push({ id, ok: true, below: con.below, gaps: con.gaps, na: true });
     console.log(`${id.padEnd(15)} balance n/a (travelling, phases pending) static margin ${bal.margin == null ? '-' : bal.margin.toFixed(3)}   contact n/a support gap mm ${con.gaps.map((g) => (g * 1000).toFixed(1)).join(',') || '-'} below ${con.below}`);
+    // Provisional three-phase readings (src/chasse-phases.js). Shown, not scored; timing is provisional.
+    for (const r of chassePhaseReadings(spec)) {
+      const pb = balanceOf(spec, id, r.supportIdx);
+      const freeTxt = r.freeGap == null ? '' : `   free ${r.freeAboveRef ? 'at/above ref' : 'BELOW ref'} (${(r.freeGap * 1000).toFixed(1)} mm)`;
+      console.log(`  phase ${r.name.padEnd(15)} support ${r.support.join('+').padEnd(11)} balance margin ${pb.margin == null ? '-' : pb.margin.toFixed(3)} ${pb.ok ? 'in base' : 'outside base'}   gaps mm L ${(r.gaps.left * 1000).toFixed(1)} R ${(r.gaps.right * 1000).toFixed(1)}${freeTxt}`);
+    }
     continue;
   }
   findings.balance.push({ id, ok: bal.ok, margin: bal.margin });
