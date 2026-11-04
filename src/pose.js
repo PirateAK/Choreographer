@@ -46,7 +46,8 @@ export const POSE_SPECS = {
   // Feet together, arms curved low in front: the pose a class starts from.
   first: { arms: [[32, -8], [32, -8]], legs: [[2, 1], [2, 1]], lean: 0, rise: 0 },
   // The wide one: arms open at shoulder height, feet a stride apart.
-  second: { arms: [[72, 80], [72, 80]], legs: [[20, 18], [20, 18]], lean: 0, rise: 0 },
+  // Provisional preview: rise −0.028405 sinks the body so both ankles sit on the flat-foot floor reference (0.010). Not school-approved.
+  second: { arms: [[72, 80], [72, 80]], legs: [[20, 18], [20, 18]], lean: 0, rise: -0.028405 },
   // One arm raised in a curve over the head, the other out, the feet crossed behind.
   third: { arms: [[140, 200], [75, 72]], legs: [[2, 1], [-3, 6]], lean: 0, rise: 0 },
   // As third, but the low arm reaches forward and the legs are split fore and aft: the whole point of
