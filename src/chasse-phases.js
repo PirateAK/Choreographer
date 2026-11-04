@@ -1,4 +1,5 @@
-// Provisional three-phase chassé support scheduling. SUPPORT SCHEDULING ONLY: not a validated chassé.
+// Provisional three-phase chassé support analysis. SUPPORT ANALYSIS ONLY: not motion, not a pelvis path,
+// not a validated chassé. The track holds one pose; it does not describe travel between phases.
 // Geometry is the existing chasse pose, unchanged. The feet float 33–40 mm above the floor reference in
 // this pose, so the load schedule does not establish valid physical contact or balance until the geometry
 // is addressed. Phase timing (CHASSE_PHASE_MS) is provisional. Not school-approved. No flight phase.
@@ -12,7 +13,7 @@ import { feetPlaceOf, FLOOR_REF, joints, toeDirection } from './pose.js';
 import { compileFootSchedule } from './foot-scheduler.js';
 import { sampleFootTrajectory } from './foot-trajectory.js';
 
-export const CHASSE_STATUS = 'support scheduling only; not a validated chassé (feet float above the floor reference)';
+export const CHASSE_STATUS = 'support analysis only; not motion, not a validated chassé (feet float above the floor reference)';
 export const CHASSE_PHASE_MS = 400; // provisional duration of each phase, milliseconds
 export const CHASSE_CONTACT_TOL = 0.002; // body units, same tolerance as the basic-movement review
 // Base geometry, same solver assumptions as the basic-movement review (not school-measured).
@@ -118,8 +119,8 @@ export function chassePhaseReadings(spec, opts = {}) {
       validated: false,
     };
   });
-  // Pelvis change at each phase boundary. The schedule holds one pose, so the pelvis does not move between
-  // phases; the zero change is reported as is and is not a travelling step.
+  // Pelvis change at each phase boundary. The track holds one pose, so the zero change follows from that
+  // construction; it is not evidence of a travelling movement, and no pelvis path is defined here.
   for (let i = 1; i < rows.length; i++) {
     const prev = rows[i - 1].pelvis;
     const cur = rows[i].pelvis;

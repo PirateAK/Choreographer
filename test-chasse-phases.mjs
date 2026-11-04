@@ -1,5 +1,5 @@
-// Engine check for the provisional chassé support schedule. SUPPORT SCHEDULING ONLY: not a validated chassé,
-// not ballet certification. Verifies: the schedule compiles; phase timing matches the provisional constant;
+// Engine check for the provisional chassé support analysis. SUPPORT ANALYSIS ONLY: not motion, not a validated
+// chassé, not ballet certification. Verifies: the track compiles; phase timing matches the provisional constant;
 // contact flags per phase; loads transfer with a sum of 1 in double support; ankles hold pose positions; and
 // the readings flag feet that float above the floor reference.
 import assert from 'node:assert/strict';
@@ -17,7 +17,7 @@ const P = sched.phases;
 assert.equal(P.length, 3, 'three phases');
 assert.deepEqual(P.map((p) => p.name), CHASSE_PHASES.map((p) => p.name));
 for (const p of P) assert.equal(p.end - p.start, CHASSE_PHASE_MS, `${p.name} duration`);
-assert.match(CHASSE_STATUS, /support scheduling only/);
+assert.match(CHASSE_STATUS, /support analysis only/);
 
 // Loads at phase boundaries: left-support (1,0), double (1 -> 0 left, 0 -> 1 right), right-support (0,1).
 near(at(P[0].start).left.load, 1, 'start left'); near(at(P[0].start).right.load, 0, 'start right');
@@ -65,8 +65,8 @@ for (const r of rows) {
   assert.ok(Number.isFinite(r.pelvis.pelvisY) && r.pelvis.pelvisY > 0, `${r.name} pelvis height is finite and above the deck`);
   near(r.pelvis.pelvisYPhysicalMm, r.pelvis.pelvisY * 1.7 * 1000, `${r.name} physical mm conversion`, 1e-6);
 }
-// Transitions: the schedule holds one pose, so the pelvis does not move between phases (zero change). This
-// pins the current limitation; a schedule that moves the pelvis must update this check.
+// Transitions: the track holds one pose, so the pelvis change is zero by construction. This is not evidence
+// of travel; a track that moves the pelvis must update this check and the status label.
 assert.equal(rows[0].transitionFromPrev, null, 'first phase has no previous transition');
 for (const r of rows.slice(1)) {
   near(r.transitionFromPrev.dx, 0, `${r.name} transition dx`, 1e-9);
