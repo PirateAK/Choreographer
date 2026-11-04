@@ -46,14 +46,15 @@ export const POSE_SPECS = {
   // Feet together, arms curved low in front: the pose a class starts from.
   first: { arms: [[32, -8], [32, -8]], legs: [[2, 1], [2, 1]], lean: 0, rise: 0 },
   // The wide one: arms open at shoulder height, feet a stride apart.
-  // Provisional preview: rise −0.028405 sinks the body so both ankles sit on the flat-foot floor reference (0.010). Not school-approved.
-  second: { arms: [[72, 80], [72, 80]], legs: [[20, 18], [20, 18]], lean: 0, rise: -0.028405 },
+  // Provisional preview: rise −0.0282072 sinks the body so both ankles sit on the first-position floor reference (0.010198). Not school-approved.
+  second: { arms: [[72, 80], [72, 80]], legs: [[20, 18], [20, 18]], lean: 0, rise: -0.0282072 },
   // One arm raised in a curve over the head, the other out, the feet crossed behind.
   third: { arms: [[140, 200], [75, 72]], legs: [[2, 1], [-3, 6]], lean: 0, rise: 0 },
   // As third, but the low arm reaches forward and the legs are split fore and aft: the whole point of
   // the position is the axis the elevation has never had. The hips come down to pay for it, which is
   // what a dancer does — a fore-and-aft split cannot be made with the legs at their length.
-  fourth: { arms: [[140, 200], [45, 30]], legs: [[22.087, -13.04, 22.978], [4.483, -30.454, -21.077]], lean: 0, rise: -0.02 },
+  // Provisional preview (Root A): rise −0.0648006 and back knee −28.53349 level both feet at the 0.010198 floor reference. Balance −2 mm stays a provisional warning. Not school-approved.
+  fourth: { arms: [[140, 200], [45, 30]], legs: [[22.087, -13.04, 22.978], [4.483, -28.53349, -21.077]], lean: 0, rise: -0.0648006 },
   // Both arms rounded above the head, feet crossed tightly: the closed position.
   fifth: { arms: [[138, 196], [138, 196]], legs: [[2, 1], [-4, 8]], lean: 0, rise: 0 },
   // One foot stretched out to touch the floor, the other carrying the weight. Devant: the working leg
