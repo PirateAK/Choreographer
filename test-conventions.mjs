@@ -146,4 +146,14 @@ console.log(`provisional in use (${summary.provisionalInUse.length}): ${summary.
 console.log(`school-approved in use (${summary.approvedInUse.length}): ${summary.approvedInUse.join(', ') || 'none'}`);
 console.log(`unset (${summary.unset.length}): ${summary.unset.join(', ')}`);
 
+// Chassé school decisions: recorded as unset notes, never inferred from the current pose.
+for (const id of ['chasse.lunge_depth', 'chasse.balance_expectation']) {
+  const row = CONVENTIONS.find((c) => c.id === id);
+  assert.ok(row, `${id} row exists`);
+  assert.equal(row.status, 'unset', `${id} is unset`);
+  assert.equal(row.value, null, `${id} holds no value`);
+  assert.match(row.school_method, /school decision to revisit/i, `${id} records the decision`);
+  assert.ok(summary.unset.includes(id), `${id} listed in unset summary`);
+}
+
 console.log('conventions: ok');

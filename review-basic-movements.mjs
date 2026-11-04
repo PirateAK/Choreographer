@@ -105,13 +105,21 @@ for (const id of scored) {
     findings.contact.push({ id, ok: true, below: con.below, gaps: con.gaps, na: true });
     console.log(`${id.padEnd(15)} balance n/a (${CHASSE_STATUS}) static margin ${bal.margin == null ? '-' : bal.margin.toFixed(3)}   contact n/a support gap mm ${con.gaps.map((g) => (g * 1000).toFixed(1)).join(',') || '-'} below ${con.below}`);
     // Provisional phase readings (src/chasse-phases.js). Shown, not scored; timing and contact states are provisional.
+    // Per phase: foot contact, free-foot clearance, pelvis x against the support base, height and transition.
+    // Pelvis-vs-base is a diagnostic reading (the static balance margin), not a pass/fail criterion.
+    const mm = (v) => (v * 1000).toFixed(1);
     for (const r of chassePhaseReadings(spec)) {
-      const pb = balanceOf(spec, id, r.supportIdx);
-      const freeTxt = r.freeGap == null ? '' : `   free ${r.freeAboveRef ? 'at/above ref' : 'BELOW ref'} (${(r.freeGap * 1000).toFixed(1)} mm)`;
+      const pb = r.pelvis;
+      const freeTxt = r.freeGap == null ? '' : `   free ${r.freeAboveRef ? 'at/above ref' : 'BELOW ref'} (${mm(r.freeGap)} mm review / ${(r.freeGap * 1.7 * 1000).toFixed(1)} mm phys)`;
       const floatTxt = r.floating.length ? `   FLOATING ${r.floating.join('+')}` : '';
-      console.log(`  phase ${r.name.padEnd(15)} contact ${r.support.join('+').padEnd(11)} balance margin ${pb.margin == null ? '-' : pb.margin.toFixed(3)} ${pb.ok ? 'in base' : 'outside base'}   gaps mm L ${(r.gaps.left * 1000).toFixed(1)} R ${(r.gaps.right * 1000).toFixed(1)}${freeTxt}${floatTxt}`);
+      const baseTxt = `pelvis x ${mm(pb.pelvisX)} mm review, base [${mm(pb.baseX[0])}, ${mm(pb.baseX[1])}]`;
+      const offTxt = pb.inside ? 'inside base' : `OUTSIDE base by ${mm(Math.abs(pb.offsetX))} mm review / ${Math.abs(pb.offsetXPhysicalMm).toFixed(1)} mm phys`;
+      const trTxt = r.transitionFromPrev ? `   transition from prev dx ${mm(r.transitionFromPrev.dx)} mm, dy ${mm(r.transitionFromPrev.dy)} mm review / ${r.transitionFromPrev.dyPhysicalMm.toFixed(1)} mm phys` : '';
+      console.log(`  phase ${r.name.padEnd(15)} contact ${r.support.join('+').padEnd(11)} gaps mm L ${mm(r.gaps.left)} R ${mm(r.gaps.right)}${freeTxt}${floatTxt}`);
+      console.log(`    ${baseTxt}; ${offTxt}; margin ${pb.margin.toFixed(3)} (diagnostic, unscored)   pelvis height ${pb.pelvisY.toFixed(3)} bu${trTxt}`);
     }
     continue;
+
   }
   findings.balance.push({ id, ok: bal.ok, margin: bal.margin });
   if (RAISED[id]) {

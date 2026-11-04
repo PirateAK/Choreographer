@@ -126,6 +126,18 @@ export const CONVENTIONS = [
     measurement_reference: 'ankle height (ball of the foot when risen) above the deck, the contact landmark for flat-foot poses',
     school_method: 'Provisional. The first-position ankle height in this rig, shared by plié, second, fourth, and the basic review (pose.js FLOOR_REF). Not a measured shoe or sole height.',
   },
+  {
+    id: 'chasse.lunge_depth', kind: 'note', applied: false, value: null, status: 'unset',
+    label: 'Chassé lunge depth (school decision to revisit)', unit: 'text',
+    measurement_reference: 'depth of the lunge in the chassé pose: the hip and knee angles of each leg, named by the school',
+    school_method: 'Unset: school decision to revisit. The current chassé pose keeps its lunge angles (25/20 and −25/−15) unchanged; this row does not validate them and no value is inferred from the pose.',
+  },
+  {
+    id: 'chasse.balance_expectation', kind: 'note', applied: false, value: null, status: 'unset',
+    label: 'Chassé balance expectation (school decision to revisit)', unit: 'text',
+    measurement_reference: 'where the pelvis is expected relative to the support base in each chassé phase (inside the base, or allowed to travel beyond it)',
+    school_method: 'Unset: school decision to revisit. Static balance is a diagnostic reading for the chassé, not a pass/fail criterion, until the school defines the expectation for each phase.',
+  },
 ];
 
 const BY_ID = Object.fromEntries(CONVENTIONS.map((c) => [c.id, c]));

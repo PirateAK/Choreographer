@@ -52,7 +52,28 @@ assert.deepEqual(rows[1].floating, ['left', 'right'], 'current pose floats both 
 assert.deepEqual(rows[0].floating, ['left'], 'left support foot floats in the current pose');
 assert.ok(Math.abs(rows[0].gaps.left) > CHASSE_CONTACT_TOL, 'the floating gap is real, not hidden');
 
+// Pelvis against the support base (diagnostic). Margins equal the review's static balance readings for the
+// same support sets (left -0.194, double -0.082, right -0.082 body units), so the new reading has not drifted.
+const near3 = (a, b, label) => assert.ok(Math.abs(a - b) <= 0.0005, `${label}: ${a} vs ${b}`);
+near3(rows[0].pelvis.margin, -0.194, 'left-support pelvis margin');
+near3(rows[1].pelvis.margin, -0.082, 'double-support pelvis margin');
+near3(rows[2].pelvis.margin, -0.082, 'right-support pelvis margin');
+for (const r of rows) {
+  assert.equal(r.pelvis.inside, r.pelvis.margin >= 0, `${r.name} inside flag follows margin`);
+  if (r.pelvis.inside) assert.equal(r.pelvis.offsetX, 0, `${r.name} no x offset when inside`);
+  else assert.ok(r.pelvis.offsetX !== 0 || r.pelvis.margin < 0, `${r.name} outside reading is consistent`);
+  assert.ok(Number.isFinite(r.pelvis.pelvisY) && r.pelvis.pelvisY > 0, `${r.name} pelvis height is finite and above the deck`);
+  near(r.pelvis.pelvisYPhysicalMm, r.pelvis.pelvisY * 1.7 * 1000, `${r.name} physical mm conversion`, 1e-6);
+}
+// Transitions: the schedule holds one pose, so the pelvis does not move between phases (zero change). This
+// pins the current limitation; a schedule that moves the pelvis must update this check.
+assert.equal(rows[0].transitionFromPrev, null, 'first phase has no previous transition');
+for (const r of rows.slice(1)) {
+  near(r.transitionFromPrev.dx, 0, `${r.name} transition dx`, 1e-9);
+  near(r.transitionFromPrev.dy, 0, `${r.name} transition dy`, 1e-9);
+}
+
 console.log('chasse support scheduling: ok (' + CHASSE_STATUS + ')');
 for (const r of rows) {
-  console.log(`${r.name.padEnd(15)} contact ${r.support.join('+').padEnd(11)} loads start L${r.loadsStart.left} R${r.loadsStart.right} end L${r.loadsEnd.left} R${r.loadsEnd.right} floating ${r.floating.join('+') || 'none'} gaps mm L ${(r.gaps.left * 1000).toFixed(1)} R ${(r.gaps.right * 1000).toFixed(1)}`);
+  console.log(`${r.name.padEnd(15)} contact ${r.support.join('+').padEnd(11)} loads start L${r.loadsStart.left} R${r.loadsStart.right} end L${r.loadsEnd.left} R${r.loadsEnd.right} floating ${r.floating.join('+') || 'none'} gaps mm L ${(r.gaps.left * 1000).toFixed(1)} R ${(r.gaps.right * 1000).toFixed(1)} pelvis margin ${r.pelvis.margin.toFixed(3)} ${r.pelvis.inside ? 'inside' : 'outside'} base`);
 }
