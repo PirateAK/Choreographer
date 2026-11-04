@@ -17,6 +17,8 @@ const FLOOR_REF = FLOOR_REF_SHARED;
 
 const basic = ['first', 'second', 'third', 'fourth', 'fifth', 'tendu', 'plie', 'releve', 'arabesque', 'attitude', 'pirouette', 'chasse', 'pas-de-bourree'];
 const scored = basic; // fourth is scored for balance/contact/continuity; only spacing checks are excluded
+// Travelling steps: their static balance and contact are shown as n/a until support phases are defined (see the chassé review).
+const travelling = new Set(['chasse']);
 const findings = { balance: [], contact: [], continuity: [], transitions: [] };
 const provisional = previewSummary().provisionalInUse;
 
@@ -84,6 +86,13 @@ for (const id of scored) {
   const spec = specOf(id);
   const bal = balanceOf(spec, id);
   const con = contactOf(spec, id);
+  if (travelling.has(id)) {
+    // Travelling step: support changes over time. The static numbers are shown but not scored until its phases are defined.
+    findings.balance.push({ id, ok: true, margin: bal.margin, na: true });
+    findings.contact.push({ id, ok: true, below: con.below, gaps: con.gaps, na: true });
+    console.log(`${id.padEnd(15)} balance n/a (travelling, phases pending) static margin ${bal.margin == null ? '-' : bal.margin.toFixed(3)}   contact n/a support gap mm ${con.gaps.map((g) => (g * 1000).toFixed(1)).join(',') || '-'} below ${con.below}`);
+    continue;
+  }
   findings.balance.push({ id, ok: bal.ok, margin: bal.margin });
   findings.contact.push({ id, ok: con.ok, below: con.below, gaps: con.gaps });
   console.log(`${id.padEnd(15)} balance ${bal.ok ? 'pass' : 'FAIL'} margin ${bal.margin == null ? '-' : bal.margin.toFixed(3)}   contact ${con.ok ? 'pass' : 'FAIL'} support gap mm ${con.gaps.map((g) => (g * 1000).toFixed(1)).join(',') || '-'} below ${con.below}`);

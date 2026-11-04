@@ -62,9 +62,15 @@ export const CONVENTIONS = [
   },
   {
     id: 'pas-de-bourree.rise', kind: 'rise', pose: 'pas-de-bourree', applied: true, value: 0.02, min: 0, max: 0.1, status: 'provisional',
-    label: 'Pas de bourrée', unit: 'body height (1 = dancer height)',
-    measurement_reference: 'vertical distance from the floor to the ball of the foot on the pointe behind',
-    school_method: 'Pending the syllabus. Confirm value and whether demi-pointe or pointe.',
+    label: 'Pas de bourrée body rise (applied to the pose)', unit: 'body height (1 = dancer height); a body offset, not a ball height',
+    measurement_reference: 'body rise applied to the pose (positive lifts the body and the support ankle relative to the floor reference)',
+    school_method: 'Provisional. Today this value is applied as a body rise in POSE_SPECS, which is not the ball height. Proposed: the back-ball lift moves to pas-de-bourree.back_ball_lift and the body rise is re-solved. Awaiting school review.',
+  },
+  {
+    id: 'pas-de-bourree.back_ball_lift', kind: 'rise', pose: 'pas-de-bourree', applied: false, value: 0.02, min: 0, max: 0.1, status: 'provisional',
+    label: 'Pas de bourrée back-ball lift (provisional target)', unit: 'body height above the flat-foot reference (FLOOR_REF 0.010198); 1 = dancer height',
+    measurement_reference: 'vertical lift of the back foot ball above FLOOR_REF, measured from the flat-foot reference (not the floor plane y = 0)',
+    school_method: 'Provisional interpretation: back ball raised from the floor; 0.020 is a preview target only, not a school-approved value. Recorded, not applied: the pose geometry is unchanged until the proposal is approved. Pending school review of demi-pointe or pointe.',
   },
   {
     id: 'plie.depth', kind: 'measure', applied: true, value: 42.68, min: 17.9, max: 90, status: 'provisional',
