@@ -1832,6 +1832,8 @@ function bindPanelEvents() {
         item.h = Math.max(0.2, Math.min(lim, Number(e.target.value) || 0.8));
       } else if (f === 'span') {
         item.span = Math.max(0.5, Math.min(maxClothSpan(state.show.stage), Number(e.target.value) || state.show.stage.width));
+        // The field shows what is stored, so a value past the limit is seen to be capped.
+        if (Number(e.target.value) !== item.span) e.target.value = String(item.span);
         // Narrowing frees it to move, widening squeezes it back to the middle.
         item.x = clampClothX(item.x, item.span);
         // The Across field's limits and value depend on the width, so refresh it
