@@ -1285,9 +1285,9 @@ function rebuildPanels() {
           <button class="del" data-act="del" title="Remove this costume; anyone wearing it goes back to their own colour">×</button>
         </div>
         <div class="row">
-          <span class="label">Body</span><input type="color" data-f="body" value="${c.body}" title="Body and tights">
-          <span class="label">Skirt</span><input type="color" data-f="skirt" value="${c.skirt}" title="Skirt or tunic">
-          <span class="label">Hair</span><input type="color" data-f="hair" value="${c.hair}" title="Hair">
+          <span class="label">Body</span><input type="color" data-f="body" value="${c.body}" title="Body and tights"><input type="text" class="hex" data-hex="body" value="${c.body}" maxlength="7" spellcheck="false" aria-label="Body colour as hex" title="Hex, e.g. #e0b08a">
+          <span class="label">Skirt</span><input type="color" data-f="skirt" value="${c.skirt}" title="Skirt or tunic"><input type="text" class="hex" data-hex="skirt" value="${c.skirt}" maxlength="7" spellcheck="false" aria-label="Skirt colour as hex" title="Hex, e.g. #e0b08a">
+          <span class="label">Hair</span><input type="color" data-f="hair" value="${c.hair}" title="Hair"><input type="text" class="hex" data-hex="hair" value="${c.hair}" maxlength="7" spellcheck="false" aria-label="Hair colour as hex" title="Hex, e.g. #e0b08a">
         </div>
         <div class="row">
           <span class="label">Cut</span>
@@ -2329,7 +2329,36 @@ function bindPanelEvents() {
       const sw = host.querySelector('.swatch');
       if (sw) sw.style.background = e.target.value;
     }
+    const hex = host.querySelector(`input[data-hex="${f}"]`);
+    if (hex) hex.value = e.target.value;
     persist();
+  });
+  // Hex text entry beside each colour swatch. Firefox's colour picker has no hex field,
+  // so typed values are accepted here when they are a full #rrggbb.
+  wardrobe.addEventListener('change', (e) => {
+    const host = e.target.closest('[data-costume]');
+    const f = e.target.dataset.hex;
+    if (!host || !f) return;
+    const c = state.show.costumes.find((x) => x.id === host.dataset.costume);
+    if (!c) return;
+    const raw = e.target.value.trim();
+    const v = /^#?([0-9a-f]{6})$/i.exec(raw);
+    if (!v) {
+      e.target.value = c[f];
+      return;
+    }
+    const hex = `#${v[1].toLowerCase()}`;
+    commit();
+    c[f] = hex;
+    e.target.value = hex;
+    const picker = host.querySelector(`input[type="color"][data-f="${f}"]`);
+    if (picker) picker.value = hex;
+    if (f === 'body') {
+      const sw = host.querySelector('.swatch');
+      if (sw) sw.style.background = hex;
+    }
+    persist();
+    app.rebuild();
   });
   wardrobe.addEventListener('change', (e) => {
     const host = e.target.closest('[data-costume]');
