@@ -3022,6 +3022,16 @@ function paintView() {
     b.setAttribute('aria-pressed', on ? 'true' : 'false');
     b.textContent = on ? '⛶ Both' : which === 'plan' ? 'Top-down' : '⛶ Fill';
   }
+  // The header button names the view it will take you to: Top-down while the plan is
+  // not filling, Elevation while it is.
+  const headerTopDown = $('btnTopDown');
+  if (headerTopDown) {
+    const plan = filling === 'plan';
+    headerTopDown.textContent = plan ? 'Elevation' : 'Top-down';
+    headerTopDown.title = plan ? 'Fill the centre with the elevation' : 'Open the overhead stage plan';
+    headerTopDown.classList.toggle('on', plan);
+    headerTopDown.setAttribute('aria-pressed', String(plan));
+  }
   for (const [id, key] of [['btnPaths', 'showPaths'], ['btnStations', 'showStations']]) {
     const on = state.ui[key] !== false;
     $(id).classList.toggle('on', on);
@@ -4476,7 +4486,11 @@ function boot() {
   $('btnFoldAll').addEventListener('click', foldAllSections);
 
   // one view at a time, and how the elevation reads distance
-  $('btnTopDown').addEventListener('click', () => setFill('plan'));
+  $('btnTopDown').addEventListener('click', () => {
+    // From the plan, the button leads on to the elevation; from anywhere else it opens the plan.
+    if (state.ui.fill === 'plan') setFill('elevation');
+    else setFill('plan');
+  });
   $('btnFillPlan').addEventListener('click', () => setFill('plan'));
   for (const [id, key] of [['btnPaths', 'showPaths'], ['btnStations', 'showStations']]) {
     $(id).addEventListener('click', () => {
