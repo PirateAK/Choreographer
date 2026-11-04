@@ -231,7 +231,7 @@ export class Timeline {
         label: s.name,
         kind: 'sceneryCue',
         color: s.color,
-        visible: true,
+        visible: s.visible !== false,
         scenery: s,
         selected: state.ui.selectedTrack === s.id,
       });
@@ -2068,6 +2068,14 @@ export class Timeline {
           // cues stay where they are, so the eye is a view, not a deletion.
           tr.light.visible = tr.light.visible === false;
           if (!tr.light.visible && state.ui.lightId === tr.light.id) state.ui.lightId = null;
+        } else if (tr.kind === 'sceneryCue') {
+          // The eye on a curtain, drop or screen is the same switch as the one in the
+          // Scenery panel: it takes the piece out of every view, and its cues stay put.
+          tr.scenery.visible = tr.scenery.visible === false;
+          if (!tr.scenery.visible && state.ui.selectedId === tr.scenery.id) {
+            state.ui.selectedId = null;
+            state.ui.stationIdx = null;
+          }
         } else {
           show.trackVis[tr.id] = !show.trackVis[tr.id];
         }
