@@ -241,6 +241,8 @@ export class NarrationEngine {
     const want = new Map();
     if (audible) {
       for (const c of clips) {
+        // A clip with no speaker is silent: nothing sounds from the house without a voice on stage.
+        if (!c.speaker) continue;
         if (showMs >= c.at && showMs < c.at + (c.length || 0) && (c.length || 0) > 0) want.set(c.id, c);
       }
     }

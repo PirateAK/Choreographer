@@ -11,6 +11,7 @@ import {
   clothDepth, dropStack, actRanges, actAt, addAct, removeAct, actHasWork, ACT_MIN_MS, ACT_MAX_MS, sceneryStateAt, totalActLength,
   activeMusicAt, addMusicTrack, removeMusicTrack, setMusicStart, musicSpan,
   narrationAt, narrationSpan, addNarration, removeNarration, setNarrationAt, renameNarration,
+  setNarrationSpeaker, clipsSpokenBy,
   nextNarrationName, STEPS,
   addLight, removeLight, addLightCue, updateLightCue, removeLightCue, lightLevelAt,
   LIGHT_TYPES, LIGHT_GOBOS, LIGHT_GELS, LIGHT_SPREAD_BY_TYPE,
@@ -746,13 +747,29 @@ function voiceItem(c) {
         <button class="tag pick" data-voice-act="seek" title="Put the playhead at the start of this piece">go</button>
       </div>
       <div class="row">
+        <span class="label">speaker</span>
+        <select data-f="voice-speaker" aria-label="Who speaks this piece">${speakerOptions(c.speaker)}</select>
+      </div>
+      <div class="row">
         <span class="tag">${c.length ? fmtTime(c.length) + ' long' : 'length unknown'}</span>
         <span class="tag">ends ${fmtTime(end)}</span>
       </div>
       <div class="row live-row" title="Whether this piece is speaking at the playhead"><span class="label">now</span><span class="tag live" data-voice-live="${c.id}">${voiceLive(c)}</span></div>
       ${missing ? '<p class="hint">The recording for this piece is not in this browser. Record it again or attach the file — the piece keeps its moment.</p>' : ''}
+      ${c.speaker ? '' : '<p class="hint">Unattached: silent until a speaker is chosen, or delete it.</p>'}
       ${over.length ? `<p class="hint">Speaks at the same time as ${over.map((x) => esc(x.name)).join(', ')} — both will be heard.</p>` : ''}
     </div>`;
+}
+
+// Who can speak a clip: the cast, in number order, with unattached (silent) first.
+function speakerOptions(selected) {
+  const cast = [...(state.show.cast || [])].sort((a, b) => a.number - b.number);
+  const missing = selected && !cast.some((d) => d.id === selected);
+  return (
+    `<option value="">Unattached (silent)</option>` +
+    (missing ? `<option value="${esc(selected)}" selected>Missing speaker</option>` : '') +
+    cast.map((d) => `<option value="${esc(d.id)}"${d.id === selected ? ' selected' : ''}>${esc(d.name)}</option>`).join('')
+  );
 }
 
 function voiceOverlaps(c) {
@@ -2587,6 +2604,14 @@ function bindPanelEvents() {
       return;
     }
     if (!e.target.closest('[data-act="del-dancer"]')) return;
+    // A speaker cannot leave while clips are still attached: they are un-attached or deleted first.
+    const spoken = clipsSpokenBy(state.show, state.ui.selectedId);
+    if (spoken.length) {
+      state.ui.hint = `Not removed: ${spoken.map((c) => c.name).join(', ')} ${spoken.length === 1 ? 'is' : 'are'} attached to this speaker. Set the speaker to Unattached or delete the clip first.`;
+      state.ui.dirtyPanels = true;
+      app.rebuild();
+      return;
+    }
     commit();
     const goneId = state.ui.selectedId;
     state.show.cast = state.show.cast.filter((d) => d.id !== goneId);
@@ -4280,14 +4305,47 @@ function boot() {
       });
   });
 
+  $('btnVoiceFolder').addEventListener('click', () => $('folderNarration').click());
+  // A folder of numbered recordings: taken in file-name order (01, 02, … 10), one after
+  // another from the end of the narration already in the show, unattached until a speaker is chosen.
+  $('folderNarration').addEventListener('change', async (e) => {
+    const files = [...(e.target.files || [])]
+      .filter((f) => /^audio\//.test(f.type) || /\.(wav|mp3|m4a|ogg|webm|flac|aac)$/i.test(f.name))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+    e.target.value = '';
+    if (!files.length) {
+      state.ui.hint = 'No audio files in that folder';
+      app.rebuild();
+      return;
+    }
+    commit();
+    let placed = 0;
+    for (const file of files) {
+      state.ui.hint = `Reading ${file.name} (${placed + 1} of ${files.length})…`;
+      state.ui.dirtyPanels = true;
+      try {
+        const info = await narration.attachFile(file);
+        addNarration(state.show, { key: info.key, name: file.name.replace(/\.[^.]+$/, ''), length: info.length });
+        placed += 1;
+      } catch {
+        // An unreadable file is skipped; the count below says how many made it.
+      }
+    }
+    state.ui.hint = `Imported ${placed} of ${files.length} clips — choose a speaker for each`;
+    state.ui.dirtyPanels = true;
+    app.rebuild();
+  });
+
   $('voiceRow').addEventListener('change', (e) => {
     const host = e.target.closest('[data-voice]');
     const c = host ? voiceById(host.dataset.voice) : null;
     if (!c) return;
     const f = e.target.dataset.f;
-    if (f === 'voice-name') {
+    if (f === 'voice-speaker') {
       commit();
-      renameNarration(state.show, c.id, e.target.value);
+      setNarrationSpeaker(state.show, c.id, e.target.value);
+      app.rebuild();
+    } else if (f === 'voice-name') {
       app.rebuild();
     } else if (f === 'voice-at') {
       const secs = Number(e.target.value);

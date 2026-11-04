@@ -2205,6 +2205,8 @@ export function addNarration(show, data) {
     name: String((data && data.name) || 'Narration') || 'Narration',
     at,
     length: Math.max(0, Math.round(Number(data && data.length) || 0)),
+    // The cast member who speaks the clip. None means silent until one is chosen.
+    speaker: data && data.speaker ? String(data.speaker) : null,
   };
   list.push(clip);
   list.sort((a, b) => a.at - b.at);
@@ -2232,6 +2234,21 @@ export function renameNarration(show, id, name) {
 export function removeNarration(show, id) {
   if (!show || !Array.isArray(show.narration)) return;
   show.narration = show.narration.filter((c) => c.id !== id);
+}
+
+// Who speaks a clip. An empty choice leaves it unattached, which is silent.
+export function setNarrationSpeaker(show, id, castId) {
+  const clip = ((show && show.narration) || []).find((c) => c.id === id);
+  if (!clip) return null;
+  clip.speaker = castId ? String(castId) : null;
+  return clip;
+}
+
+// The clips a cast member speaks. Removing that member is blocked while any remain,
+// so the clips can be un-attached or deleted first.
+export function clipsSpokenBy(show, castId) {
+  if (!castId) return [];
+  return ((show && show.narration) || []).filter((c) => c.speaker === castId);
 }
 
 // The name a new take is given, so three recordings are told apart in a list.
