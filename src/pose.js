@@ -75,7 +75,8 @@ export const POSE_SPECS = {
   // Up on one pointe, the other foot at the knee, arms rounded to make a hoop.
   pirouette: { arms: [[35, -15], [35, -15]], legs: [[1, 0], [40, -35]], lean: 0, rise: 0.06 },
   // The travelling step that links two poses: crossed feet, one on the pointe behind.
-  'pas-de-bourree': { arms: [[58, 62], [58, 62]], legs: [[-6, -10], [-16, -22]], lean: 0, rise: 0.02 },
+  // Provisional preview (P2): back knee −16.0432 puts the back-ball lift at the 20 mm provisional target (FLOOR_REF + 0.020). Body rise unchanged. Not school-approved.
+  'pas-de-bourree': { arms: [[58, 62], [58, 62]], legs: [[-6, -10], [-16, -16.0432]], lean: 0, rise: 0.02 },
   // A lunge carrying the dancer across the stage, leaning the way they travel, and the weight going
   // forward over the front foot.
   chasse: { arms: [[55, 50], [55, 50]], legs: [[25, 20], [-25, -15]], lean: 6, rise: 0, rock: 5 },
