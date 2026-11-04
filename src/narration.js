@@ -41,6 +41,7 @@ export class NarrationEngine {
     this.recording = false;
     this.recordingSince = 0;
     this.finished = null;
+    this.captureAudioTap = false;
     // The permission prompt is asynchronous: a second click while it is open
     // must not open a second microphone.
     this.starting = false;
@@ -288,7 +289,7 @@ export class NarrationEngine {
   stopLive(id) {
     const entry = this.live.get(id);
     if (!entry) return;
-    this.live.delete(id);
+    this.captureTracks.delete(entry.gain);
     try {
       entry.source.onended = null;
       entry.source.stop();
@@ -299,6 +300,22 @@ export class NarrationEngine {
       entry.gain.disconnect();
     } catch (e) {
       /* already gone */
+    }
+  }
+
+  setCaptureAudioTap(enabled) {
+    this.captureAudioTap = enabled === true;
+    for (const entry of this.live.values()) {
+      if (!music.captureMix) continue;
+      try {
+        if (this.captureAudioTap) {
+          entry.gain.connect(music.captureMix);
+          this.captureTracks.set(entry.gain, true);
+        } else {
+          entry.gain.disconnect(music.captureMix);
+          this.captureTracks.delete(entry.gain);
+        }
+      } catch (error) { /* disconnecting an absent path is harmless */ }
     }
   }
 
@@ -326,17 +343,28 @@ export class NarrationEngine {
       gain = ctx.createGain();
       source.connect(gain);
       gain.connect(ctx.destination);
+      if (music.captureMix && this.captureAudioTap) {
+        gain.connect(music.captureMix);
+        this.captureTracks.set(gain, true);
+      }
       source.start(0, offset / 1000);
     } catch (e) {
       return;
     }
     const entry = { source, gain, anchorCtx: ctx.currentTime, startOffset: offset };
+    if (music.captureMix && this.captureAudioTap) {
+      gain.connect(music.captureMix);
+      this.captureTracks.set(gain, true);
+    }
     this.live.set(clip.id, entry);
     source.onended = () => {
       // Only clear the entry if it is still this source: stopping one by hand
       // also fires this, and a restart replaces the entry.
       const now = this.live.get(clip.id);
-      if (now && now.source === source) this.live.delete(clip.id);
+      if (now && now.source === source) {
+        this.live.delete(clip.id);
+        this.captureTracks.delete(gain);
+      }
     };
   }
 }

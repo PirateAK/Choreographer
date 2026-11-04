@@ -1,7 +1,7 @@
 // Elevation: the stage as the house sees it — width across, height up. The plan
 // answers "where", this answers "how high, and can the audience see it".
 import {
-  THEME, state, posOfContent, propPosOfContent, objectShown, sceneryStateAt,
+  THEME, state, posOfContent, propPosOfContent, objectShown, sceneryTrackShown, sceneryStateAt,
   clothSpan, clothX, clothDepth, curtainLegW, lightLevelAt, lightSpot, costumeOf, evaluateMovement,
   localOfContent,
 } from './model.js';
@@ -100,7 +100,8 @@ export class ElevationView {
     return clothDepth(item);
   }
 
-  draw() {
+  draw({ clean = false } = {}) {
+    this.captureClean = !!clean;
     const show = state.show;
     const ctx = this.ctx;
     const dpr = window.devicePixelRatio || 1;
@@ -172,11 +173,13 @@ export class ElevationView {
 
     ctx.restore();
 
-    this.drawRuler(halfW, top, floor);
-    this.drawFrame(halfW, top);
-    this.drawClothNotes();
-    this.drawFlownOut(halfW, top);
-    this.drawTitle(w);
+    if (!this.captureClean) {
+      this.drawRuler(halfW, top, floor);
+      this.drawFrame(halfW, top);
+      this.drawClothNotes();
+      this.drawFlownOut(halfW, top);
+      this.drawTitle(w);
+    }
   }
 
   // Upstage first, so a downstage curtain covers what stands behind it.
@@ -184,6 +187,7 @@ export class ElevationView {
     const show = state.show;
     const items = [];
     for (const s of show.scenery) {
+      if (!sceneryTrackShown(show, s)) continue;
       if (s.kind === 'prop') continue;
       items.push({ kind: 'cloth', item: s, depth: this.layerDepth(s) });
     }
@@ -410,7 +414,7 @@ export class ElevationView {
     // Further upstage is further from the house, so the figure is smaller about the
     // same feet. The click box shrinks with it, because it is the same drawing.
     const s = this.scale * depthScale(p.y);
-    const focused = d.id === state.ui.selectedId;
+      const focused = d.id === state.ui.selectedId;
 
     // The position the station carries, eased towards the next one: this is what turns
     // a marker sliding across the stage into a dancer doing fifth, then arabesque.
@@ -596,7 +600,7 @@ export class ElevationView {
   // Anything above the opening is out of sight; say so rather than hiding it silently.
   drawFlownOut(halfW, top) {
     const out = state.show.scenery.filter((s) => {
-      if (s.kind !== 'drop') return false;
+      if (s.kind !== 'drop' || !sceneryTrackShown(state.show, s)) return false;
       return sceneryStateAt(s, state.ui.playhead).fly <= 0.02;
     });
     if (!out.length) return;

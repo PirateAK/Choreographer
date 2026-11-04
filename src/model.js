@@ -1549,6 +1549,12 @@ export function objectShown(obj) {
   return true;
 }
 
+// Non-prop scenery has its own timeline row: its eye is visibility, just like
+// cast/prop eyes, while cue timing and show metadata remain untouched.
+export function sceneryTrackShown(show, item) {
+  return !!show && !!item && show.trackVis?.[item.id] !== false;
+}
+
 // Dancers and props are both timed objects; either can be focused by id.
 export function findObject(show, id) {
   if (!show || !id) return null;

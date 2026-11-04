@@ -20,6 +20,7 @@
   <button id="btnReload" class="ghost" title="Reload a show from a JSON file">Reload</button>
   <button id="btnClear" class="ghost" title="Clear the stage for a new show — keeps dancers, costumes, props, cloth, lanterns, music, voice and every setting. Undo brings it back">Clear</button>
   <button id="btnTopDown" class="ghost" title="Open the overhead stage plan">Top-down</button>
+  <button id="btnCapture" class="ghost" title="Capture the current view or full app">Capture</button>
   <button id="btnWatch" class="ghost watch-link" title="Watch the show: the stage alone, with its music, from the top">▶ Watch</button>
   <a id="btnPrint" class="ghost print-link" href="print.html" target="_blank" rel="noopener" title="Open the printable stage plot, paths and cue sheet in a new tab">Print plan</a>
   <input id="fileImport" type="file" accept="application/json" hidden />
@@ -242,6 +243,28 @@
       <span id="movesWhere" class="moves-where"></span>
       <button id="btnMovesClose" class="ghost">Close</button>
     </header>
+  <div id="movesBody" class="moves-body"></div>
+    <p class="hint">Click a move to put it on the point being edited, then close this and look at the elevation. A position and a step belong to a stage station; a level to how that station meets the floor. Or choose a <b>phrase</b> at the top and place the whole step at once.</p>
+  </div>
+</div>
+
+<div id="captureSheet" class="moves-sheet" hidden>
+  <div class="moves-panel capture-panel" role="dialog" aria-modal="true" aria-labelledby="captureTitle">
+    <header class="moves-head">
+      <h2 id="captureTitle">Capture</h2>
+      <span class="moves-where">PNG stills · WebM recordings, subject to browser support</span>
+      <button id="btnCaptureClose" class="ghost">Close</button>
+    </header>
+    <div class="capture-controls">
+      <label>Capture area <select id="captureArea"><option value="center">Center view</option><option value="full">Full app window</option></select></label>
+      <label id="captureViewLabel">View <select id="captureView"><option value="house">House</option><option value="plan">Top-down</option><option value="elevation">Elevation</option></select></label>
+      <label id="captureAudioLabel">Recording audio <select id="captureAudio"><option value="none">No audio</option><option value="playback">Show playback</option><option value="microphone">Microphone</option></select></label>
+      <label class="check"><input id="captureHideUI" type="checkbox" /> Hide House playback controls</label>
+      <div class="capture-actions"><button id="btnScreenshot">Save screenshot</button><button id="btnRecordCapture" class="primary">● Record</button><button id="btnStopCapture" disabled>■ Stop &amp; save</button></div>
+      <p id="captureStatus" class="hint" role="status">Capture is read-only and does not start, stop, or seek playback.</p>
+    </div>
+  </div>
+</div>
     <div id="movesBody" class="moves-body"></div>
     <p class="hint">Click a move to put it on the point being edited, then close this and look at the elevation. A position and a step belong to a stage station; a level to how that station meets the floor. Or choose a <b>phrase</b> at the top and place the whole step at once.</p>
   </div>
@@ -261,7 +284,7 @@
 
 <script type="importmap">
 {"imports": {
-  "./src/app.js": "./src/app.js?v=scroll27",
+  "./src/app.js": "./src/app.js?v=scroll28",
   "./src/stage.js": "./src/stage.js?v=guide21",
   "./src/cheatsheet.js": "./src/cheatsheet.js?v=guide22",
   "./src/placement-guide.js": "./src/placement-guide.js?v=guide20",

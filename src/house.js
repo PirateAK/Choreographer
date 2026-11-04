@@ -2,7 +2,7 @@
 // perspective; all drawing stays on the supplied canvas.
 import {
   sceneryStateAt, posOfContent, evaluateMovement, localOfContent, feetOnFloor,
-  propPosOfContent, objectShown, costumeOf, dancerHeight, clothDepth,
+  propPosOfContent, objectShown, sceneryTrackShown, costumeOf, dancerHeight, clothDepth,
 } from './model.js';
 import { drawPose, darker } from './pose.js';
 
@@ -33,6 +33,7 @@ export class HouseView {
   useDepth(enabled) { this.setDepth(enabled); }
 
   draw(show, contentTimeMs = 0, videoElement = null) {
+    this.captureClean = false;
     const ctx = this.ctx;
     if (!ctx) return;
     const w = this.width;
@@ -117,8 +118,8 @@ export class HouseView {
     ctx.beginPath();
     ctx.rect(left, stageTop, openingW, floorFront - stageTop);
     ctx.clip();
-    const scenery = Array.isArray(show.scenery) ? show.scenery : [];
-    const cloth = scenery.filter((item) => item && item.kind !== 'prop')
+    const scenery = Array.isArray(show.scenery) ? show.scenery.filter((item) => sceneryTrackShown(show, item)) : [];
+    const cloth = scenery.filter((item) => item && item.kind !== 'prop' && sceneryTrackShown(show, item))
       .slice().sort((a, b) => clothDepth(b) - clothDepth(a));
     for (const item of cloth) this._drawScenery(item, contentTimeMs, videoElement, {
       ctx, show, stageW, stageD, openingH, scale, half, xAt, floorAt, zScale,
@@ -161,7 +162,7 @@ export class HouseView {
     }
 
     // Dressing and movable props sit on the deck in front of the cloth and cast.
-    const props = scenery.filter((p) => p && p.kind === 'prop' && objectShown(p))
+    const props = scenery.filter((p) => p && p.kind === 'prop' && objectShown(p) && sceneryTrackShown(show, p))
       .map((item) => ({ item, p: propPosOfContent(show, item, contentTimeMs) }))
       .filter((v) => v.p).sort((a, b) => b.p.y - a.p.y);
     for (const { item, p } of props) {

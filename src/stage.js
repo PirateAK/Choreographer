@@ -2,7 +2,7 @@
 // dragging dancers (which writes keyframes at the playhead).
 import {
   THEME, state, posAtLocal, posOfContent, localOfContent, holdsFor, contentOfLocal, commit, persist,
-  addStation, objectShown, wingBays, findObject, propPosOfContent, carrierOf, sceneryStateAt,
+  addStation, objectShown, sceneryTrackShown, wingBays, findObject, propPosOfContent, carrierOf, sceneryStateAt,
   clothSpan, clothX, clothDepth, clothThick, clampClothX, curtainLegW, POSE_LABEL, lightLevelAt,
   lightSpot, costumeOf, legPoints, curveAt, BEND_LIMIT,
   footAtLocal, footSkate, legOverreach, dancerHeight, overheadPoseAtLocal,
@@ -76,7 +76,8 @@ export class StageView {
 
   /* ------------------------------------------------------------- drawing */
 
-  draw() {
+  draw({ clean = false } = {}) {
+    this.captureClean = !!clean;
     const show = state.show;
     const ctx = this.ctx;
     const dpr = window.devicePixelRatio || 1;
@@ -155,7 +156,7 @@ export class StageView {
     // Lighting first: a pool is what is already on the floor before anyone
     // walks into it, so it goes under the scenery and the cast.
     this.drawLightPools();
-    this.drawPlacementGuide(floor);
+    if (!this.captureClean) this.drawPlacementGuide(floor);
 
     // proscenium
     const pr = this.w2s(-halfW - st.wingDepth, 0);
@@ -168,7 +169,7 @@ export class StageView {
     ctx.stroke();
     ctx.lineWidth = 1;
 
-    if (!this.compact) {
+    if (!this.compact && !this.captureClean) {
       ctx.fillStyle = '#3b4a60';
       ctx.font = '10px "Segoe UI", system-ui, sans-serif';
       ctx.textAlign = 'center';
@@ -201,7 +202,7 @@ export class StageView {
 
     // paths: dancers, plus any prop that has stations
     const selected = findObject(show, state.ui.selectedId);
-    if (!this.compact) {
+    if (!this.compact && !this.captureClean) {
       for (const body of this.pathBodies()) {
         if (!objectShown(body)) continue;
         this.drawPath(body, body === selected);
@@ -216,10 +217,10 @@ export class StageView {
 
     // The lanterns themselves last, so a marker is never buried under a dancer
     // who is standing in the light.
-    if (!this.compact) this.drawLightMarkers();
+    if (!this.captureClean) this.drawLightMarkers();
 
     // collision
-    if (!this.compact && state.ui.collision) {
+    if (!this.compact && !this.captureClean && state.ui.collision) {
       for (const id of state.ui.collision.ids) {
         const d = show.cast.find((c) => c.number === id);
         if (!d) continue;
@@ -236,7 +237,7 @@ export class StageView {
     }
 
     // Last, so the guide and readout sit over everything else on the plan.
-    if (this.grab && this.grab.type === 'cloth') this.drawClothDrag(this.grab);
+    if (!this.captureClean && this.grab && this.grab.type === 'cloth') this.drawClothDrag(this.grab);
   }
 
   // A drag is judged by where the cloth was, where it is, and the number.
@@ -363,7 +364,8 @@ export class StageView {
     return clothDepth(item);
   }
 
-  drawScenery(item) {
+  drawScenery(item, { capture = false } = {}) {
+    if (item.kind !== 'prop' && !sceneryTrackShown(state.show, item)) return;
     const ctx = this.ctx;
     const st = state.show.stage;
     const halfW = st.width / 2;
@@ -537,6 +539,7 @@ export class StageView {
   }
 
   drawPath(dancer, strong) {
+    if (this.captureClean) return;
     const show = state.show;
     const ctx = this.ctx;
     const keys = dancer.keys;
@@ -659,6 +662,7 @@ export class StageView {
   }
 
   drawCast(d, selected) {
+    if (this.captureClean) selected = false;
     const ctx = this.ctx;
     const show = state.show;
     const p = posOfContent(show, d, state.ui.playhead);
@@ -668,7 +672,7 @@ export class StageView {
     const r = this.compact ? 3 : Math.max(4.5, Math.min(12, 0.26 * this.scale));
     const sp = this.w2s(p.x, p.y);
 
-    if (!this.compact && state.ui.showPaths !== false) {
+    if (!this.compact && !this.captureClean && state.ui.showPaths !== false) {
       // short ghost trail behind the playhead
       const trail = [];
       for (let back = 700; back >= 0; back -= 70) {
@@ -694,7 +698,7 @@ export class StageView {
     if (solved) this.drawOverhead(d, p, lt, solved);
     if (solved) this.drawFeet(d, lt, solved);
 
-    if (selected) {
+    if (!this.captureClean && selected) {
       ctx.beginPath();
       ctx.arc(sp.x, sp.y, r + 5, 0, Math.PI * 2);
       ctx.strokeStyle = THEME.accent;
@@ -720,7 +724,7 @@ export class StageView {
       ctx.lineWidth = 1;
     }
 
-    if (!this.compact) {
+    if (!this.compact && !this.captureClean) {
       ctx.fillStyle = 'rgba(230,240,252,.85)';
       ctx.font = 'bold 9px "Segoe UI", system-ui, sans-serif';
       ctx.textAlign = 'center';

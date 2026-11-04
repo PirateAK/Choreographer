@@ -2974,6 +2974,15 @@ function paintView() {
   $('btnCostumes').setAttribute('aria-pressed', String(state.ui.showCostumes === true));
   $('btnTilt').classList.toggle('on', !!state.ui.tiltMode);
   $('btnTilt').setAttribute('aria-pressed', String(!!state.ui.tiltMode));
+  // While the overhead is the filled view, the header button names the view it switches to.
+  const topDown = $('btnTopDown');
+  if (topDown) {
+    const plan = filling === 'plan';
+    topDown.textContent = plan ? 'Elevation' : 'Top-down';
+    topDown.title = plan ? 'Switch to the elevation view' : 'Open the overhead stage plan';
+    topDown.classList.toggle('on', plan);
+    topDown.setAttribute('aria-pressed', String(plan));
+  }
   $('stage').style.cursor = state.ui.tiltMode ? 'ns-resize' : '';
   const depth = $('btnDepth');
   if (depth) {
@@ -4324,7 +4333,7 @@ function boot() {
   $('btnFoldAll').addEventListener('click', foldAllSections);
 
   // one view at a time, and how the elevation reads distance
-  $('btnTopDown').addEventListener('click', () => setFill('plan'));
+  $('btnTopDown').addEventListener('click', () => setFill(state.ui.fill === 'plan' ? 'elevation' : 'plan'));
   $('btnFillPlan').addEventListener('click', () => setFill('plan'));
   for (const [id, key] of [['btnPaths', 'showPaths'], ['btnStations', 'showStations']]) {
     $(id).addEventListener('click', () => {

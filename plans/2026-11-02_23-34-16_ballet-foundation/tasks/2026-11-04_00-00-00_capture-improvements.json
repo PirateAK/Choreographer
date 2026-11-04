@@ -1,0 +1,22 @@
+[
+  {
+    "content": "[capture-1] Trace and add capture-clean render options without changing normal view rendering (self)",
+    "id": "capture-1",
+    "status": "in_progress"
+  },
+  {
+    "content": "[capture-2] Add capture controls, view-mode label update, PNG screenshot and WebM record/stop flows (self)",
+    "id": "capture-2",
+    "status": "pending"
+  },
+  {
+    "content": "[capture-3] Add deterministic composition/visibility/timing tests and browser capture checks (self)",
+    "id": "capture-3",
+    "status": "pending"
+  },
+  {
+    "content": "[capture-4] Run full regressions, inspect diff, commit locally; push only if requested (self)",
+    "id": "capture-4",
+    "status": "pending"
+  }
+]

@@ -16,6 +16,9 @@ export class MusicEngine {
   constructor() {
     this.ctx = null;
     this.gain = null;
+    this.captureBus = null;
+    this.captureMix = null;
+    this.captureTracks = new Map();
     this.buffer = null;
     this.peaks = null;
     this.ready = null;
@@ -88,7 +91,17 @@ export class MusicEngine {
     this.gain = this.ctx.createGain();
     this.gain.gain.value = this.effectiveGain();
     this.gain.connect(this.ctx.destination);
+    this.captureBus = this.ctx.createMediaStreamDestination();
+    this.captureMix = this.ctx.createGain();
+    this.captureMix.gain.value = 1;
+    this.captureMix.connect(this.captureBus);
+    this.gain.connect(this.captureMix);
     return this.ctx;
+  }
+
+  capturePlaybackStream() {
+    if (!this.ensure()) throw new Error('Show playback audio is not supported in this browser');
+    return this.captureBus.stream;
   }
 
   // Decode from the store, or take it from the cache. Resolves true only when
