@@ -841,8 +841,19 @@ function toggleRecording(at) {
       state.ui.hint = 'Recording from ' + fmtTime(voiceTakeAt) + ' — speak, then press Stop';
       app.rebuild();
     })
-    .catch(() => {
-      state.ui.hint = 'The microphone is blocked, or not there. Check this page\u2019s permission.';
+    .catch((err) => {
+      const name = err && err.name || 'Error';
+      const detail = err && err.message ? `: ${err.message}` : '';
+      const help = name === 'NotAllowedError'
+        ? 'Firefox denied microphone access. Recheck this site’s permission and system microphone privacy settings.'
+        : name === 'NotFoundError'
+          ? 'Firefox could not find a microphone input. Check that one is connected and enabled.'
+          : name === 'NotReadableError' || name === 'AbortError'
+            ? 'Firefox could not open the microphone. It may be unavailable or in use by another app.'
+            : name === 'OverconstrainedError'
+              ? 'The selected microphone does not meet the browser’s audio requirements.'
+              : 'Check Firefox’s microphone permission and available input devices.';
+      state.ui.hint = `${help} (${name}${detail})`;
       app.rebuild();
     });
 }
