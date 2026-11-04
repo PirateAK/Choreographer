@@ -59,7 +59,7 @@ export const POSE_SPECS = {
   // goes forward, out to the audience's side of her.
   tendu: { arms: [[40, 45], [40, 45]], legs: [[2, 1], [22, 20, 16]], lean: 0, rise: 0 },
   // Both knees out over the toes, the whole body a hand's width lower.
-  plie: { arms: [[30, -6], [30, -6]], legs: [[42.68, -30.57], [42.68, -30.57]], lean: 0, rise: -0.09 },
+  plie: { arms: [[30, -6], [30, -6]], legs: [[42.68, -30.57], [42.68, -30.57]], lean: 0, rise: -0.105011 },
   releve: { arms: [[60, 64], [60, 64]], legs: [[1, 1], [1, 1]], lean: 0, rise: 0.03 },
   // The long line: one leg carried back at hip height, one arm forward, one back — and the body tipped
   // forward over the standing foot, which is what a balance is. The working leg is straight and reads as
@@ -85,7 +85,7 @@ export const POSE_SPECS = {
 // POSE_SPECS.plie entry itself, so the default drawing is unchanged.
 export const PLIE_BASELINE_DEPTH = 42.68;
 const PLIE_FOOT_X = 0.089; // ankle distance from the centre line at the baseline contact
-const PLIE_ANKLE_Y = 0.025; // flat-foot ankle height above the floor at the baseline contact
+const PLIE_ANKLE_Y = 0.010; // shared flat-foot floor reference (same as first position), body units
 
 export function plieSpec(depth) {
   const h = (Number(depth) * Math.PI) / 180;
@@ -255,10 +255,10 @@ export function blendSpecs(a, b, t) {
 // square — most of what "her weight is over here" looks like from the house is these two numbers.
 const HIP_SHIFT = 0.035;
 const HIP_DROP = 0.022;
-// The deepest the body lowers to keep weighted contacts through a travelling step: the gallery's own
-// demi-plié, so a step never asks for more bend than a position the table already accepts. It also
-// stands in for the foot and ankle articulation the figure does not have yet (Phase 2).
-const STEP_SINK_MAX = Math.abs(POSE_SPECS.plie.rise);
+// The deepest the body lowers to keep weighted contacts through a travelling step. Pinned at the sink the
+// plié had before the floor reference moved to 0.010 (0.090), so reconciling the plié does not widen travel
+// allowances. Do not derive it from POSE_SPECS.plie.rise again.
+const STEP_SINK_MAX = 0.09;
 
 // Which foot carries her, as a leg index, and how much: 0 is the left, 1 the right, `null` when both
 // are planted, because the weight is then between them and the hips stay square.

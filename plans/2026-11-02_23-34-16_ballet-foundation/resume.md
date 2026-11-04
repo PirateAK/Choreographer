@@ -200,3 +200,11 @@ Proposed order: (a) add shared `evaluateMovement` in model.js, (b) switch elevat
   - Balance, centre outside support base: fourth −9 mm; tendu −9 mm; chassé −194 mm; pas de bourrée −74 mm. Arabesque, attitude and pirouette sit on the edge (0 mm margin).
 - Plié contact note: the plié preview uses a 0.025 flat-foot height, which differs from the 0.010 first-position reference by 15 mm. The two conventions need reconciling.
 - Not decided: whether second and fourth should sink or change their leg geometry to put the feet on the floor. That changes established stationary positions, so it needs the user's direction.
+
+## Shared flat-foot floor reference (plié reconciled)
+
+- Shared provisional flat-foot reference: standing ankle height 0.010 body units (first position, relevé). Plié now uses the same value (was 0.025).
+- Plié table rise is now −0.105011 (was −0.090). The body sinks 15 mm more; knee angles unchanged. The plié contact gap is −0.2 mm in the review.
+- STEP_SINK_MAX is pinned to 0.090 (the previous plié sink). It no longer reads POSE_SPECS.plie.rise, so travel allowances do not widen.
+- Test oracles updated to 0.010: test-plie-preview.mjs, test-conventions.mjs, test-ankle-lift.mjs (plié HEAD oracle), test-pose-calibration.mjs (sink cap pinned to 0.090 + 0.022 + 0.001).
+- Basic-movement review rerun, thresholds unchanged. Plié contact passes. Remaining failures: second, fourth, fifth (contact); fourth, tendu, chassé, pas de bourrée (balance); chassé and pas de bourrée (contact).

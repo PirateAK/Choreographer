@@ -77,7 +77,7 @@ for (const id of ids) {
   // and the body never lowers more than that to chase it.
   const far = joints(spec, 1, 0, { [plant]: { ...fp, x: fp.x + 0.4, w: 1 } });
   assert(far.shortfall[i] && far.shortfall[i].over > 0.001, `${id} displaced contact still reported`);
-  const sinkCap = Math.abs(POSE_SPECS.plie.rise) + 0.022 + 0.001;
+  const sinkCap = 0.09 + 0.022 + 0.001; // the pre-reconciliation plié sink, pinned so the cap does not widen
   assert(joints(spec).pelvis[1] - far.pelvis[1] <= sinkCap, `${id} body lowering capped`);
 }
 

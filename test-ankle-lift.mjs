@@ -10,7 +10,7 @@ const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 // Relevé x moved 1 mm with the fixed leg length (HEAD 0.055); its tolerance is widened to 2 mm, named here.
 const HEAD_CONTACT = {
   fourth: [[0.081, 0.055, 0.203], [0.059, 0.059, -0.187]],
-  plie: [[0.089, 0.025, 0], [-0.089, 0.025, 0]],
+  plie: [[0.089, 0.010, 0], [-0.089, 0.010, 0]], // reconciled to the shared flat-foot reference (was 0.025)
   releve: [[0.055, 0.010, 0], [-0.055, 0.010, 0]],
 };
 

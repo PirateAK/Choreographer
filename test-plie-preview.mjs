@@ -17,7 +17,7 @@ for (let depth = MIN; depth <= 90 + 1e-9; depth += STEP) {
   assert.equal(hip, depth, `plié ${depth.toFixed(1)} hip angle is the target`);
   assert(knee < 0 && knee > -90, `plié ${depth.toFixed(1)} knee bends forward within limits (${knee})`);
   const [left, right] = feetPlaceOf(s, 1, 0);
-  assert(Math.abs(left.y - 0.025) < 1e-6 && Math.abs(right.y - 0.025) < 1e-6, `plié ${depth.toFixed(1)} ankles on the floor contact height`);
+  assert(Math.abs(left.y - 0.010) < 1e-6 && Math.abs(right.y - 0.010) < 1e-6, `plié ${depth.toFixed(1)} ankles on the shared flat-foot reference (0.010)`);
   assert(Math.abs(Math.abs(left.x) - 0.089) < 1e-6 && Math.abs(Math.abs(right.x) - 0.089) < 1e-6, `plié ${depth.toFixed(1)} ankle x holds`);
   if (prev) {
     assert(s.rise < prev.rise, `plié ${depth.toFixed(1)} lowers the body further`);
@@ -39,7 +39,7 @@ assert.equal(specOf('plie'), POSE_SPECS.plie, 'baseline plié spec is the shared
 const base = joints(specOf('plie'));
 assert(base && base.legs3, 'baseline plié joints are built');
 const [bl] = feetPlaceOf(specOf('plie'), 1, 0);
-assert(Math.abs(bl.y - 0.025) < 1e-3, `baseline plié ankle at floor contact (${bl.y})`);
+assert(Math.abs(bl.y - 0.010) < 1e-3, `baseline plié ankle at floor contact (${bl.y})`);
 assert.equal(PLIE_BASELINE_DEPTH, 42.68, 'baseline depth constant');
 
 console.log('plie-preview: ok');

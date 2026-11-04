@@ -83,7 +83,7 @@ for (const depth of [20, 42.68, 60, 90]) {
   const [l, r] = feetPlaceOf(s, 1, 0);
   near(Math.abs(l.x), 0.089, 1e-6, `plié ${depth} left ankle x holds`);
   near(Math.abs(r.x), 0.089, 1e-6, `plié ${depth} right ankle x holds`);
-  near(l.y, 0.025, 1e-6, `plié ${depth} ankle height holds`);
+  near(l.y, 0.010, 1e-6, `plié ${depth} ankle height holds`);
   assert.equal(s.rise < 0, true, `plié ${depth} sinks the body`);
 }
 near(plieSpec(42.68).rise, POSE_SPECS.plie.rise, 1e-4, 'closed form at the baseline matches the table rise to rounding');
