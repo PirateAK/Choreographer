@@ -120,7 +120,7 @@ export class HouseView {
     const scenery = Array.isArray(show.scenery) ? show.scenery : [];
     const cloth = scenery.filter((item) => item && item.kind !== 'prop' && item.visible !== false)
       .slice().sort((a, b) => clothDepth(b) - clothDepth(a));
-    for (const item of cloth) this._drawScenery(item, contentTimeMs, videoElement, {
+    const drawCloth = (item) => this._drawScenery(item, contentTimeMs, videoElement, {
       ctx, show, stageW, stageD, openingH, scale, half, xAt, floorAt, zScale,
       stageTop, floorFront,
     });
@@ -133,8 +133,13 @@ export class HouseView {
       const p = posOfContent(show, d, contentTimeMs);
       if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) dancers.push({ d, p });
     }
-    dancers.sort((a, b) => b.p.y - a.p.y);
-    for (const { d, p } of dancers) {
+    // Cloth and performers share one back-to-front order: a curtain downstage of a
+    // dancer is drawn after her and hides her, as it would from the house.
+    const layers = cloth.map((item) => ({ depth: clothDepth(item), draw: () => drawCloth(item) }))
+      .concat(dancers.map((e) => ({ depth: e.p.y, draw: () => drawDancer(e) })));
+    layers.sort((a, b) => b.depth - a.depth);
+    for (const layer of layers) layer.draw();
+    function drawDancer({ d, p }) {
       const ev = evaluateMovement(show, d, localOfContent(show, d.id, contentTimeMs));
       const at = ev.at;
       const local = localOfContent(show, d.id, contentTimeMs);
