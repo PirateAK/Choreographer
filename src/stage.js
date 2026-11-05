@@ -95,7 +95,7 @@ export class StageView {
     const st = show.stage;
     const worldW = st.width + st.wingDepth * 2;
     const worldH = st.depth;
-    const pad = this.compact ? 6 : 34;
+    const pad = this.compact ? 6 : 8;
     // The editor picks one scale for the plan and the elevation together, so a metre
     // is the same size in both. Fitting this canvas on its own would make them
     // disagree the moment the panes differed.
