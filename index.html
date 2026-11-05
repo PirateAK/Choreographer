@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Choreographer</title>
 <link rel="icon" type="image/png" href="favicon.png" />
-<link rel="stylesheet" href="styles.css?v=scroll32" />
+<link rel="stylesheet" href="styles.css?v=scroll34" />
 </head>
 <body>
 <header>
@@ -110,13 +110,16 @@
       <label class="act-picker"><select id="actSelect" aria-label="Select act"></select></label>
       <button id="btnAddAct" class="view-btn act-action" title="Add an act after the last one">+ Act</button>
       <button id="btnAddScene" class="view-btn act-action" title="Add a scene at the playhead">+ Scene</button>
+      <div class="view-tabs" role="tablist" aria-label="Choose a view">
+        <button id="btnFillPlan" class="view-tab on" role="tab" aria-selected="true" title="Overhead stage plan">Plan</button>
+        <button id="btnFillElev" class="view-tab" role="tab" aria-selected="false" title="Side elevation: heights, levels and flying">Elevation</button>
+      </div>
       <div class="stage-tools" aria-label="Overhead stage controls">
         <button id="btnPaths" class="view-btn on" aria-pressed="true" title="Show or hide movement lines">Paths</button>
         <button id="btnStations" class="view-btn on" aria-pressed="true" title="Show or hide station points">Stations</button>
         <button id="btnCostumes" class="view-btn" aria-pressed="false" title="Show or hide overhead costume shapes">Costumes</button>
         <button id="btnTilt" class="view-btn" aria-pressed="false" title="Drag vertically on the stage to tilt the view; dancer editing is disabled while active">Tilt view</button>
         <button id="btnResetOverhead" class="view-btn" title="Return to directly overhead and leave tilt mode">Reset overhead</button>
-        <button id="btnFillPlan" class="view-btn" aria-pressed="false" title="Enlarge the overhead stage plan">Top-down</button>
       </div>
     </div>
     <div id="sceneTabs" class="act-tabs scene-tabs" aria-label="Scenes in this act"></div>
@@ -129,7 +132,6 @@
       <canvas id="elevation"></canvas>
       <div class="view-tools">
         <button id="btnDepth" class="view-btn on" aria-pressed="true" title="Shrink figures the further upstage they stand, as the house sees them — turn it off when judging heights">Depth</button>
-        <button id="btnFillElev" class="view-btn" aria-pressed="false" title="Give the elevation the whole centre, for watching from the house">⛶ Fill</button>
       </div>
     </div>
     <div id="house-wrap" hidden>
@@ -273,8 +275,8 @@
       <button id="btnAboutClose" class="ghost">Close</button>
     </header>
     <div class="moves-body">
-      <p><strong>Version 0.4.3</strong> <span class="about-build">Release date: <time datetime="2026-11-05">5 November 2026</time></span></p>
-      <p>Compact stage toolbar with an act dropdown and grouped scene/view controls.</p>
+      <p><strong>Version 0.4.4</strong> <span class="about-build">Release date: <time datetime="2026-11-05">5 November 2026</time></span></p>
+      <p>Plan and Elevation are separate tabs, so the plan takes the whole stage area when shown.</p>
       <p>Legs and feet preview: shaped thighs/calves and articulated heel, ball and toe rendering. Movement technique remains under review.</p>
       <p>Includes Mirror path and Cast tools. Show-video recording is disabled; music and voice recording remain available.</p>
       <p>Show files are JSON; music and voice recordings are stored separately in this browser. Keep a copy of your show file when moving between browsers or computers.</p>
@@ -296,7 +298,7 @@
 
 <script type="importmap">
 {"imports": {
-  "./src/app.js": "./src/app.js?v=scroll48",
+  "./src/app.js": "./src/app.js?v=scroll50",
   "./src/music.js": "./src/music.js?v=cap3",
   "./src/stage.js": "./src/stage.js?v=guide22",
   "./src/cheatsheet.js": "./src/cheatsheet.js?v=guide23",

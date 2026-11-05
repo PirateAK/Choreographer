@@ -1,6 +1,6 @@
 /* House preview uses the same theatre palette as the existing planner. */
 body.fill-house #stage-wrap, body.fill-house #elevation-wrap { display: none; }
-#house-wrap { position: relative; min-height: 0; overflow: hidden; background: #090d14; }
+#house-wrap { position: relative; min-height: 0; overflow: hidden; background: #090d14; grid-row: 3 / 5; }
 #house-wrap[hidden] { display: none; }
 #house { display: block; width: 100%; height: 100%; }
 .house-caption { position: absolute; bottom: 12px; left: 16px; color: #9aa9bd; font-size: 10px; letter-spacing: .18em; pointer-events: none; }
@@ -316,6 +316,16 @@ table.cast span.dim { color: #8a8578; }
   border-radius: 5px;
 }
 .act-action { flex: none; }
+.view-tabs {
+  display: inline-flex; flex: none; padding: 2px; gap: 2px;
+  background: #0e141d; border: 1px solid #26313f; border-radius: 7px;
+}
+.view-tab {
+  padding: 3px 12px; font: inherit; font-size: 11.5px; color: #93a4ba;
+  background: transparent; border: 1px solid transparent; border-radius: 5px; cursor: pointer;
+}
+.view-tab:hover { color: #dfe8f5; }
+.view-tab.on { color: #f0d79a; background: rgba(58,44,14,.82); border-color: #6b5620; }
 .stage-tools { display: flex; flex: 1 1 410px; align-items: center; justify-content: flex-end; gap: 4px; flex-wrap: wrap; min-width: 0; }
 .act-tab {
   display: flex;

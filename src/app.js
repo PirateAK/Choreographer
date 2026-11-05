@@ -2854,7 +2854,7 @@ function setWatch(on) {
     pause();
     play();
   } else {
-    state.ui.fill = state.ui.beforeWatchFill ?? null;
+    state.ui.fill = state.ui.beforeWatchFill ?? 'plan';
     pause();
     if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
   }
@@ -3046,7 +3046,8 @@ const VIEW_KEY = 'choreographer.view.v1';
 function loadView() {
   try {
     const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || '{}');
-    if (['plan', 'elevation', 'house'].includes(saved.fill)) state.ui.fill = saved.fill;
+    // One view at a time: an unset or old split setting opens on the plan.
+    state.ui.fill = ['plan', 'elevation', 'house'].includes(saved.fill) ? saved.fill : 'plan';
     if (saved.depth === false) state.ui.depth = false;
     state.ui.showPaths = saved.showPaths !== false;
     state.ui.showStations = saved.showStations !== false;
@@ -3081,8 +3082,7 @@ function paintView() {
     if (!b) continue;
     const on = filling === which;
     b.classList.toggle('on', on);
-    b.setAttribute('aria-pressed', on ? 'true' : 'false');
-    b.textContent = on ? '⛶ Both' : which === 'plan' ? 'Top-down' : '⛶ Fill';
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
   }
   for (const [id, key] of [['btnPaths', 'showPaths'], ['btnStations', 'showStations']]) {
     const on = state.ui[key] !== false;
@@ -3104,8 +3104,13 @@ function paintView() {
 // Filling is not watching: one view takes the centre and the other stands down, so
 // the plan can be worked on at twice the size and put back with the same click.
 // Only one can be full, because the point of filling is having the room to yourself.
+// Plan and elevation are tabs: choosing one shows that view alone, and the other
+// stands down. Choosing the open tab again does nothing, so the view never goes blank.
 function setFill(which) {
-  state.ui.fill = state.ui.fill === which ? null : which;
+  // House is a toggle: pressing it again returns to the plan. Plan and elevation are tabs.
+  const next = which === 'house' ? (state.ui.fill === 'house' ? 'plan' : 'house') : which;
+  if (state.ui.fill === next) return;
+  state.ui.fill = next;
   paintView();
   saveView();
   // The row heights are the fit's business, so it has to be told the layout moved.
@@ -3837,7 +3842,7 @@ function boot() {
 
   // Projector files and cues stay separate from the screen's fly cues.
   $('btnHouse').addEventListener('click', () => setFill('house'));
-  $('btnHouseBack').addEventListener('click', () => setFill('house'));
+  $('btnHouseBack').addEventListener('click', () => setFill('plan'));
   $('btnAddScreen').disabled = false;
   $('screenStatus').textContent = 'Screen controls ready · add a screen to reveal its settings and timeline row.';
   $('btnAddScreen').addEventListener('click', () => {
@@ -4607,6 +4612,7 @@ function boot() {
   paintView();
 
   // Watch mode: the stage alone, playing, with a bar that can end it.
+  $('btnWatch').addEventListener('click', () => setWatch(true));
   $('wPlay').addEventListener('click', togglePlay);
   $('wRestart').addEventListener('click', () => {
     stop();
