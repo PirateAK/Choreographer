@@ -675,12 +675,16 @@ export function torsoShapes(j) {
 // onto the pointe lengthens into the box, so the shoe follows the foot rather than a separate pose.
 export const POINTE_SHOE = { satin: '#f2b5c6', box: '#e291aa', ribbon: '#d9869f' };
 export function pointeShoeShapes(foot, knee) {
-  const [heel, ankle, ball, toe] = foot.points;
+  // The contact points are the centreline of the shoe, so the sole hangs below the floor by about its
+  // thickness. Lift the whole shoe by the sole radius so its underside rests on the floor line.
+  const SOLE = 0.0095;
+  const [heel, ankle, ball, toe] = foot.points.map(([x, y]) => [x, y + SOLE]);
+  const kneeUp = [knee[0], knee[1] + SOLE];
   const along = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
   return [
     { shape: limbContour([heel, ankle, ball, toe], [0.012, 0.0105, 0.0095, 0.0068]), fill: POINTE_SHOE.satin },
     { shape: limbContour([ball, toe], [0.0098, 0.0072]), fill: POINTE_SHOE.box },
-    { shape: limbContour([ankle, along(ankle, knee, 0.42)], [0.0028, 0.0022]), fill: POINTE_SHOE.ribbon },
+    { shape: limbContour([ankle, along(ankle, kneeUp, 0.42)], [0.0028, 0.0022]), fill: POINTE_SHOE.ribbon },
   ];
 }
 
