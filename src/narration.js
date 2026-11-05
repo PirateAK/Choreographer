@@ -337,7 +337,7 @@ export class NarrationEngine {
   // Called from the frame loop. `showMs` is the playhead, and every clip is
   // placed against it rather than against a running tally, so a scrub, a seek or
   // a moved clip all land in the right part of the take.
-  sync(show, showMs, playing, muted) {
+  sync(show, showMs, playing, muted, playbackRate = music.playbackRate) {
     const clips = (show && show.narration) || [];
     const audible = playing && !muted;
     const want = new Map();
@@ -361,7 +361,7 @@ export class NarrationEngine {
         this.stopLive(id);
         continue;
       }
-      const expected = entry.startOffset + (ctx.currentTime - entry.anchorCtx) * 1000;
+      const expected = entry.startOffset + (ctx.currentTime - entry.anchorCtx) * 1000 * playbackRate;
       const desired = showMs - clip.at;
       if (Math.abs(expected - desired) > RESYNC_MS) this.stopLive(id);
     }
@@ -406,7 +406,7 @@ export class NarrationEngine {
     }
   }
 
-  startLive(clip, showMs) {
+  startLive(clip, showMs, playbackRate = music.playbackRate) {
     const ctx = this.ensure();
     if (!ctx) return;
     const offset = Math.max(0, showMs - clip.at);
@@ -430,11 +430,12 @@ export class NarrationEngine {
       gain = ctx.createGain();
       source.connect(gain);
       gain.connect(music.bus);
+      source.playbackRate.value = playbackRate;
       source.start(0, offset / 1000);
     } catch (e) {
       return;
     }
-    const entry = { source, gain, anchorCtx: ctx.currentTime, startOffset: offset };
+    const entry = { source, gain, anchorCtx: ctx.currentTime, startOffset: offset, playbackRate };
     this.live.set(clip.id, entry);
     source.onended = () => {
       // Only clear the entry if it is still this source: stopping one by hand

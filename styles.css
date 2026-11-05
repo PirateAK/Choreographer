@@ -575,6 +575,9 @@ body.watch #stage { cursor: default; }
   min-width: 84px;
   font-size: 12px;
 }
+.review-speed { display: flex; align-items: center; gap: 6px; color: var(--dim); font-size: 11px; white-space: nowrap; }
+.review-speed output { color: var(--accent); min-width: 24px; font-variant-numeric: tabular-nums; }
+.review-speed input { width: 92px; accent-color: var(--accent); }
 .check { display: flex; align-items: center; gap: 4px; color: var(--dim); font-size: 11px; white-space: nowrap; }
 .check input { accent-color: var(--accent); }
 .collision { color: var(--danger); font-size: 11px; white-space: nowrap; overflow: hidden; }

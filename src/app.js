@@ -5,7 +5,7 @@ import {
   contentOfLocal, localOfContent, endContent, ensureDurations, reflowKeys, removeStation, toggleVisibility, displayOfContent,
   endMarker, setEnd,
   removeFromStation, truncateAfter, addWingLeg, removeWingLeg, canAddWingLeg,
-  findObject, isProp, mirrorPathLeftRight, propPosOfContent, CARRY_OFFSET, carrierOf, carrierIdOf,
+  findObject, isProp, mirrorPathLeftRight, addCastGroup, removeCastGroup, propPosOfContent, CARRY_OFFSET, carrierOf, carrierIdOf,
   addCarryHandoff, removeCarryHandoff, addSceneryCue, removeSceneryCue, clothSpan, clampClothX, maxClothSpan,
   musicLevelAt, addMusicCue, removeMusicCue, updateMusicCue, audibleLevel,
   clothDepth, dropStack, actRanges, actAt, addAct, removeAct, actHasWork, ACT_MIN_MS, ACT_MAX_MS, sceneryStateAt, totalActLength,
@@ -948,7 +948,7 @@ function rebuildPanels() {
   $('prefEndFade').value = +(prefs.endFade / 1000).toFixed(1);
   $('prefTempo').value = prefs.tempo;
   $('prefBeats').value = prefs.beatsPerBar;
-  $('castCount').textContent = String(state.show.cast.length);
+  $('castCount').textContent = String(state.show.cast.length + (state.show.castGroups || []).length);
 
   // The running order: tabs for switching act, a list for editing them.
   const acts = state.show.acts || [];
@@ -1272,9 +1272,8 @@ function rebuildPanels() {
   const actWord = here ? here.name : 'this act';
 
   const cl = $('castList');
-  cl.innerHTML = state.show.cast
-    .map(
-      (d) => `<div class="item ${d.id === state.ui.selectedId ? 'sel' : ''}" data-id="${d.id}" data-kind="cast">
+  cl.innerHTML = (state.show.cast || []).map(
+    (d) => `<div class="item ${d.id === state.ui.selectedId ? 'sel' : ''}" data-id="${d.id}" data-kind="cast">
         <div class="row">
           <button class="eye ${d.visible ? '' : 'off'}" data-act="eye">${d.visible ? '◉' : '○'}</button>
           <span class="swatch" style="background:${d.color}"></span>
@@ -1288,8 +1287,18 @@ function rebuildPanels() {
         </div>
         ${costumes.length ? `<div class="row dress"><span class="label">wears</span><select data-act="dress" title="What this performer is dressed in">${dressOptions(d)}</select></div>` : ''}
       </div>`
-    )
-    .join('');
+  ).join('') + (state.show.castGroups || []).map((group) => `<div class="item cast-group" data-id="${group.id}" data-kind="cast-group">
+    <div class="row"><span class="swatch" style="background:#687477"></span>
+      <label class="label" for="group-name-${esc(group.id)}">Group</label>
+      <input id="group-name-${esc(group.id)}" type="text" data-group-field="name" maxlength="80" value="${esc(group.name)}" aria-label="Group name">
+      <button class="del" data-act="delete-group" title="Remove this cast group">×</button></div>
+    <div class="row"><label class="label" for="group-type-${esc(group.id)}">Type</label>
+      <select id="group-type-${esc(group.id)}" data-group-field="type" aria-label="Group type">
+        ${[['audience','Audience'],['chorus','Chorus'],['crew','Crew'],['extras','Extras'],['other','Other']].map(([v,label]) => `<option value="${v}"${group.type === v ? ' selected' : ''}>${label}</option>`).join('')}
+      </select>
+      <input type="text" data-group-field="role" maxlength="80" value="${esc(group.role)}" placeholder="Optional role / notes" aria-label="Group role or notes">
+    </div>
+  </div>`).join('');
 
   // The overlaps: what the whole-show scan found, each with the one fix worth offering. A scan is
   // only good for the show it was read from — a fix names stations by their place in a path, so a
@@ -2255,20 +2264,43 @@ function bindPanelEvents() {
 
   const castList = $('castList');
   castList.addEventListener('click', (e) => {
+    const host = e.target.closest('[data-id]');
+    if (!host) return;
+    if (host.dataset.kind === 'cast-group') {
+      if (e.target.closest('[data-act="delete-group"]')) {
+        commit();
+        removeCastGroup(state.show, host.dataset.id);
+        app.rebuild();
+      }
+      return;
+    }
     // The costume picker and the role field are controls inside the row: using one must
     // not select the dancer and rebuild the panel under the pointer.
     if (e.target.closest('[data-act="dress"]') || e.target.closest('[data-act="role"]')) return;
-    const host = e.target.closest('[data-id]');
-    if (!host) return;
     const d = state.show.cast.find((x) => x.id === host.dataset.id);
     if (!d) return;
-    if (e.target.closest('[data-act="eye"]')) {
+    if (e.target.closest('button[data-act="eye"]')) {
       toggleVisibility(d, e.ctrlKey || e.metaKey);
       app.rebuild();
       app.select(state.ui.selectedId);
       return;
     }
     app.select(d.id);
+  });
+
+  // Group fields are production metadata, not movement/rendering objects.
+  castList.addEventListener('change', (e) => {
+    const host = e.target.closest('[data-kind="cast-group"]');
+    if (!host || !e.target.dataset.groupField) return;
+    const group = (state.show.castGroups || []).find((item) => item.id === host.dataset.id);
+    if (!group) return;
+    commit();
+    const field = e.target.dataset.groupField;
+    group[field] = field === 'type'
+      ? (['audience', 'chorus', 'crew', 'extras', 'other'].includes(e.target.value) ? e.target.value : 'other')
+      : String(e.target.value).slice(0, field === 'name' || field === 'role' ? 80 : 0);
+    persist();
+    app.rebuild();
   });
 
   // Dressing is one choice on the performer's own row, because that is where you are
@@ -2741,7 +2773,7 @@ function advance(dt) {
   const show = state.show;
 
   if (ui.activePause) {
-    ui.activePause.remaining -= dt;
+    ui.activePause.remaining -= dt * (ui.playbackRate || 1);
     if (ui.activePause.remaining <= 0) {
       ui.activePause = null;
       ui.playhead += 1;
@@ -3635,7 +3667,7 @@ function render() {
   }
   const projection = projectionAt(state.show, state.ui.playhead);
   const videoClips = projection.kind === 'video' ? [projection.clip] : [];
-  video.sync(videoClips, state.ui.playhead, state.ui.playing && !state.ui.activePause);
+  video.sync(videoClips, state.ui.playhead, state.ui.playing && !state.ui.activePause, state.ui.playbackRate || 1);
   const layers = slideLayersAt(state.show, state.ui.playhead);
   slides.sync(state.show.images, layers);
   const screens = state.show.scenery.filter((s) => s.screen);
@@ -3712,7 +3744,8 @@ function frame(now) {
     state.show,
     state.ui.playhead,
     state.ui.playing && !state.ui.activePause,
-    state.show.trackVis.narration === false
+    state.show.trackVis.narration === false,
+    state.ui.playbackRate || 1
   );
   if (state.ui.playing) {
     // Whatever stopped the track (a pause marker the playhead was dragged out
@@ -4213,6 +4246,11 @@ function boot() {
     app.select(d.id);
     app.rebuild();
   });
+  $('btnAddCastGroup').addEventListener('click', () => {
+    commit();
+    addCastGroup(state.show, 'Audience', 'audience');
+    app.rebuild();
+  });
 
   // music: a list of tracks. Adding, replacing, renaming, moving and removing
   // all work per row, the way the cast does, because a show changes music the
@@ -4640,8 +4678,22 @@ function boot() {
   $('watchExit').addEventListener('click', () => setWatch(false));
 
   // transport
-  $('btnPlay').addEventListener('click', togglePlay);
-  $('btnStop').addEventListener('click', stop);
+  let storedReviewRate = 1;
+  try { storedReviewRate = Number(localStorage.getItem('choreographer.reviewSpeed.v1')) || 1; } catch (_) { /* storage blocked */ }
+  const savedReviewRate = Math.max(1, Math.min(4, storedReviewRate));
+  state.ui.playbackRate = savedReviewRate;
+  music.setPlaybackRate(savedReviewRate);
+  $('reviewSpeed').value = String(savedReviewRate);
+  $('reviewSpeedValue').value = `${savedReviewRate}×`;
+  $('reviewSpeed').addEventListener('input', (e) => {
+    const rate = Math.max(1, Math.min(4, Number(e.target.value) || 1));
+    state.ui.playbackRate = rate;
+    music.setPlaybackRate(rate);
+    $('reviewSpeedValue').value = `${rate}×`;
+    try { localStorage.setItem('choreographer.reviewSpeed.v1', String(rate)); } catch (_) { /* preference storage optional */ }
+    // Restart active narration clips at their exact show-time offsets using the new rate.
+    narration.stopAll();
+  });
   $('btnKey').addEventListener('click', addKeyAtPlayhead);
   $('btnPath').addEventListener('click', () => {
     state.ui.placingStations = !state.ui.placingStations;

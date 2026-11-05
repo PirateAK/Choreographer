@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Choreographer</title>
 <link rel="icon" type="image/png" href="favicon.png" />
-<link rel="stylesheet" href="styles.css?v=scroll30" />
+<link rel="stylesheet" href="styles.css?v=scroll31" />
 </head>
 <body>
 <header>
@@ -160,10 +160,10 @@
       <p class="hint">A slide stays until the next slide, video or off cue. Set crossfade to <b>0</b> for an instant change. Screen fly cues remain separate. Images stay in this browser; show JSON carries references only.</p>
     </section>
     <section class="cast-section">
-      <h2>Performers <span id="castCount" class="count">0</span></h2>
-      <div class="btn-row"><button id="btnAddDancer">+ Dancer</button></div>
+      <h2>Cast <span id="castCount" class="count">0</span></h2>
+      <div class="btn-row"><button id="btnAddDancer">+ Dancer</button><button id="btnAddCastGroup">+ Group</button></div>
       <div id="castList" class="list"></div>
-      <p class="hint">Ctrl-click an eye to keep more than one performer on stage.</p>
+      <p class="hint">Dancers are movement tracks. Groups (such as Audience) are organizational cast entries for now, not stage objects. Ctrl-click an eye to keep more than one dancer on stage.</p>
     </section>
 
     <section class="overlap-section">
@@ -215,6 +215,9 @@
   <div id="transport">
     <button id="btnPlay" class="primary" title="Play / pause (Space)">▶</button>
     <button id="btnStop" title="Return to start">■</button>
+    <label class="review-speed" for="reviewSpeed">Review speed <output id="reviewSpeedValue">1×</output>
+      <input id="reviewSpeed" type="range" min="1" max="4" step="0.25" value="1" aria-label="Review playback speed" title="Review faster without changing the show's authored timings" />
+    </label>
     <span id="timeDisplay" class="time">00:00.000</span>
     <span class="divider"></span>
     <button id="btnKey" title="Add a keyframe at the playhead">+ Key</button>
@@ -277,15 +280,15 @@
 
 <script type="importmap">
 {"imports": {
-  "./src/app.js": "./src/app.js?v=scroll40",
+  "./src/app.js": "./src/app.js?v=scroll43",
   "./src/capture.js": "./src/capture.js?v=cap2",
-  "./src/music.js": "./src/music.js?v=cap1",
+  "./src/music.js": "./src/music.js?v=cap3",
   "./src/stage.js": "./src/stage.js?v=guide22",
   "./src/cheatsheet.js": "./src/cheatsheet.js?v=guide23",
   "./src/placement-guide.js": "./src/placement-guide.js?v=guide20",
   "./src/pose.js": "./src/pose.js?v=load15",
-  "./src/model.js": "./src/model.js?v=trajectory14",
-  "./src/narration.js": "./src/narration.js?v=narr5",
+  "./src/model.js": "./src/model.js?v=trajectory15",
+  "./src/narration.js": "./src/narration.js?v=narr7",
   "./src/narration-bundle.js": "./src/narration-bundle.js?v=narr2",
   "./src/conventions.js": "./src/conventions.js?v=conv14",
   "./src/chasse-phases.js": "./src/chasse-phases.js?v=chasse1",
@@ -294,7 +297,7 @@
   "./src/timeline.js": "./src/timeline.js?v=slides-on11",
   "./src/house.js": "./src/house.js?v=slides14",
   "./src/slides.js": "./src/slides.js?v=slides9",
-  "./src/video.js": "./src/video.js?v=video-sync7"
+  "./src/video.js": "./src/video.js?v=video-sync9"
 }}
 </script>
 <script>

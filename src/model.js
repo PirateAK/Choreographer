@@ -791,6 +791,7 @@ export const state = {
     playing: false,
     lastFrame: 0,
     activePause: null,
+    playbackRate: 1,
     pxPerSec: 30,
     scrollT: 0,
     vscroll: 0,
@@ -1104,6 +1105,9 @@ export function createShow() {
     showId: uid('show'),
     stage,
     cast: [],
+    // Non-dancer entries used to organize the production cast; these are not
+    // movement tracks and are intentionally excluded from dancer/render logic.
+    castGroups: [],
     // The wardrobe: costumes are named here and worn by performers, so a show with
     // none is simply undressed rather than broken.
     costumes: [],
@@ -1253,6 +1257,20 @@ export function normalise(show) {
     .sort((a, b) => a.start - b.start);
   delete out.music;
   out.cast = Array.isArray(out.cast) ? out.cast : [];
+  const groups = (Array.isArray(show && show.castGroups) ? show.castGroups : [])
+    .filter((group) => group && typeof group === 'object');
+  const usedGroupIds = new Set();
+  out.castGroups = groups.map((group) => {
+    let id = typeof group.id === 'string' && group.id ? group.id : uid('group');
+    while (usedGroupIds.has(id)) id = uid('group');
+    usedGroupIds.add(id);
+    return {
+      id,
+      name: String(group.name || 'Group').slice(0, 80),
+      type: ['audience', 'chorus', 'crew', 'extras', 'other'].includes(group.type) ? group.type : 'other',
+      role: String(group.role || '').slice(0, 80),
+    };
+  });
   out.cast.forEach((d) => {
     if (!d) return;
     if (d.footTrajectory) {
@@ -2352,6 +2370,20 @@ export function toggleVisibility(dancer, additive) {
     state.ui.selectedId = null;
     state.ui.stationIdx = null;
   }
+}
+
+export function addCastGroup(show, name = 'Audience', type = 'audience', role = '') {
+  const group = { id: uid('group'), name: String(name).trim() || 'Group', type, role: String(role || '') };
+  show.castGroups = Array.isArray(show.castGroups) ? show.castGroups : [];
+  show.castGroups.push(group);
+  return group;
+}
+
+export function removeCastGroup(show, id) {
+  if (!show || !Array.isArray(show.castGroups)) return false;
+  const length = show.castGroups.length;
+  show.castGroups = show.castGroups.filter((group) => group.id !== id);
+  return show.castGroups.length !== length;
 }
 
 export function addCast(show, over) {
