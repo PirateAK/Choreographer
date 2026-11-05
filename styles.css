@@ -547,6 +547,11 @@ body.watch #stage { cursor: default; }
    left pane from growing another section under the music. */
 .voice-section { flex: none; }
 .inspector { border-bottom: none; }
+#voiceMic { max-width: 175px; font: inherit; color: var(--text); background: #111821; border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; }
+#voiceInputLevel { width: 74px; height: 16px; vertical-align: middle; accent-color: #61c5a5; }
+#voiceInputStatus { min-width: 115px; font-size: 10px; margin: 0; }
+.voice-section .btn-row { flex-wrap: wrap; align-items: center; }
+
 
 /* ---------- bottom ---------- */
 #bottom {

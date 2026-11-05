@@ -715,6 +715,24 @@ function renderNarration() {
   const list = state.show.narration || [];
   const badge = $('voiceCount');
   if (badge) badge.textContent = list.length ? String(list.length) : 'none';
+  const mic = $('voiceMic');
+  if (mic) {
+    const devices = narration.devices || [];
+    const value = narration.deviceId || '';
+    mic.innerHTML = '<option value="">Default microphone</option>' + devices.map((d, i) => `<option value="${esc(d.deviceId)}">${esc(d.label || `Microphone ${i + 1}`)}</option>`).join('');
+    mic.value = value;
+    mic.disabled = narration.recording || narration.starting || devices.length === 0;
+  }
+  const meter = $('voiceInputLevel');
+  if (meter) meter.value = Math.min(1, Math.max(0, narration.inputLevel * 5));
+  const inputStatus = $('voiceInputStatus');
+  if (inputStatus) {
+    const level = narration.recording ? narration.inputLevel : 0;
+    if (narration.recording) inputStatus.textContent = level > 0.01 ? 'Mic live · signal detected' : 'Mic live · no signal';
+    else if (narration.inputError) inputStatus.textContent = narration.inputError;
+    else if (narration.lastRecordingLevel > 0) inputStatus.textContent = `Last take peak · ${(20 * Math.log10(narration.lastRecordingLevel)).toFixed(0)} dBFS`;
+    else inputStatus.textContent = 'Input idle';
+  }
   const btn = $('btnRecord');
   if (btn) {
     // While the mic is open the button is the way out of it, and says for how
@@ -835,10 +853,13 @@ function toggleRecording(at) {
   voiceTakeAt = Math.round(at / 100) * 100;
   pendingVoiceAt = voiceTakeAt;
   state.ui.hint = 'Opening the microphone…';
+  app.rebuild();
   narration
     .startRecording()
-    .then(() => {
+    .then(async () => {
+      await refreshVoiceInputs();
       state.ui.hint = 'Recording from ' + fmtTime(voiceTakeAt) + ' — speak, then press Stop';
+      $('voiceInputStatus').textContent = 'Mic live · speak now';
       app.rebuild();
     })
     .catch((err) => {
@@ -851,9 +872,10 @@ function toggleRecording(at) {
           : name === 'NotReadableError' || name === 'AbortError'
             ? 'Firefox could not open the microphone. It may be unavailable or in use by another app.'
             : name === 'OverconstrainedError'
-              ? 'The selected microphone does not meet the browser’s audio requirements.'
+              ? 'The selected microphone is unavailable. Choose Default microphone or another input.'
               : 'Check Firefox’s microphone permission and available input devices.';
       state.ui.hint = `${help} (${name}${detail})`;
+      $('voiceInputStatus').textContent = `${name}: ${err && err.message || 'Microphone unavailable'}`;
       app.rebuild();
     });
 }
@@ -3589,6 +3611,17 @@ function render() {
   if (state.ui.dirtyPanels) {
     rebuildPanels();
     state.ui.dirtyPanels = false;
+    if (!narration.recording) {
+      const status = $('voiceInputStatus');
+      if (status) {
+        if (narration.lastRecordingLevel > 0) {
+          const db = (20 * Math.log10(narration.lastRecordingLevel)).toFixed(0);
+          status.textContent = `Saved mic peak ${db} dBFS · ${narration.lastRecordingMime || 'audio'}`;
+        } else if (narration.lastRecordingMime) {
+          status.textContent = `No input signal detected · ${narration.lastRecordingMime}`;
+        }
+      }
+    }
     // The sheet's phrase caption is a promise about where the next phrase lands, so it
     // follows the path while the sheet is open: an undone or deleted phrase must not leave
     // a stale address behind.
@@ -4363,6 +4396,33 @@ function boot() {
 
   // narration: both ways in are module functions, because the track menu starts a
   // take (or a picker) at the moment it was right-clicked rather than at the
+  // playhead.
+  const renderVoiceInputs = (devices) => {
+    const select = $('voiceMic');
+    if (!select) return;
+    const current = narration.deviceId;
+    select.innerHTML = '<option value="">Default microphone</option>' + devices.map((d, i) => `<option value="${esc(d.deviceId)}">${esc(d.label || `Microphone ${i + 1}`)}</option>`).join('');
+    select.value = current;
+    select.disabled = narration.recording || narration.starting;
+  };
+  const refreshVoiceInputs = async () => renderVoiceInputs(await narration.listInputs());
+
+  narration.devicesCallback = renderVoiceInputs;
+  narration.levelCallback = (level) => {
+    const meter = $('voiceInputLevel');
+    const status = $('voiceInputStatus');
+    if (meter) meter.value = Math.min(1, Math.max(0, level * 5));
+    if (status && narration.recording) status.textContent = level > 0.01 ? 'Mic live · signal detected' : 'Mic live · no signal';
+  };
+  $('voiceMic').addEventListener('change', (e) => {
+    narration.selectInput(e.target.value);
+    state.ui.hint = e.target.value ? 'Microphone selected' : 'Using the browser default microphone';
+  });
+  $('voiceMic').addEventListener('focus', refreshVoiceInputs);
+  $('btnRecord').addEventListener('focus', refreshVoiceInputs);
+  navigator.mediaDevices?.addEventListener?.('devicechange', refreshVoiceInputs);
+  refreshVoiceInputs();
+
   // playhead.
   $('btnRecord').addEventListener('click', () => toggleRecording(state.ui.playhead));
   $('btnVoiceFile').addEventListener('click', () => attachVoiceFile(state.ui.playhead));

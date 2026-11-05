@@ -1,0 +1,22 @@
+[
+  {
+    "content": "[mic-1] Add device selection/constraint support to narration recorder and preserve errors (self)",
+    "id": "mic-1",
+    "status": "completed"
+  },
+  {
+    "content": "[mic-2] Add minimal recording level meter and level summary beside narration controls (self)",
+    "id": "mic-2",
+    "status": "completed"
+  },
+  {
+    "content": "[mic-3] Add tests for input-level meter and recording diagnostics; validate UI in browser (self)",
+    "id": "mic-3",
+    "status": "in_progress"
+  },
+  {
+    "content": "[mic-4] Run narration/capture regressions, review diff, commit focused fix (self)",
+    "id": "mic-4",
+    "status": "pending"
+  }
+]

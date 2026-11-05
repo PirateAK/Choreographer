@@ -41,6 +41,15 @@ export class NarrationEngine {
     this.recording = false;
     this.recordingSince = 0;
     this.finished = null;
+    this.deviceId = '';
+    this.inputMonitor = null;
+    this.levelCallback = () => {};
+    this.inputLevel = 0;
+    this.peakInputLevel = 0;
+    this.lastRecordingLevel = 0;
+    this.inputError = '';
+    this.devices = [];
+    this.devicesCallback = () => {};
     // The permission prompt is asynchronous: a second click while it is open
     // must not open a second microphone.
     this.starting = false;
@@ -103,57 +112,140 @@ export class NarrationEngine {
 
   // Opens the microphone. He asks for the stream inside a click, which is the
   // only time a browser will allow it.
+  async listInputs() {
+    if (!this.canRecord || !navigator.mediaDevices.enumerateDevices) return [];
+    try {
+      this.devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput');
+      this.devicesCallback(this.devices);
+      return this.devices;
+    } catch (err) {
+      this.inputError = err && err.message || 'Unable to list microphones';
+      return [];
+    }
+  }
+
+  selectInput(deviceId) {
+    this.deviceId = deviceId || '';
+  }
+
   async startRecording() {
     if (this.recording || this.starting) return false;
     if (!this.canRecord) throw new Error('This browser cannot record audio');
     this.starting = true;
     let stream = null;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const audio = this.deviceId ? { deviceId: { exact: this.deviceId } } : true;
+      stream = await navigator.mediaDevices.getUserMedia({ audio });
+      const track = stream.getAudioTracks()[0];
+      if (!track || track.readyState !== 'live') throw new Error('The selected microphone did not provide a live audio track');
+      this.inputLevel = 0;
+      this.peakInputLevel = 0;
+      this.lastRecordingLevel = 0;
+      this.stream = stream;
+      this.devices = await this.listInputs();
+      await this.startMonitor(stream);
+      let rec;
+      try {
+        const types = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/webm', 'audio/ogg'];
+        const mimeType = types.find((type) => MediaRecorder.isTypeSupported(type));
+        rec = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+        this.chunks = [];
+        this.finished = new Promise((resolve, reject) => {
+          rec.ondataavailable = (event) => { if (event.data && event.data.size) this.chunks.push(event.data); };
+          rec.onerror = (event) => reject(event.error || new Error('Microphone recording failed'));
+          rec.onstop = () => {
+            const blob = new Blob(this.chunks, { type: rec.mimeType || mimeType || 'audio/webm' });
+            resolve(blob);
+          };
+        });
+        rec.start(250);
+      } catch (err) {
+        this.stopMonitor();
+        stream.getTracks().forEach((t) => t.stop());
+        this.stream = null;
+        throw err;
+      }
+      this.recorder = rec;
+      this.recording = true;
+      this.recordingSince = performance.now();
+      this.devicesCallback(this.devices);
+      return true;
+    } catch (err) {
+      this.inputError = err && err.message || String(err);
+      if (stream && !this.recording) stream.getTracks().forEach((t) => t.stop());
+      throw err;
     } finally {
       this.starting = false;
     }
-    let rec = null;
-    try {
-      rec = new MediaRecorder(stream);
-    } catch (e) {
-      stream.getTracks().forEach((t) => t.stop());
-      throw new Error('This browser cannot record audio');
-    }
-    this.chunks = [];
-    rec.ondataavailable = (e) => {
-      if (e.data && e.data.size) this.chunks.push(e.data);
-    };
-    // A take is cut into slices rather than one buffer at the end: a long
-    // rehearsal should not be held in a single growing blob.
-    rec.start(250);
-    this.finished = new Promise((resolve) => {
-      rec.onstop = () => resolve(new Blob(this.chunks, { type: rec.mimeType || 'audio/webm' }));
-    });
-    this.recorder = rec;
-    this.stream = stream;
-    this.recording = true;
-    this.recordingSince = performance.now();
-    return true;
   }
 
-  // Stops the microphone and resolves with the take, ready to be saved.
-  async stopRecording() {
+  async startMonitor(stream) {
+    this.stopMonitor();
+    try {
+      const Ctor = window.AudioContext || window.webkitAudioContext;
+      if (!Ctor) return;
+      const ctx = new Ctor();
+      if (ctx.state === 'suspended') await ctx.resume();
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      const silentOutput = ctx.createGain();
+      silentOutput.gain.value = 0;
+      source.connect(analyser);
+      analyser.connect(silentOutput);
+      silentOutput.connect(ctx.destination);
+      const data = new Float32Array(analyser.fftSize);
+      let raf = 0;
+      const sample = () => {
+        analyser.getFloatTimeDomainData(data);
+        let sum = 0;
+        for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+        this.inputLevel = Math.sqrt(sum / data.length);
+        this.peakInputLevel = Math.max(this.peakInputLevel, this.inputLevel);
+        this.levelCallback(this.inputLevel);
+        raf = requestAnimationFrame(sample);
+      };
+      sample();
+      this.inputMonitor = { ctx, source, analyser, silentOutput, raf };
+    } catch (err) {
+      this.inputError = err && err.message || String(err);
+    }
+  }
+
+  stopMonitor() {
+    const monitor = this.inputMonitor;
+    if (monitor) this.lastRecordingLevel = this.peakInputLevel;
+    this.inputMonitor = null;
+    this.inputLevel = 0;
+    this.levelCallback(0);
+    if (!monitor) return;
+    cancelAnimationFrame(monitor.raf);
+    try { monitor.source.disconnect(); } catch (_) { /* already disconnected */ }
+    try { monitor.analyser.disconnect(); } catch (_) { /* already disconnected */ }
+    try { monitor.silentOutput.disconnect(); } catch (_) { /* already disconnected */ }
+    monitor.ctx.close().catch(() => {});
+  }
+
+  stopRecording() {
     const rec = this.recorder;
     if (!rec) return null;
+    this.lastRecordingLevel = this.peakInputLevel;
+    this.lastRecordingMime = rec.mimeType || '';
     this.recording = false;
+    this.stopMonitor();
+    this.devicesCallback(this.devices);
     if (rec.state !== 'inactive') rec.stop();
-    let blob = null;
-    try {
-      blob = await this.finished;
-    } catch (e) {
-      blob = null;
-    }
-    this.releaseMic();
-    return blob && blob.size ? blob : null;
+    return this.finished.then((blob) => {
+      this.releaseMic();
+      return blob && blob.size ? blob : null;
+    }).catch((err) => {
+      this.releaseMic();
+      throw err;
+    });
   }
 
   releaseMic() {
+    this.stopMonitor();
     if (this.stream) {
       for (const t of this.stream.getTracks()) t.stop();
     }
