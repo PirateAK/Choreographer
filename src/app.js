@@ -31,6 +31,7 @@ import { Timeline, GUTTER } from './timeline.js';
 import { CompanyLine } from './company.js';
 import { fmtTime } from './draw.js';
 import { music, dropStored } from './music.js';
+import { makeBeatGridMarkers, tempoFromMarkers, translateCountToMs } from './beat-map.js';
 import { narration } from './narration.js';
 import { storeAudio, readAudio } from './audiostore.js';
 import { buildBundle, bundleFileName, checkBundle, applyBundle } from './narration-bundle.js';
@@ -645,9 +646,16 @@ function musicItem(t) {
         <button class="tag pick" data-music="trim" title="End this track where the playhead is">end here</button>
       </div>
       <div class="row">
+        <span class="label">count 1</span>
+        <select data-f="music-beat-one" aria-label="Choose beat marker as count one">${(t.beatMarkers || []).slice(0, 64).map((v, i) => `<option value="${i}"${i === (Number(t.beatOne) || 0) ? ' selected' : ''}>beat ${i + 1} · ${fmtTime(v)}</option>`).join('') || '<option value="0">no markers</option>'}</select>
+        <span class="label">next count</span><span class="tag">${fmtTime(translateCountToMs(state.show, t, 1, 2) || 0)}</span>
+      </div>
+      <div class="row">
         <span class="tag">${missing ? 'file missing' : t.length ? fmtTime(t.length) + ' of file' : 'no length'}</span>
         ${musicSpan(t) !== t.length ? `<span class="tag">trimmed to ${fmtTime(musicSpan(t))}</span>` : ''}
         <button class="tag pick" data-music="replace" title="Attach the audio for this track">replace</button>
+        <button class="tag pick" data-music="beats" title="Analyze the attached audio and replace this track's estimated beat markers">analyze beats</button>
+        <button class="tag pick" data-music="tap-grid" title="Replace estimates with an even grid using the show's tapped tempo">tap-tempo grid</button>
       </div>
       ${missing ? '<p class="hint">The audio for this track is not in this browser. Attach it again to hear it — the track keeps its place.</p>' : ''}
       ${short ? `<p class="hint">The track runs to ${fmtTime(t.start + t.length)} but the acts end at ${fmtTime(totalActLength(state.show))}, so the show — and the music — stop there. <button class="tag pick" data-music="fit" title="Lengthen the last act to cover this track">Fit the running order</button></p>` : ''}
@@ -4194,19 +4202,43 @@ function boot() {
 
   // Tap tempo. The first tap of a session is count one: it fixes the downbeat at the playhead
   // (press it as the music starts, or on the bar's first beat while it plays). Every tap after
-  // that sets the tempo from the gaps. A pause of more than 2.5 s starts a new session.
+  // that sets the tempo from the gaps and rebuilds the active track's grid from that derived
+  // tempo, still anchored to the first tap — steady tapping refines the spacing without moving
+  // count one. A pause of more than 2.5 s starts a new session; hand-dragged markers made
+  // between sessions are left alone.
   let tapSession = null;
   $('btnTapTempo').addEventListener('click', () => {
     const now = performance.now();
     if (!tapSession || now - tapSession.last > 2500) {
       commit();
-      tapSession = { taps: [], last: now };
-      state.show.prefs.downbeat = Math.round(state.ui.playhead || 0);
+      tapSession = {
+        taps: [now],
+        last: now,
+        anchorMs: Math.round(state.ui.playhead || 0),
+        trackId: (activeMusicAt(state.show, state.ui.playhead) || {}).id || null,
+      };
+      state.show.prefs.downbeat = tapSession.anchorMs;
+      state.ui.dirtyPanels = true;
+      persist();
+      refreshCountReadout(1);
+      return; // one tap only names count one; tempo needs a second
     }
     tapSession.last = now;
     tapSession.taps.push(now);
     const bpm = tempoFromTaps(tapSession.taps);
-    if (bpm) state.show.prefs.tempo = bpm;
+    if (bpm) {
+      state.show.prefs.tempo = bpm;
+      const active = tapSession.trackId ? trackById(tapSession.trackId) : null;
+      if (active) {
+        // Rebuild from the session's fixed phase; taps during playback advance the playhead,
+        // but count one must remain where the first tap placed it.
+        const offset = Math.max(0, tapSession.anchorMs - active.start);
+        active.beatMarkers = makeBeatGridMarkers(active.length || musicSpan(active), bpm, offset);
+        active.beatOne = active.beatMarkers.length
+          ? active.beatMarkers.reduce((best, v, i) => Math.abs(v - offset) < Math.abs(active.beatMarkers[best] - offset) ? i : best, 0)
+          : 0;
+      }
+    }
     state.ui.dirtyPanels = true;
     persist();
     refreshCountReadout(tapSession.taps.length);
@@ -4348,6 +4380,8 @@ function boot() {
           before.key = info.key;
           before.name = info.name;
           before.length = info.length;
+          before.beatMarkers = info.beatMarkers || [];
+          before.beatOne = 0;
           // A new file is played whole; a trim that belonged to the old audio would
           // otherwise silently cut the replacement short.
           before.play = info.length;
@@ -4356,6 +4390,8 @@ function boot() {
           // At the playhead, which is where the change of music belongs — the
           // running order only decides it if the picker was opened at the very top.
           const t = addMusicTrack(state.show, { key: info.key, name: info.name, length: info.length, start: at });
+          t.beatMarkers = info.beatMarkers || [];
+          t.beatOne = 0;
           state.ui.selectedTrack = t.id;
           // Say where it landed: the file picker can take a while, and "at the
           // playhead" is only reassuring if the moment is named.
@@ -4396,6 +4432,12 @@ function boot() {
       const ms = Math.max(0, Math.round(secs * 1000));
       m.play = m.length > 0 ? Math.min(ms, m.length) : ms;
       if (state.ui.playing) music.seek(state.ui.playhead);
+      app.rebuild();
+    } else if (f === 'music-beat-one') {
+      commit();
+      m.beatOne = Math.max(0, Math.min(Math.max(0, (m.beatMarkers || []).length - 1), Number(e.target.value) || 0));
+      state.show.prefs.downbeat = m.start + ((m.beatMarkers || [])[m.beatOne] || 0);
+      persist();
       app.rebuild();
     } else if (f === 'fade-edit') {
       const row = e.target.closest('[data-music-cue]');
@@ -4442,6 +4484,41 @@ function boot() {
     if (e.target.closest('[data-music="replace"]')) {
       // A replacement keeps the row's own place, so there is no new moment to read.
       pickMusicFor(m.id, m.start);
+      return;
+    }
+    if (e.target.closest('[data-music="tap-grid"]')) {
+      commit();
+      const downbeat = Number.isFinite(Number(state.show.prefs.downbeat)) && state.show.prefs.downbeat !== null
+        ? Number(state.show.prefs.downbeat)
+        : m.start;
+      const phase = downbeat - m.start;
+      m.beatMarkers = makeBeatGridMarkers(m.length || musicSpan(m), state.show.prefs.tempo, phase);
+      m.beatOne = m.beatMarkers.length
+        ? m.beatMarkers.reduce((best, v, i) => Math.abs(v - phase) < Math.abs(m.beatMarkers[best] - phase) ? i : best, 0)
+        : 0;
+      state.ui.hint = `Replaced estimates with ${Math.round(countGrid(state.show).tempo)} bpm grid`;
+      persist();
+      app.rebuild();
+      return;
+    }
+    if (e.target.closest('[data-music="beats"]')) {
+      state.ui.hint = 'Analyzing ' + m.name + '…';
+      app.rebuild();
+      music.analyze(m).then((beatMarkers) => {
+        commit();
+        m.beatMarkers = beatMarkers;
+        m.beatOne = 0;
+        const estimatedTempo = tempoFromMarkers(beatMarkers);
+        if (estimatedTempo) state.show.prefs.tempo = estimatedTempo;
+        state.ui.hint = beatMarkers.length
+          ? `Estimated ${beatMarkers.length} beat markers · drag them on the timeline to correct`
+          : 'No reliable beat pattern detected; use tap tempo and the manual grid';
+        persist();
+        app.rebuild();
+      }).catch((err) => {
+        state.ui.hint = err && err.message ? err.message : 'Could not analyze this audio';
+        app.rebuild();
+      });
       return;
     }
     if (e.target.closest('[data-music="eye"]')) {

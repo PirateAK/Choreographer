@@ -1293,6 +1293,10 @@ export function normalise(show) {
         // to the end and a trimmed one keeps the trim across a reload.
         play: Number.isFinite(Number(t.play)) ? Math.max(0, Math.round(Number(t.play))) : undefined,
         level: Number.isFinite(Number(t.level)) ? Math.max(0, Math.min(1, Number(t.level))) : 1,
+        beatMarkers: Array.isArray(t.beatMarkers)
+          ? t.beatMarkers.map(Number).filter(Number.isFinite).map((v) => Math.max(0, Math.min(Number.isFinite(length) && length > 0 ? length : Infinity, Math.round(v)))).sort((a, b) => a - b)
+          : [],
+        beatOne: Math.max(0, Math.round(finiteModel(t.beatOne, 0))),
         visible: t.visible !== false,
         cues: (Array.isArray(t.cues) ? t.cues : [])
           .filter((c) => c && Number.isFinite(Number(c.level)))
@@ -2081,6 +2085,7 @@ export function addMusicTrack(show, data) {
     : last
       ? last.start + (last.length || 0)
       : 0;
+  const beatMarkers = Array.isArray(data && data.beatMarkers) ? data.beatMarkers.map(Number).filter(Number.isFinite).map((v) => Math.max(0, Math.round(v))).sort((a, b) => a - b) : [];
   const track = {
     id: uid('trk'),
     key: String((data && data.key) || uid('audio')),
@@ -2089,6 +2094,8 @@ export function addMusicTrack(show, data) {
     length: Math.max(0, Math.round(Number(data && data.length) || 0)),
     play: Math.max(0, Math.round(Number(data && data.length) || 0)),
     level: 1,
+    beatMarkers,
+    beatOne: Math.max(0, Math.min(Math.max(0, beatMarkers.length - 1), Math.round(Number(data && data.beatOne) || 0))),
     visible: true,
     cues: [],
   };

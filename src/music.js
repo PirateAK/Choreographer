@@ -11,6 +11,7 @@
 // under a different key prefix.
 
 import { storeAudio, readAudio, dropAudio, peaksOf } from './audiostore.js';
+import { estimateBeatMarkers } from './beat-map.js';
 
 
 export function clampReviewRate(rate) {
@@ -203,6 +204,17 @@ export class MusicEngine {
     return !!this.buffer;
   }
 
+  // Analyze a stored track without changing the currently playing buffer/source.
+  async analyze(track) {
+    if (!track) return [];
+    const ctx = this.ensure();
+    if (!ctx) throw new Error('This browser cannot analyze audio');
+    const record = await readAudio(track.key);
+    if (!record || !record.bytes) throw new Error('Audio is missing in this browser');
+    const buffer = await ctx.decodeAudioData(record.bytes.slice(0));
+    return estimateBeatMarkers(buffer);
+  }
+
   // Take a file from disk: decode it, keep the peaks for the row, and store the
   // bytes so the track survives a reload without asking for the file again.
   async attach(file) {
@@ -212,16 +224,17 @@ export class MusicEngine {
     const buffer = await ctx.decodeAudioData(bytes.slice(0));
     const key = 'music-' + Date.now().toString(36);
     const peaks = peaksOf(buffer);
+    const beatMarkers = estimateBeatMarkers(buffer);
     try {
-      await storeAudio(key, { name: file.name, bytes, peaks: Array.from(peaks) });
+      await storeAudio(key, { name: file.name, bytes, peaks: Array.from(peaks), beatMarkers });
     } catch (e) {
       // Storage blocked: the track still plays this session, it just will not
       // come back on reload. Not fatal.
     }
-    this.cache.set(key, { buffer, peaks });
+    this.cache.set(key, { buffer, peaks, beatMarkers });
     this.peaksByKey.set(key, peaks);
     this.status.set(key, 'ready');
-    return { key, name: file.name, length: Math.round(buffer.duration * 1000) };
+    return { key, name: file.name, length: Math.round(buffer.duration * 1000), beatMarkers };
   }
 
   async forget(track) {

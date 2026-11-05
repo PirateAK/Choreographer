@@ -946,6 +946,19 @@ export class Timeline {
           }
           ctx.strokeStyle = 'rgba(76,201,240,' + 0.65 * a + ')';
           ctx.strokeRect(left + 0.5, mid - 10.5, Math.max(2, right - left - 1), 21);
+          // Estimated/editable beats are thin coral ticks, with count one called out in gold.
+          for (let bi = 0; bi < (m.beatMarkers || []).length; bi++) {
+            const beatX = this.xOfDisplay(displayOfContent(show, m.start + m.beatMarkers[bi]));
+            if (beatX < left || beatX > right) continue;
+            const activeDrag = this.drag && this.drag.type === 'beat' && this.drag.trackId === m.id && this.drag.index === bi;
+            ctx.strokeStyle = bi === (Number(m.beatOne) || 0) ? '#ffb703' : activeDrag ? '#fff1c2' : 'rgba(255,127,112,.95)';
+            ctx.lineWidth = activeDrag ? 2 : 1;
+            ctx.beginPath();
+            ctx.moveTo(Math.round(beatX) + 0.5, mid - 11);
+            ctx.lineTo(Math.round(beatX) + 0.5, mid + 11);
+            ctx.stroke();
+            ctx.lineWidth = 1;
+          }
         }
         if (x0 >= GUTTER && right > x0) {
           ctx.fillStyle = 'rgba(226,236,248,.8)';
@@ -2270,6 +2283,22 @@ export class Timeline {
       }
     }
 
+    // Beat ticks are edited independently of track trims and fade cues.
+    if (tr.kind === 'music' && tr.track) {
+      const m = tr.track;
+      let closest = null;
+      for (let bi = 0; bi < (m.beatMarkers || []).length; bi++) {
+        const beatX = this.xOfDisplay(displayOfContent(show, m.start + m.beatMarkers[bi]));
+        const dist = Math.abs(beatX - x);
+        if (dist <= 7 && (!closest || dist < closest.dist)) closest = { index: bi, dist };
+      }
+      if (closest) {
+        commit();
+        this.drag = { type: 'beat', trackId: m.id, index: closest.index };
+        return;
+      }
+    }
+
     // A fade's band is a cue, and takes precedence over sliding the track.
     if (tr.kind === 'music' && tr.track) {
       const hit = this.fadeAt(x, tr.track);
@@ -2374,6 +2403,14 @@ export class Timeline {
       for (let i = 1; i < keys.length; i++) {
         if (Number.isFinite(keys[i].dur)) keys[i].dur = Math.max(0, keys[i].t - keys[i - 1].t);
       }
+    } else if (this.drag.type === 'beat') {
+      const m = (show.musicTracks || []).find((t) => t.id === this.drag.trackId);
+      if (!m || !Array.isArray(m.beatMarkers)) return;
+      const markerX = this.contentAtX(x) - m.start;
+      const minGap = 30;
+      const prev = this.drag.index > 0 ? m.beatMarkers[this.drag.index - 1] + minGap : 0;
+      const next = this.drag.index < m.beatMarkers.length - 1 ? m.beatMarkers[this.drag.index + 1] - minGap : m.length || Infinity;
+      m.beatMarkers[this.drag.index] = Math.round(Math.max(prev, Math.min(next, markerX)));
     } else if (this.drag.type === 'hold' || this.drag.type === 'pause') {
       const t = Math.max(0, this.contentAtX(x));
       this.drag.marker.t = Math.round(t);
@@ -2520,9 +2557,11 @@ export class Timeline {
     }
     if (this.drag) {
       const moved = this.drag.type === 'music' || this.drag.type === 'musicEnd';
+      const beatMoved = this.drag.type === 'beat';
       this.drag = null;
       persist();
       this.app.rebuild();
+      if (beatMoved && state.ui.playing) music.seek(state.ui.playhead);
       // The cue moved under a running track: restart it from the right place.
       if (moved && state.ui.playing) music.seek(state.ui.playhead);
     }
