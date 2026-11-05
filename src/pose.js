@@ -633,6 +633,26 @@ export function legContours(leg) {
   ];
 }
 
+// Shaped arms, same method as the legs: a tapered upper arm, a forearm, and a short
+// hand carried on the forearm's line. Radii are body units and sit well inside the old
+// uniform stroke, so the arm reads as an arm rather than a rod. Also returns the elbow
+// and wrist discs that cover the two seams, as the knee disc does for the leg.
+export function armContours(arm) {
+  const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+  const [shoulder, elbow, wrist] = arm;
+  const len = Math.hypot(wrist[0] - elbow[0], wrist[1] - elbow[1]) || 1;
+  const dir = [(wrist[0] - elbow[0]) / len, (wrist[1] - elbow[1]) / len];
+  const hand = [wrist[0] + dir[0] * 0.07, wrist[1] + dir[1] * 0.07];
+  return {
+    shapes: [
+      limbContour([shoulder, mix(shoulder, elbow, 0.35), mix(shoulder, elbow, 0.7), elbow], [0.019, 0.017, 0.014, 0.012]),
+      limbContour([elbow, mix(elbow, wrist, 0.35), mix(elbow, wrist, 0.7), wrist], [0.012, 0.011, 0.009, 0.0075]),
+      limbContour([wrist, mix(wrist, hand, 0.5), hand], [0.0075, 0.0068, 0.0045]),
+    ],
+    discs: [elbow, wrist],
+  };
+}
+
 /* ------------------------------------------------------------------ drawing */
 
 // The figure uses shaped, articulated legs around the solved skeleton; arms and torso
@@ -675,14 +695,22 @@ export function drawPose(ctx, o) {
     ctx.fillStyle = body;
     ctx.fill();
   }
-  const limbs = [j.arms[0], j.arms[1], [j.pelvis, j.chest]];
-  for (const seg of limbs) stroke(seg, wide * 1.7, outline);
-  for (const seg of limbs) stroke(seg, wide, body);
+  const torso = [j.pelvis, j.chest];
+  stroke(torso, wide * 1.7, outline);
+  stroke(torso, wide, body);
+  for (const arm of j.arms) {
+    const { shapes, discs } = armContours(arm);
+    for (const shape of shapes) polygon(shape);
+    ctx.beginPath();
+    ctx.arc(X(discs[0][0]), Y(discs[0][1]), h * 0.012, 0, Math.PI * 2);
+    ctx.arc(X(discs[1][0]), Y(discs[1][1]), h * 0.0075, 0, Math.PI * 2);
+    ctx.fillStyle = body;
+    ctx.fill();
+  }
   for (const foot of footGeometry(spec, j, facing, turn)) {
     polygon(limbContour(foot.points, [0.009, 0.010, 0.009, 0.006]));
   }
 
-  // Head, then hair over the crown.
   const headR = j.headR * h;
   const hx = X(j.head[0]);
   const hy = Y(j.head[1]);
@@ -767,9 +795,15 @@ export function poseSvg(o) {
     for (const shape of legContours(leg)) out.push(polygon(shape));
     out.push(`<circle cx="${X(leg[1][0]).toFixed(2)}" cy="${Y(leg[1][1]).toFixed(2)}" r="${(h * 0.016).toFixed(2)}" fill="${body}" />`);
   }
-  const limbs = [j.arms[0], j.arms[1], [j.pelvis, j.chest]];
-  for (const s of limbs) out.push(seg(s, width, ink));
-  for (const s of limbs) out.push(seg(s, wide, body));
+  const torso = [j.pelvis, j.chest];
+  out.push(seg(torso, width, ink));
+  out.push(seg(torso, wide, body));
+  for (const arm of j.arms) {
+    const { shapes, discs } = armContours(arm);
+    for (const shape of shapes) out.push(polygon(shape));
+    out.push(`<circle cx="${X(discs[0][0]).toFixed(2)}" cy="${Y(discs[0][1]).toFixed(2)}" r="${(h * 0.012).toFixed(2)}" fill="${body}" />`);
+    out.push(`<circle cx="${X(discs[1][0]).toFixed(2)}" cy="${Y(discs[1][1]).toFixed(2)}" r="${(h * 0.0075).toFixed(2)}" fill="${body}" />`);
+  }
   for (const foot of footGeometry(spec, j, facing, turn)) {
     out.push(polygon(limbContour(foot.points, [0.009, 0.010, 0.009, 0.006])));
   }
