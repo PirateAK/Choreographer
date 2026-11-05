@@ -2459,6 +2459,85 @@ export function removeCostume(show, id) {
 
 /* -------------------------------------------------------- path stations */
 
+// Move one authored station only; generated foot knots remain untouched. The station is
+// clamped to the stage and wing bounds independently of its neighbours.
+export function pathStationTranslationDelta(dancer, index, dx, dy, show = null) {
+  const key = dancer && Array.isArray(dancer.keys) && dancer.keys[index];
+  const x = Number(dx);
+  const y = Number(dy);
+  if (!key || !Number.isInteger(index) || !Number.isFinite(x) || !Number.isFinite(y) || (!x && !y)) return null;
+  let moveX = x;
+  let moveY = y;
+  if (show && show.stage) {
+    const stage = show.stage;
+    const minX = -(stage.width / 2 + (Number(stage.wingDepth) || 0));
+    const maxX = -minX;
+    const minY = -0.5;
+    const maxY = stage.depth + 0.5;
+    moveX = x > 0 ? Math.min(x, Math.max(0, maxX - key.x))
+      : x < 0 ? Math.max(x, Math.min(0, minX - key.x)) : 0;
+    moveY = y > 0 ? Math.min(y, Math.max(0, maxY - key.y))
+      : y < 0 ? Math.max(y, Math.min(0, minY - key.y)) : 0;
+  }
+  return moveX || moveY ? { x: moveX, y: moveY } : null;
+}
+
+export function translatePathStation(dancer, index, dx, dy, show = null) {
+  const key = dancer && dancer.keys && dancer.keys[index];
+  const delta = pathStationTranslationDelta(dancer, index, dx, dy, show);
+  if (!key || !delta) return false;
+  key.x += delta.x;
+  key.y += delta.y;
+  return true;
+}
+
+export function pathTranslationDelta(dancer, dx, dy, show = null) {
+  if (!dancer || !Array.isArray(dancer.keys) || dancer.keys.length === 0) return null;
+  const x = Number(dx);
+  const y = Number(dy);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || (!x && !y)) return null;
+  const coordinates = [
+    ...dancer.keys,
+    ...Object.values(dancer.footTrajectory || {}).flatMap((track) => Array.isArray(track) ? track : []),
+  ];
+  let moveX = x;
+  let moveY = y;
+  if (show && show.stage) {
+    const stage = show.stage;
+    const minX = -(stage.width / 2 + (Number(stage.wingDepth) || 0));
+    const maxX = -minX;
+    const minY = -0.5;
+    const maxY = stage.depth + 0.5;
+    const xs = coordinates.map((p) => Number(p.x) || 0);
+    const ys = coordinates.map((p) => Number(p.y) || 0);
+    const positiveRoomX = maxX - Math.max(...xs);
+    const negativeRoomX = minX - Math.min(...xs);
+    const positiveRoomY = maxY - Math.max(...ys);
+    const negativeRoomY = minY - Math.min(...ys);
+    moveX = x > 0
+      ? (positiveRoomX < 0 ? 0 : Math.min(x, positiveRoomX))
+      : x < 0 ? (negativeRoomX > 0 ? 0 : Math.max(x, negativeRoomX)) : 0;
+    moveY = y > 0
+      ? (positiveRoomY < 0 ? 0 : Math.min(y, positiveRoomY))
+      : y < 0 ? (negativeRoomY > 0 ? 0 : Math.max(y, negativeRoomY)) : 0;
+  }
+  return moveX || moveY ? { x: moveX, y: moveY } : null;
+}
+
+export function translatePathTrack(dancer, dx, dy, show = null) {
+  const delta = pathTranslationDelta(dancer, dx, dy, show);
+  if (!delta) return false;
+  const coordinates = [
+    ...dancer.keys,
+    ...Object.values(dancer.footTrajectory || {}).flatMap((track) => Array.isArray(track) ? track : []),
+  ];
+  for (const point of coordinates) {
+    point.x = (Number(point.x) || 0) + delta.x;
+    point.y = (Number(point.y) || 0) + delta.y;
+  }
+  return true;
+}
+
 // Mirror authored path geometry around the stage centre line without changing its
 // sequence, timing, pose, turn, or movement metadata.
 export function mirrorPathLeftRight(dancer) {

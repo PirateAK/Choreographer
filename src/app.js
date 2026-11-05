@@ -5,7 +5,7 @@ import {
   contentOfLocal, localOfContent, endContent, ensureDurations, reflowKeys, removeStation, toggleVisibility, displayOfContent,
   endMarker, setEnd,
   removeFromStation, truncateAfter, addWingLeg, removeWingLeg, canAddWingLeg,
-  findObject, isProp, mirrorPathLeftRight, addCastGroup, removeCastGroup, propPosOfContent, CARRY_OFFSET, carrierOf, carrierIdOf,
+  findObject, isProp, mirrorPathLeftRight, pathStationTranslationDelta, translatePathStation, pathTranslationDelta, translatePathTrack, addCastGroup, removeCastGroup, propPosOfContent, CARRY_OFFSET, carrierOf, carrierIdOf,
   addCarryHandoff, removeCarryHandoff, addSceneryCue, removeSceneryCue, clothSpan, clampClothX, maxClothSpan,
   musicLevelAt, addMusicCue, removeMusicCue, updateMusicCue, audibleLevel,
   clothDepth, dropStack, actRanges, actAt, addAct, removeAct, actHasWork, ACT_MIN_MS, ACT_MAX_MS, sceneryStateAt, totalActLength,
@@ -55,7 +55,7 @@ let pendingMusicAt = 0;
 let pendingVoiceAt = 0;
 // The moment the take in progress began at, which is where it lands.
 let voiceTakeAt = 0;
-const STAGE_HINT = 'Click a point to edit it · drag to move it · drag the line to bow it · right-click deletes it and everything after';
+const STAGE_HINT = 'Select a dancer and a station: arrows nudge that station only; with no station selected, arrows shift the whole track · Shift+arrow moves twice the grid · right-click deletes from a point onward';
 // The standing instruction is a coach mark: read once, then out of the way. It sits over
 // the front of the stage, which is exactly where a scene card stands and a downstage
 // path ends, so it retires on the first click there (or after a while) rather than
@@ -100,6 +100,10 @@ const app = {
     // else cancels it rather than putting it on whoever happens to be picked next.
     state.ui.phraseArmed = null;
     if (state.ui.selectedId !== id) {
+      clearTimeout(state.ui.trackNudgeTimer);
+      state.ui.trackNudgeCommitted = false;
+      state.ui.trackNudgeDancerId = null;
+      state.ui.trackNudgeMode = null;
       if (state.ui.stationGuide) {
         state.ui.stationGuide = null;
         state.ui.placingStations = false;
@@ -134,6 +138,18 @@ const app = {
     this.select(dancer.id);
     const key = dancer.keys[index];
     if (!key) return;
+    if (state.ui.stationIdx !== index) {
+      clearTimeout(state.ui.trackNudgeTimer);
+      state.ui.trackNudgeCommitted = false;
+      state.ui.trackNudgeDancerId = null;
+      state.ui.trackNudgeMode = null;
+    }
+    if (state.ui.stationIdx !== index) {
+      clearTimeout(state.ui.trackNudgeTimer);
+      state.ui.trackNudgeCommitted = false;
+      state.ui.trackNudgeDancerId = null;
+      state.ui.trackNudgeMode = null;
+    }
     state.ui.stationIdx = index;
     state.ui.playhead = contentOfLocal(state.show, dancer.id, key.t);
     state.ui.dirtyPanels = true;
@@ -164,7 +180,7 @@ const app = {
     }
     const d = findObject(state.show, state.ui.selectedId);
     const i = state.ui.stationIdx;
-    const key = d && Number.isInteger(i) ? d.keys[i] : null;
+    const key = d && !isProp(d) && Number.isInteger(i) ? d.keys[i] : null;
     moves.open(key ? { pose: key.pose, step: key.step, level: key.level || 'flat' } : null);
     moves.say(key ? `point ${i + 1} of ${d.name}` : 'no point picked');
     moves.phraseWhere(this.phraseLead());
@@ -2279,6 +2295,16 @@ function bindPanelEvents() {
       app.rebuild();
       app.select(state.ui.selectedId);
       return;
+    }
+    // Picking the dancer again is an explicit "whole track" choice: drop any focused station
+    // so the arrow keys move the track, not the last point that was edited.
+    if (state.ui.selectedId === d.id) {
+      clearTimeout(state.ui.trackNudgeTimer);
+      state.ui.trackNudgeCommitted = false;
+      state.ui.trackNudgeDancerId = null;
+      state.ui.trackNudgeMode = null;
+      state.ui.stationIdx = null;
+      state.ui.dirtyPanels = true;
     }
     app.select(d.id);
   });
@@ -4705,6 +4731,9 @@ function boot() {
 
   window.addEventListener('keydown', (e) => {
     const tag = (e.target && e.target.tagName) || '';
+    // Arrows do nothing on a focused button or link, so a button click (Undo, a toolbar tool)
+    // must not stop the track or station nudge from taking the arrow keys.
+    const isTyping = ['INPUT', 'SELECT', 'TEXTAREA'].includes(tag) || e.target?.isContentEditable;
     // While the cheat sheet is up it owns the keyboard: Escape closes it, and the space bar
     // does not start a show playing behind a curtain nobody can see through.
     if (moves && moves.isOpen) {
@@ -4715,6 +4744,68 @@ function boot() {
       return;
     }
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') && state.ui.selectedId && !state.ui.watch && !state.ui.placingStations && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      const dancer = findObject(state.show, state.ui.selectedId);
+      const selectedStationIndex = Number.isInteger(state.ui.stationIdx) && dancer && !isProp(dancer) && dancer.keys[state.ui.stationIdx]
+        ? state.ui.stationIdx : null;
+      const mode = selectedStationIndex != null ? `station:${selectedStationIndex}` : 'track';
+      if (dancer && !isProp(dancer) && dancer.keys?.length && !isTyping) {
+        e.preventDefault();
+        const grid = Number(state.show.stage.grid) || 0.5;
+        const step = grid * (e.shiftKey ? 2 : 1);
+        const delta = {
+          ArrowLeft: [-step, 0], ArrowRight: [step, 0],
+          ArrowUp: [0, step], ArrowDown: [0, -step],
+        }[e.key];
+        if (state.ui.trackNudgeCommitted && (state.ui.trackNudgeDancerId !== dancer.id || state.ui.trackNudgeMode !== mode)) {
+          clearTimeout(state.ui.trackNudgeTimer);
+          state.ui.trackNudgeCommitted = false;
+          state.ui.trackNudgeDancerId = null;
+          state.ui.trackNudgeMode = null;
+          persist();
+        }
+        if (!state.ui.trackNudgeCommitted) {
+          let allowed;
+          if (selectedStationIndex != null) {
+            const key = dancer.keys[selectedStationIndex];
+            allowed = { x: delta[0], y: delta[1] };
+            const stage = state.show.stage;
+            const minX = -(stage.width / 2 + (Number(stage.wingDepth) || 0));
+            const maxX = -minX;
+            if (key.x + allowed.x < minX) allowed.x = minX - key.x;
+            if (key.x + allowed.x > maxX) allowed.x = maxX - key.x;
+            if (key.y + allowed.y < -0.5) allowed.y = -0.5 - key.y;
+            if (key.y + allowed.y > stage.depth + 0.5) allowed.y = stage.depth + 0.5 - key.y;
+            if (!allowed.x && !allowed.y) return;
+          } else {
+            allowed = pathTranslationDelta(dancer, delta[0], delta[1], state.show);
+            if (!allowed) return;
+          }
+          commit();
+          state.ui.trackNudgeCommitted = true;
+          state.ui.trackNudgeDancerId = dancer.id;
+          state.ui.trackNudgeMode = mode;
+        }
+        const moved = selectedStationIndex != null
+          ? translatePathStation(dancer, selectedStationIndex, delta[0], delta[1], state.show)
+          : translatePathTrack(dancer, delta[0], delta[1], state.show);
+        if (moved) {
+          state.ui.dirtyPanels = true;
+          app.stage.draw();
+          app.elevation.draw();
+          app.timeline.draw();
+          persist();
+          clearTimeout(state.ui.trackNudgeTimer);
+          state.ui.trackNudgeTimer = setTimeout(() => {
+            state.ui.trackNudgeCommitted = false;
+            state.ui.trackNudgeDancerId = null;
+            persist();
+            app.rebuild();
+          }, 250);
+        }
+        return;
+      }
+    }
     if (e.key === 'Escape' && state.ui.stationGuide) {
       e.preventDefault();
       state.ui.stationGuide = null;
@@ -4734,6 +4825,12 @@ function boot() {
       togglePlay();
     } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
       e.preventDefault();
+      if (state.ui.trackNudgeCommitted) {
+        clearTimeout(state.ui.trackNudgeTimer);
+        state.ui.trackNudgeCommitted = false;
+        state.ui.trackNudgeDancerId = null;
+        persist();
+      }
       state.ui.stationIdx = null;
       if (e.shiftKey) redo();
       else undo();
