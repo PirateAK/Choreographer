@@ -288,20 +288,35 @@ table.cast span.dim { color: #8a8578; }
    The act strip sits above both, because switching act is switching the moment. */
 #center {
   min-width: 0; min-height: 0; background: #080b10;
-  display: grid; grid-template-rows: 34px 27px minmax(0, 1fr) 186px;
+  display: grid; grid-template-rows: minmax(40px, auto) auto minmax(0, 1fr) 186px;
 }
 
 .act-tabs {
   display: flex;
-  align-items: stretch;
-  gap: 2px;
-  padding: 0 8px;
+  flex-wrap: wrap;
+  align-content: center;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 5px 8px;
   background: #0b0f16;
   border-bottom: 1px solid var(--line);
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
 }
+.act-tabs[aria-label="Scenes in this act"]:empty { display: none; }
+.act-picker { min-width: 0; }
+#actSelect {
+  max-width: min(220px, 24vw);
+  height: 27px;
+  padding: 0 25px 0 9px;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--accent);
+  background: #101722;
+  border: 1px solid #334155;
+  border-radius: 5px;
+}
+.act-action { flex: none; }
+.stage-tools { display: flex; flex: 1 1 410px; align-items: center; justify-content: flex-end; gap: 4px; flex-wrap: wrap; min-width: 0; }
 .act-tab {
   display: flex;
   align-items: center;
@@ -334,9 +349,14 @@ table.cast span.dim { color: #8a8578; }
 /* Scenes belong to the lit act, so they sit under the act strip and read smaller. */
 .scene-tabs {
   gap: 0;
+  min-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
   background: #090d13;
   border-bottom: 1px solid #141b26;
+  overflow-x: auto;
 }
+.scene-tabs[hidden] { display: none; }
 .scene-tab {
   position: relative;
   padding: 0 11px 0 9px;
@@ -367,9 +387,10 @@ table.cast span.dim { color: #8a8578; }
 
 .scene-row { padding-left: 16px; }
 .scene-row .tag { font-size: 9px; }
-#stage-wrap { position: relative; min-height: 0; }
+#stage-wrap { position: relative; min-height: 0; grid-row: 3; }
 #stage { display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
 #elevation-wrap {
+  grid-row: 4;
   position: relative; min-height: 0;
   border-top: 1px solid var(--line);
   background: #080b10;
@@ -387,6 +408,9 @@ body.fill-elev #stage-wrap { display: none; }
   padding: 4px 8px; border-radius: 5px; cursor: pointer;
   background: rgba(12,17,25,.82); color: #93a4ba; border: 1px solid #26313f;
 }
+body.fill-plan #stage-wrap { grid-row: 3 / 5; }
+body.fill-elev #elevation-wrap { grid-row: 3 / 5; }
+
 .view-btn:hover { color: #dfe8f5; border-color: #33445a; }
 .view-btn.on { color: #f0d79a; border-color: #6b5620; background: rgba(58,44,14,.82); }
 
@@ -486,6 +510,7 @@ body.watch #left,
 body.watch #right,
 body.watch #actTabs,
 body.watch #sceneTabs,
+body.watch .stage-tools,
 body.watch .stage-hint,
 body.watch .point-strip,
 body.watch .view-tools {

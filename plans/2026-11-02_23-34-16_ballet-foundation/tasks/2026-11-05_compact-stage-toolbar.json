@@ -1,0 +1,17 @@
+[
+  {
+    "content": "[layout-1] Inspect act/scene handlers and stage sizing contracts — self",
+    "id": "ct1",
+    "status": "completed"
+  },
+  {
+    "content": "[layout-2] Consolidate toolbar, add accessible act selector and preserve playback selection/sizing — delegate",
+    "id": "ct2",
+    "status": "completed"
+  },
+  {
+    "content": "[layout-3] Verify laptop layout, acts/scenes/view actions and 32 engine regressions; update release and commit — self",
+    "id": "ct3",
+    "status": "completed"
+  }
+]

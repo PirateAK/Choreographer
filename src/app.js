@@ -948,23 +948,20 @@ function rebuildPanels() {
   $('prefBeats').value = prefs.beatsPerBar;
   $('castCount').textContent = String(state.show.cast.length + (state.show.castGroups || []).length);
 
-  // The running order: tabs for switching act, a list for editing them.
+  // The running order: a compact picker for switching act, with all acts in its menu.
   const acts = state.show.acts || [];
   const ranges = actRanges(state.show);
   const activeAct = actAt(state.show, state.ui.playhead);
   $('actCount').textContent = String(acts.length);
-  $('actTabs').innerHTML =
-    acts
-      .map((a, i) => {
-        const r = ranges[i];
-        const from = fmtTime(displayOfContent(state.show, r.start));
-        const to = fmtTime(displayOfContent(state.show, r.end));
-        return `<button class="act-tab${activeAct && activeAct.id === a.id ? ' on' : ''}" data-id="${a.id}" title="${esc(a.name)} — ${from} to ${to}">
-          <span class="act-no">${i + 1}</span><span class="act-name">${esc(a.name)}</span>
-        </button>`;
-      })
-      .join('') +
-    '<button class="act-tab add" data-add="1" title="Add an act after the last one">+ Act</button>';
+  $('actSelect').innerHTML = acts
+    .map((a, i) => {
+      const r = ranges[i];
+      const from = fmtTime(displayOfContent(state.show, r.start));
+      const to = fmtTime(displayOfContent(state.show, r.end));
+      return `<option value="${a.id}" title="${esc(a.name)} — ${from} to ${to}">${i + 1}. ${esc(a.name || 'Act')}</option>`;
+    })
+    .join('');
+  $('actSelect').value = activeAct ? activeAct.id : '';
 
   // Scenes of the act the playhead is in: named moments inside that act.
   const activeScenes = activeAct ? scenesOf(acts.find((a) => a.id === activeAct.id)) : [];
@@ -975,9 +972,9 @@ function rebuildPanels() {
           const at = activeAct.start + s.offset;
           return `<button class="scene-tab${activeScene && activeScene.id === s.id ? ' on' : ''}" data-id="${s.id}" title="${esc(s.name)} — ${fmtTime(displayOfContent(state.show, at))}">${esc(s.name)}</button>`;
         })
-        .join('') +
-      '<button class="scene-tab add" data-add="1" title="Add a scene at the playhead">+ Scene</button>'
+        .join('')
     : '';
+  $('sceneTabs').hidden = !activeScenes.length;
 
   renderMusic();
   renderNarration();
@@ -2146,19 +2143,19 @@ function bindPanelEvents() {
     state.ui.dirtyPanels = true;
   };
 
-  $('actTabs').addEventListener('click', (e) => {
-    const btn = e.target.closest('.act-tab');
-    if (!btn) return;
-    if (btn.dataset.add) {
-      commit();
-      const act = addAct(state.show);
-      const range = actRanges(state.show).find((r) => r.id === act.id);
-      gotoTimes(range ? range.start : 0);
+  $('actSelect').addEventListener('change', () => {
+    const range = actRanges(state.show).find((r) => r.id === $('actSelect').value);
+    if (range) {
+      gotoTimes(range.start);
       app.rebuild();
-      return;
     }
-    const range = actRanges(state.show).find((r) => r.id === btn.dataset.id);
-    if (range) gotoTimes(range.start);
+  });
+  $('btnAddAct').addEventListener('click', () => {
+    commit();
+    const act = addAct(state.show);
+    const range = actRanges(state.show).find((r) => r.id === act.id);
+    gotoTimes(range ? range.start : 0);
+    app.rebuild();
   });
 
   const actsList = $('actsList');
@@ -2174,9 +2171,9 @@ function bindPanelEvents() {
     if (!act) return;
     if (e.target.dataset.f === 'name') {
       act.name = e.target.value;
-      // Keep the tab in step while typing, without rebuilding the list under the cursor.
-      const name = $('actTabs').querySelector(`.act-tab[data-id="${act.id}"] .act-name`);
-      if (name) name.textContent = act.name || 'Act';
+      // Keep the act picker in step while typing, without rebuilding the list under the cursor.
+      const option = $('actSelect').querySelector(`option[value="${act.id}"]`);
+      if (option) option.textContent = `${state.show.acts.indexOf(act) + 1}. ${act.name || 'Act'}`;
       persist();
       return;
     }
@@ -2248,17 +2245,17 @@ function bindPanelEvents() {
   $('sceneTabs').addEventListener('click', (e) => {
     const btn = e.target.closest('.scene-tab');
     if (!btn) return;
-    if (btn.dataset.add) {
-      if (!actAt(state.show, state.ui.playhead)) return;
-      commit();
-      const scene = addScene(state.show, state.ui.playhead);
-      state.ui.hint = scene ? null : 'There is already a scene at this moment';
-      app.rebuild();
-      return;
-    }
     const range = sceneRanges(state.show).find((s) => s.id === btn.dataset.id);
     if (range) gotoTimes(range.start);
   });
+  $('btnAddScene').addEventListener('click', () => {
+    if (!actAt(state.show, state.ui.playhead)) return;
+    commit();
+    const scene = addScene(state.show, state.ui.playhead);
+    state.ui.hint = scene ? null : 'There is already a scene at this moment';
+    app.rebuild();
+  });
+
 
   const castList = $('castList');
   castList.addEventListener('click', (e) => {
@@ -3218,12 +3215,8 @@ function updateTransport() {
   // Whichever act the playhead is in is the lit tab, so playing through a
   // boundary changes act on the stage as well as on the clock.
   const act = actAt(state.show, state.ui.playhead);
-  const tabs = $('actTabs');
-  if (tabs) {
-    for (const tab of tabs.querySelectorAll('.act-tab[data-id]')) {
-      tab.classList.toggle('on', !!act && tab.dataset.id === act.id);
-    }
-  }
+  const actSelect = $('actSelect');
+  if (actSelect && actSelect.value !== (act ? act.id : '')) actSelect.value = act ? act.id : '';
   // Inside an act, the scene the playhead stands in is lit too.
   const scene = sceneAt(state.show, state.ui.playhead);
   const sceneTabs = $('sceneTabs');

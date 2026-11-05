@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Choreographer</title>
 <link rel="icon" type="image/png" href="favicon.png" />
-<link rel="stylesheet" href="styles.css?v=scroll31" />
+<link rel="stylesheet" href="styles.css?v=scroll32" />
 </head>
 <body>
 <header>
@@ -106,11 +106,11 @@
   </aside>
 
   <section id="center">
-    <div id="actTabs" class="act-tabs" aria-label="Acts"></div>
-    <div id="sceneTabs" class="act-tabs scene-tabs" aria-label="Scenes in this act"></div>
-    <div id="stage-wrap">
-      <canvas id="stage"></canvas>
-      <div class="view-tools">
+    <div id="actTabs" class="act-tabs" aria-label="Act and stage controls">
+      <label class="act-picker"><select id="actSelect" aria-label="Select act"></select></label>
+      <button id="btnAddAct" class="view-btn act-action" title="Add an act after the last one">+ Act</button>
+      <button id="btnAddScene" class="view-btn act-action" title="Add a scene at the playhead">+ Scene</button>
+      <div class="stage-tools" aria-label="Overhead stage controls">
         <button id="btnPaths" class="view-btn on" aria-pressed="true" title="Show or hide movement lines">Paths</button>
         <button id="btnStations" class="view-btn on" aria-pressed="true" title="Show or hide station points">Stations</button>
         <button id="btnCostumes" class="view-btn" aria-pressed="false" title="Show or hide overhead costume shapes">Costumes</button>
@@ -118,6 +118,10 @@
         <button id="btnResetOverhead" class="view-btn" title="Return to directly overhead and leave tilt mode">Reset overhead</button>
         <button id="btnFillPlan" class="view-btn" aria-pressed="false" title="Enlarge the overhead stage plan">Top-down</button>
       </div>
+    </div>
+    <div id="sceneTabs" class="act-tabs scene-tabs" aria-label="Scenes in this act"></div>
+    <div id="stage-wrap">
+      <canvas id="stage"></canvas>
       <div id="pointStrip" class="point-strip" hidden></div>
       <div id="stageHint" class="stage-hint">Click a point to edit it · drag to move it · drag the line to bow it · right-click deletes it and everything after</div>
     </div>
@@ -269,7 +273,8 @@
       <button id="btnAboutClose" class="ghost">Close</button>
     </header>
     <div class="moves-body">
-      <p><strong>Version 0.4.2</strong> <span class="about-build">Release date: <time datetime="2026-11-05">5 November 2026</time></span></p>
+      <p><strong>Version 0.4.3</strong> <span class="about-build">Release date: <time datetime="2026-11-05">5 November 2026</time></span></p>
+      <p>Compact stage toolbar with an act dropdown and grouped scene/view controls.</p>
       <p>Legs and feet preview: shaped thighs/calves and articulated heel, ball and toe rendering. Movement technique remains under review.</p>
       <p>Includes Mirror path and Cast tools. Show-video recording is disabled; music and voice recording remain available.</p>
       <p>Show files are JSON; music and voice recordings are stored separately in this browser. Keep a copy of your show file when moving between browsers or computers.</p>
@@ -291,7 +296,7 @@
 
 <script type="importmap">
 {"imports": {
-  "./src/app.js": "./src/app.js?v=scroll47",
+  "./src/app.js": "./src/app.js?v=scroll48",
   "./src/music.js": "./src/music.js?v=cap3",
   "./src/stage.js": "./src/stage.js?v=guide22",
   "./src/cheatsheet.js": "./src/cheatsheet.js?v=guide23",
