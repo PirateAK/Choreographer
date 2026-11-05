@@ -260,6 +260,7 @@ const app = {
       state.ui.phraseArmed = null;
       state.ui.stationGuide = {
         id: d.id, step: opts.step || 'walk', pose: opts.pose || 'none', level: opts.level || 'flat',
+        port: opts.port || '', notes: opts.notes || '',
         durationMs: Math.max(1, Number(opts.counts) || 1) * countGrid(state.show).count,
       };
       state.ui.placingStations = true;
@@ -322,6 +323,8 @@ const app = {
       pose: opts.pose,
       level: opts.level,
       counts: Math.max(1, Number(opts.counts) || phraseShape(step).counts),
+      port: opts.port || '',
+      notes: opts.notes || '',
     };
     moves.close();
     state.ui.hint = `Double-click a count on the ruler to start ${d.name}'s ${label} there · Shift for the bar · Esc cancels`;
@@ -367,6 +370,8 @@ const app = {
       pose: armed.pose,
       level: armed.level,
       counts: armed.counts,
+      port: armed.port,
+      notes: armed.notes,
       at: contentMs,
       atBar: !!byBar,
     });

@@ -1267,6 +1267,8 @@ export class StageView {
         guide ? { step: guide.step, pose: guide.pose, dur: guide.durationMs } : {});
       if (guide) {
         key.level = guide.level;
+        if (guide.port) key.port = guide.port;
+        if (guide.notes) key.notes = guide.notes;
         state.ui.stationGuide = null;
         state.ui.placingStations = false;
         state.ui.hint = 'Next station placed · distance bands are draft planning estimates';

@@ -1,6 +1,6 @@
 // Paper plan: phrase runs and the lines the generator writes for them. Pure model checks, no browser.
 import assert from 'node:assert/strict';
-import { createShow, phraseRuns, POSE_LABEL, STEP_LABEL, LEVEL_LABEL } from './src/model.js';
+import { createShow, phraseRuns, addPhrase, POSE_LABEL, STEP_LABEL, LEVEL_LABEL } from './src/model.js';
 import { notationFor, pointWords, clockOf, SECTION_BARS } from './src/notation.js';
 
 // Phrase runs start at the first station after the begin point and end at phraseEnd (or the last key).
@@ -69,6 +69,40 @@ assert.equal(clockOf(65500), '01:05.5');
   show.cast.push(d);
   const [line] = notationFor(show, d).sections[0].lines;
   assert.match(line.text, / — arms 1st$/);
+}
+
+// Arriving in a foot position alone does not move the legs, so the arms are not in parentheses;
+// an arabesque does, so they are.
+{
+  const show = createShow();
+  show.prefs.tempo = 120; show.prefs.beatsPerBar = 4; show.prefs.downbeat = 0;
+  const d = { id: 'd3', name: 'Dancer C', keys: [
+    { t: 0, x: 0, y: 0, dur: 0, step: 'walk', pose: 'none', level: 'flat' },
+    { t: 1000, x: 1, y: 0, dur: 1000, step: 'walk', pose: 'fifth', level: 'flat', port: 'arms bras bas', phraseEnd: true },
+    { t: 2000, x: 2, y: 0, dur: 1000, step: 'walk', pose: 'arabesque', level: 'flat', port: 'arms 2nd', phraseEnd: true },
+  ] };
+  show.cast.push(d);
+  const [a, b] = notationFor(show, d).sections[0].lines;
+  assert.equal(a.text.includes('('), false);
+  assert.match(b.text, / — \(arms 2nd\)$/);
+}
+
+// addPhrase writes the port and the notes onto the phrase's first station, which is where the
+// paper plan and the inspector read them.
+{
+  const show = createShow();
+  show.prefs.tempo = 120; show.prefs.beatsPerBar = 4; show.prefs.downbeat = 0;
+  const d = { id: 'd4', name: 'Dancer D', keys: [
+    { t: 0, x: 0, y: 0, dur: 0, step: 'walk', pose: 'none', level: 'flat' },
+  ] };
+  show.cast.push(d);
+  const res = addPhrase(show, d, { step: 'chasse', pose: 'arabesque', level: 'flat', counts: 2, snap: 0, port: ' arms 2nd ', notes: 'head R' });
+  assert.ok(res.added.length >= 1);
+  assert.equal(d.keys[1].port, 'arms 2nd');
+  assert.equal(d.keys[1].notes, 'head R');
+  assert.equal(d.keys[d.keys.length - 1].phraseEnd, true);
+  if (res.added.length > 1) assert.equal(d.keys[d.keys.length - 1].port, undefined);
+  assert.deepEqual(phraseRuns(d), [{ start: 1, end: d.keys.length - 1 }]);
 }
 
 console.log('test-notation: ok');

@@ -717,6 +717,10 @@ export function addPhrase(show, dancer, opts = {}) {
     if (added[0].ease === 'accel' || added[0].ease === 'both') added[0].ease = 'even';
   }
   added[added.length - 1].phraseEnd = true;
+  // The arms and the notes belong to the phrase, so they sit on its first station, where the
+  // paper plan and the station inspector read them.
+  if (opts.port) added[0].port = String(opts.port).trim();
+  if (opts.notes) added[0].notes = String(opts.notes).trim();
   keys.push(...added);
   const ms = added.reduce((n, k) => n + (Number(k.dur) || 0), 0);
   const grid = countGrid(show);
