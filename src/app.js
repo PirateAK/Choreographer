@@ -5,7 +5,7 @@ import {
   contentOfLocal, localOfContent, endContent, ensureDurations, reflowKeys, removeStation, toggleVisibility, displayOfContent,
   endMarker, setEnd,
   removeFromStation, truncateAfter, addWingLeg, removeWingLeg, canAddWingLeg,
-  findObject, isProp, propPosOfContent, CARRY_OFFSET, carrierOf, carrierIdOf,
+  findObject, isProp, mirrorPathLeftRight, propPosOfContent, CARRY_OFFSET, carrierOf, carrierIdOf,
   addCarryHandoff, removeCarryHandoff, addSceneryCue, removeSceneryCue, clothSpan, clampClothX, maxClothSpan,
   musicLevelAt, addMusicCue, removeMusicCue, updateMusicCue, audibleLevel,
   clothDepth, dropStack, actRanges, actAt, addAct, removeAct, actHasWork, ACT_MIN_MS, ACT_MAX_MS, sceneryStateAt, totalActLength,
@@ -4647,6 +4647,23 @@ function boot() {
     state.ui.placingStations = !state.ui.placingStations;
     state.ui.stationGuide = null;
     state.ui.dirtyPanels = true;
+  });
+  $('btnMirrorPath').addEventListener('click', () => {
+    const d = findObject(state.show, state.ui.selectedId);
+    if (!d || !state.show.cast.some((x) => x.id === d.id)) {
+      state.ui.hint = 'Select a dancer to mirror their path';
+      state.ui.dirtyPanels = true;
+      return;
+    }
+    if (!d.keys || !d.keys.length) {
+      state.ui.hint = `${d.name || 'This dancer'} has no path to mirror`;
+      state.ui.dirtyPanels = true;
+      return;
+    }
+    commit();
+    mirrorPathLeftRight(d);
+    state.ui.hint = `Mirrored ${d.name || 'dancer'}'s path left to right across centre stage. Timing and station order are unchanged.`;
+    app.rebuild();
   });
   $('btnHold').addEventListener('click', addHold);
   $('btnPause').addEventListener('click', addPause);

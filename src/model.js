@@ -2427,6 +2427,20 @@ export function removeCostume(show, id) {
 
 /* -------------------------------------------------------- path stations */
 
+// Mirror authored path geometry around the stage centre line without changing its
+// sequence, timing, pose, turn, or movement metadata.
+export function mirrorPathLeftRight(dancer) {
+  if (!dancer || !Array.isArray(dancer.keys) || dancer.keys.length === 0) return false;
+  for (const key of dancer.keys) key.x = round2(-Number(key.x || 0));
+  if (dancer.footTrajectory && typeof dancer.footTrajectory === 'object') {
+    for (const track of Object.values(dancer.footTrajectory)) {
+      if (!Array.isArray(track)) continue;
+      for (const knot of track) knot.x = round2(-Number(knot.x || 0));
+    }
+  }
+  return true;
+}
+
 export function addStation(dancer, x, y, opts = {}) {
   const keys = dancer.keys;
   const last = keys.length ? keys[keys.length - 1] : null;
