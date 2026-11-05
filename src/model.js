@@ -675,6 +675,24 @@ export function phrasePlan(show, dancer, opts = {}) {
   };
 }
 
+// The phrases on a dancer's path, as runs of station indices. A phrase is the stations from one
+// addPhrase call: it starts after the previous phrase's last station (or at the first point
+// after the start) and ends at its own phraseEnd, or at the last station. Stations placed by hand
+// with no phrase end join the run that follows them. Station 0 is the starting position, not a step.
+export function phraseRuns(dancer) {
+  const keys = (dancer && dancer.keys) || [];
+  const runs = [];
+  let start = null;
+  for (let i = 1; i < keys.length; i++) {
+    if (start === null) start = i;
+    if (keys[i].phraseEnd === true || i === keys.length - 1) {
+      runs.push({ start, end: i });
+      start = null;
+    }
+  }
+  return runs;
+}
+
 // Place a phrase on a dancer's path: the stations its step needs, appended after the last one,
 // and — when the last one is where a phrase arrived — the junction between the two made into
 // one movement rather than two. Returns the stations added, whether they were linked and how

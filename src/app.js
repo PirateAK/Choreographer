@@ -20,7 +20,7 @@ import {
   POSE_LABEL, STEP_LABEL, LEVEL_LABEL, EASES, EASE_LABEL,
   plantsOf, plantProblem, footSkate, legOverreach, PLANT_LABEL, rolesOf, setRole,
   scanOverlaps, overlapFix, applyOverlapFix, pathsKey, CLEARANCE,
-  phraseShape, addPhrase, countGrid, tempoFromTaps, localAtCount, phrasePlan, timelineScrollRange,
+  phraseShape, addPhrase, countGrid, tempoFromTaps, phraseRuns, localAtCount, phrasePlan, timelineScrollRange,
 } from './model.js';
 import { StageView } from './stage.js';
 import { MoveSheet } from './cheatsheet.js';
@@ -1710,6 +1710,7 @@ function stationsHTML(d) {
       ? '<p class="hint">A prop with no stations is stage dressing, so it stays off the timer.</p>'
       : '<p class="hint">No stations yet. Press <b>+ Stations</b>, then click the stage in order to lay this dancer path.</p>';
   }
+  const runStart = new Set(isP ? [] : phraseRuns(d).map((r) => r.start));
   const rows = d.keys
     .map(function (k, i) {
       const secs = i === 0 || !Number.isFinite(k.dur) ? '' : (k.dur / 1000).toFixed(2);
@@ -1772,6 +1773,12 @@ function stationsHTML(d) {
             '<div class="row"><span class="label">bow</span>' +
             '<input type="number" data-f="bend" data-i="' + i + '" step="0.1" value="' + (Number(k.bend) || 0) + '" ' + dis + ' title="How far the path bows to the left of the straight line at its middle, in metres" />' +
             '<span class="label">m</span></div>') +
+        (runStart.has(i)
+          ? '<div class="row"><span class="label">port de bras</span>' +
+            '<input type="text" data-f="port" data-i="' + i + '" value="' + esc(k.port || '') + '" placeholder="—" title="The arm work for this phrase. In the paper plan it goes in brackets when the legs also move" /></div>' +
+            '<div class="row"><span class="label">notes</span>' +
+            '<input type="text" data-f="notes" data-i="' + i + '" value="' + esc(k.notes || '') + '" placeholder="head, eyes, tilt…" title="Miscellaneous notes for this phrase: head, eyes, focus. Printed in braces under the line" /></div>'
+          : '') +
         '</div>';
     })
     .join('');
@@ -2678,6 +2685,17 @@ function bindPanelEvents() {
       commit();
       d.keys[Number(i)].ease = EASE_LABEL[e.target.value] ? e.target.value : 'even';
       app.rebuild();
+      return;
+    }
+    // Port de bras and notes belong to the phrase, and live on its first station. An emptied
+    // field is absent rather than blank, so a reopened show reads the same as a fresh one.
+    if (i != null && (e.target.dataset.f === 'port' || e.target.dataset.f === 'notes')) {
+      commit();
+      const text = String(e.target.value).trim();
+      const field = e.target.dataset.f;
+      if (text) d.keys[Number(i)][field] = text;
+      else delete d.keys[Number(i)][field];
+      persist();
       return;
     }
     if (e.target.dataset.f === 'color') commit();

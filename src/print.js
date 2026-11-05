@@ -14,6 +14,7 @@ import {
   footAtLocal, footPins, feetOnFloor, rolesOf, roleOf,
 } from './model.js';
 import { specOf, blendSpecs, poseSvg } from './pose.js';
+import { notationHTML } from './notation.js';
 
 const esc = (s) =>
   String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -1786,7 +1787,11 @@ function render(show) {
   const bar = document.getElementById('docName');
   if (bar) bar.textContent = show.name;
   document.getElementById('doc').innerHTML =
-    plotPage(show) + castPage(show) + callSheetPage(show) + elevationPage(show, moment) + tableauPage(show) + pathsPage(show) + cuePage(show) + lightingPage(show);
+    plotPage(show) + castPage(show) + callSheetPage(show) + elevationPage(show, moment) + tableauPage(show) + pathsPage(show) + cuePage(show) + lightingPage(show) + notationPage(show);
+}
+
+function notationPage(show) {
+  return `<section class="sheet"><header class="doc-head"><div class="doc-title"><h1>Paper plan</h1></div></header>${notationHTML(show)}</section>`;
 }
 
 function fillMomentPicker(show) {
