@@ -4587,7 +4587,6 @@ function boot() {
   $('btnFoldAll').addEventListener('click', foldAllSections);
 
   // one view at a time, and how the elevation reads distance
-  $('btnTopDown').addEventListener('click', () => setFill('plan'));
   $('btnFillPlan').addEventListener('click', () => setFill('plan'));
   for (const [id, key] of [['btnPaths', 'showPaths'], ['btnStations', 'showStations']]) {
     $(id).addEventListener('click', () => {
