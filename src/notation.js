@@ -35,13 +35,14 @@ export function pointWords(k) {
   return level ? `${core} (${level})` : core;
 }
 
-// Whether a run of stations moves the legs: a named step, or a leg gesture or level change. The
-// five foot positions are a state the feet arrive in, not a movement, so arriving in one alone
-// does not put the arms in parentheses. Walking phrases carry their port de bras without them.
-const FOOT_POSITIONS = new Set(['first', 'second', 'third', 'fourth', 'fifth']);
+// Whether a run of stations moves the legs: a named step, or a described leg action (tendu, plié,
+// relevé, pirouette, pas de bourrée, chassé). A position name is a static state the legs arrive
+// in and holds, so arriving in 1st–5th, arabesque or attitude alone does not put the arms in
+// parentheses. Walking phrases carry their port de bras without them.
+const POSITION_STATES = new Set(['first', 'second', 'third', 'fourth', 'fifth', 'arabesque', 'attitude']);
 function legsMove(stations) {
   return stations.some((k) =>
-    (k.step && k.step !== 'walk') || (k.pose && k.pose !== 'none' && !FOOT_POSITIONS.has(k.pose)));
+    (k.step && k.step !== 'walk') || (k.pose && k.pose !== 'none' && !POSITION_STATES.has(k.pose)));
 }
 
 // The lines of one dancer's paper plan: each phrase as a line with its counts, its words, its

@@ -71,8 +71,8 @@ assert.equal(clockOf(65500), '01:05.5');
   assert.match(line.text, / — arms 1st$/);
 }
 
-// Arriving in a foot position alone does not move the legs, so the arms are not in parentheses;
-// an arabesque does, so they are.
+// A position name alone is a static state: arriving in 1st, or in arabesque, does not move the
+// legs, so the arms are not in parentheses. A described leg action (tendu) does.
 {
   const show = createShow();
   show.prefs.tempo = 120; show.prefs.beatsPerBar = 4; show.prefs.downbeat = 0;
@@ -80,11 +80,13 @@ assert.equal(clockOf(65500), '01:05.5');
     { t: 0, x: 0, y: 0, dur: 0, step: 'walk', pose: 'none', level: 'flat' },
     { t: 1000, x: 1, y: 0, dur: 1000, step: 'walk', pose: 'fifth', level: 'flat', port: 'arms bras bas', phraseEnd: true },
     { t: 2000, x: 2, y: 0, dur: 1000, step: 'walk', pose: 'arabesque', level: 'flat', port: 'arms 2nd', phraseEnd: true },
+    { t: 3000, x: 3, y: 0, dur: 1000, step: 'walk', pose: 'tendu', level: 'flat', port: 'arms 1st', phraseEnd: true },
   ] };
   show.cast.push(d);
-  const [a, b] = notationFor(show, d).sections[0].lines;
+  const [a, b, c] = notationFor(show, d).sections[0].lines;
   assert.equal(a.text.includes('('), false);
-  assert.match(b.text, / — \(arms 2nd\)$/);
+  assert.equal(b.text.includes('('), false);
+  assert.match(c.text, / — \(arms 1st\)$/);
 }
 
 // addPhrase writes the port and the notes onto the phrase's first station, which is where the
