@@ -670,6 +670,26 @@ export function torsoShapes(j) {
 
 /* ------------------------------------------------------------------ drawing */
 
+// Head furniture in head units: origin at the head centre, radius 1, y down. One function for
+// the screen and the print so the hair and face cannot disagree. The face turns with the head
+// (headTurn, degrees): eyes, nose and mouth show only while the face looks towards the viewer,
+// the ear shows in profile, and the hair is a pulled-back cap with a bun at the nape.
+export function headFace(headTurn = 0) {
+  const ha = ((Number(headTurn) || 0) * Math.PI) / 180;
+  const fwd = Math.sin(ha);
+  const front = Math.cos(ha);
+  const eye = (u) => ({ x: fwd * 0.25 + u * front, y: -0.05, rx: 0.13 * front, ry: 0.065 });
+  const facing = front > 0.2;
+  return {
+    cap: { x: -fwd * 0.35, y: -1 + (1 - front) / 2, r: 0.75 + (0.25 * (1 - front)) / 2 },
+    bun: { x: -fwd * 0.9, y: -0.15 + 0.85 * Math.max(0, -front), r: 0.36 },
+    ear: front < 0.5 ? { x: -fwd * 0.15, y: 0.05, rx: 0.13, ry: 0.22 } : null,
+    eyes: facing ? [eye(-0.38), eye(0.38)] : [],
+    nose: facing ? { x: fwd * 0.25, y: 0.12, rx: 0.05 * front, ry: 0.07 } : null,
+    mouth: facing ? { x: fwd * 0.25, y: 0.42, rx: 0.2 * front, ry: 0.045 } : null,
+  };
+}
+
 // The figure uses shaped, articulated legs around the solved skeleton; arms and torso
 // retain the simple jointed drawing for now. Returns the head box for labels.
 export function drawPose(ctx, o) {
@@ -718,6 +738,19 @@ export function drawPose(ctx, o) {
   const headR = j.headR * h;
   const hx = X(j.head[0]);
   const hy = Y(j.head[1]);
+  const face = headFace(headTurn);
+  // The bun sits behind the head: drawn first, it only shows where it sticks out (profile, nape).
+  if (hair) {
+    const b = face.bun;
+    ctx.beginPath();
+    ctx.arc(hx + b.x * headR, hy + b.y * headR, b.r * headR * 1.06, 0, Math.PI * 2);
+    ctx.fillStyle = outline;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(hx + b.x * headR, hy + b.y * headR, b.r * headR, 0, Math.PI * 2);
+    ctx.fillStyle = hair;
+    ctx.fill();
+  }
   ctx.beginPath();
   ctx.arc(hx, hy, headR * 1.06, 0, Math.PI * 2);
   ctx.fillStyle = outline;
@@ -726,25 +759,38 @@ export function drawPose(ctx, o) {
   ctx.arc(hx, hy, headR, 0, Math.PI * 2);
   ctx.fillStyle = body;
   ctx.fill();
+  if (face.ear) {
+    const e = face.ear;
+    ctx.beginPath();
+    ctx.ellipse(hx + e.x * headR, hy + e.y * headR, e.rx * headR * 1.12, e.ry * headR * 1.12, 0, 0, Math.PI * 2);
+    ctx.fillStyle = outline;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(hx + e.x * headR, hy + e.y * headR, e.rx * headR, e.ry * headR, 0, 0, Math.PI * 2);
+    ctx.fillStyle = body;
+    ctx.fill();
+  }
   if (hair) {
-    // Hair is the only cue a head this size has: from the front it is a crown on the top,
-    // in profile a mass at the back of the head, and from behind it covers the head
-    // entirely. Spotting is exactly this mass staying put while the body turns.
-    const ha = ((Number(headTurn) || 0) * Math.PI) / 180;
-    const c = Math.cos(ha);
-    const r = headR * (0.62 + 0.18 * (1 - c));
-    const ox = -Math.sin(ha) * headR * 0.62;
-    const oy = -headR * 0.34 * (1 + c) * 0.5;
+    // The cap is clipped to the head: from the front a hairline across the forehead, in profile
+    // the top and back, and from behind the whole head.
+    const c = face.cap;
     ctx.save();
     ctx.beginPath();
     ctx.arc(hx, hy, headR, 0, Math.PI * 2);
     ctx.clip();
     ctx.beginPath();
-    ctx.arc(hx + ox, hy + oy, r, 0, Math.PI * 2);
+    ctx.arc(hx + c.x * headR, hy + c.y * headR, c.r * headR, 0, Math.PI * 2);
     ctx.fillStyle = hair;
     ctx.fill();
     ctx.restore();
   }
+  const features = [...face.eyes, face.nose, face.mouth].filter(Boolean);
+  features.forEach((f, i) => {
+    ctx.beginPath();
+    ctx.ellipse(hx + f.x * headR, hy + f.y * headR, f.rx * headR, f.ry * headR, 0, 0, Math.PI * 2);
+    ctx.fillStyle = i < face.eyes.length ? '#1d1714' : f === face.mouth ? '#a1505f' : outline;
+    ctx.fill();
+  });
 
   // The skirt last, at the hip: a tutu disc, a tunic to mid-thigh, or a plain sash.
   if (skirt) {
@@ -808,21 +854,36 @@ export function poseSvg(o) {
   const headR = j.headR * h;
   const hx = X(j.head[0]);
   const hy = Y(j.head[1]);
+  const face = headFace(headTurn);
+  const ell = (cx, cy, rx, ry, fill) =>
+    `<ellipse cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" rx="${rx.toFixed(2)}" ry="${ry.toFixed(2)}" fill="${fill}" stroke="none" />`;
+  // The bun first, behind the head, as on screen.
+  if (hair) {
+    const b = face.bun;
+    out.push(
+      `<circle cx="${(hx + b.x * headR).toFixed(2)}" cy="${(hy + b.y * headR).toFixed(2)}" r="${(b.r * headR * 1.06).toFixed(2)}" fill="${ink}" stroke="none" />`,
+      `<circle cx="${(hx + b.x * headR).toFixed(2)}" cy="${(hy + b.y * headR).toFixed(2)}" r="${(b.r * headR).toFixed(2)}" fill="${hair}" stroke="none" />`
+    );
+  }
   out.push(`<circle cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="${(headR * 1.06).toFixed(1)}" fill="${ink}" stroke="none" />`);
   out.push(`<circle cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="${headR.toFixed(1)}" fill="${body}" stroke="none" />`);
+  if (face.ear) {
+    const e = face.ear;
+    out.push(ell(hx + e.x * headR, hy + e.y * headR, e.rx * headR * 1.12, e.ry * headR * 1.12, ink));
+    out.push(ell(hx + e.x * headR, hy + e.y * headR, e.rx * headR, e.ry * headR, body));
+  }
   if (hair) {
-    // The same hair as on screen, clipped to the head: a crown facing front, a mass at the
-    // back in profile, and the whole head from behind.
-    const ha = ((Number(headTurn) || 0) * Math.PI) / 180;
-    const c = Math.cos(ha);
-    const r = headR * (0.62 + 0.18 * (1 - c));
-    const ox = -Math.sin(ha) * headR * 0.62;
-    const oy = -headR * 0.34 * (1 + c) * 0.5;
+    // The same cap as on screen, clipped to the head.
+    const c = face.cap;
     const id = 'head' + ++headClipSeq;
     out.push(
       `<defs><clipPath id="${id}"><circle cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="${headR.toFixed(1)}" /></clipPath></defs>`,
-      `<circle cx="${(hx + ox).toFixed(1)}" cy="${(hy + oy).toFixed(1)}" r="${r.toFixed(1)}" fill="${hair}" stroke="none" clip-path="url(#${id})" />`
+      `<circle cx="${(hx + c.x * headR).toFixed(2)}" cy="${(hy + c.y * headR).toFixed(2)}" r="${(c.r * headR).toFixed(2)}" fill="${hair}" stroke="none" clip-path="url(#${id})" />`
     );
+  }
+  for (const [i, f] of [...face.eyes, face.nose, face.mouth].filter(Boolean).entries()) {
+    const fill = i < face.eyes.length ? '#1d1714' : f === face.mouth ? '#a1505f' : ink;
+    out.push(ell(hx + f.x * headR, hy + f.y * headR, f.rx * headR, f.ry * headR, fill));
   }
 
   if (skirt) {
