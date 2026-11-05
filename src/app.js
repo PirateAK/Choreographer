@@ -4678,6 +4678,8 @@ function boot() {
   $('watchExit').addEventListener('click', () => setWatch(false));
 
   // transport
+  $('btnPlay').addEventListener('click', togglePlay);
+  $('btnStop').addEventListener('click', stop);
   let storedReviewRate = 1;
   try { storedReviewRate = Number(localStorage.getItem('choreographer.reviewSpeed.v1')) || 1; } catch (_) { /* storage blocked */ }
   const savedReviewRate = Math.max(1, Math.min(4, storedReviewRate));
