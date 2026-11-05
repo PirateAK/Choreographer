@@ -21,12 +21,8 @@
   <button id="btnClear" class="ghost" title="Clear the stage for a new show — keeps dancers, costumes, props, cloth, lanterns, music, voice and every setting. Undo brings it back">Clear</button>
   <button id="btnTopDown" class="ghost" title="Open the overhead stage plan">Top-down</button>
   <button id="btnWatch" class="ghost watch-link" title="Watch the show: the stage alone, with its music, from the top">▶ Watch</button>
+  <button id="btnAbout" class="ghost" title="About this version of Choreographer">About</button>
   <a id="btnPrint" class="ghost print-link" href="print.html" target="_blank" rel="noopener" title="Open the printable stage plot, paths and cue sheet in a new tab">Print plan</a>
-  <select id="captureMode" aria-label="What to record" title="What the recording shows">
-    <option value="house">House (performance)</option>
-  </select>
-  <button id="btnCaptureRec" class="ghost rec" title="Start recording to a WebM file. Press again to stop and download it">● Record</button>
-  <span id="recStatus" class="rec-status" hidden></span>
   <input id="fileImport" type="file" accept="application/json" hidden />
   <input id="fileMusic" type="file" accept="audio/*" hidden />
   <input id="fileNarration" type="file" accept="audio/*" hidden />
@@ -265,6 +261,20 @@
   </div>
 </div>
 
+<div id="aboutSheet" class="moves-sheet" hidden>
+  <div class="moves-panel about-panel" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+    <header class="moves-head">
+      <h2 id="aboutTitle">About Choreographer</h2>
+      <span class="moves-where">A theatre planner for shaping a show, one cue at a time.</span>
+      <button id="btnAboutClose" class="ghost">Close</button>
+    </header>
+    <div class="moves-body">
+      <p><strong>Version 0.4.0</strong> <span class="about-build">Mirror path edition · base build 04a9a35</span></p>
+      <p>Show files are JSON; music and voice recordings are stored separately in this browser. Keep a copy of your show file when moving between browsers or computers.</p>
+    </div>
+  </div>
+</div>
+
 <div id="schoolSheet" class="moves-sheet" hidden>
   <div class="moves-panel school-panel" role="dialog" aria-modal="true" aria-labelledby="schoolTitle">
     <header class="moves-head">
@@ -279,8 +289,7 @@
 
 <script type="importmap">
 {"imports": {
-  "./src/app.js": "./src/app.js?v=scroll46",
-  "./src/capture.js": "./src/capture.js?v=cap2",
+  "./src/app.js": "./src/app.js?v=scroll47",
   "./src/music.js": "./src/music.js?v=cap3",
   "./src/stage.js": "./src/stage.js?v=guide22",
   "./src/cheatsheet.js": "./src/cheatsheet.js?v=guide23",
