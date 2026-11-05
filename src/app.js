@@ -2859,6 +2859,8 @@ function setWatch(on) {
     pause();
     play();
   } else {
+    // Leaving Watch ends a House recording too, because the Record button is hidden in Watch.
+    if (recorder?.recording && recorder.mode === 'house') recorder.stop();
     state.ui.fill = state.ui.beforeWatchFill ?? null;
     pause();
     if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
@@ -4660,8 +4662,9 @@ function boot() {
     }
     const mode = $('captureMode').value;
     try {
-      if (mode === 'house' && state.ui.fill !== 'house') setFill('house');
-      if (mode === 'app') flashRecStatus('Choose this window in the sharing prompt…');
+      // A House recording opens Watch: the run-through starts at the top with its music,
+      // and the timeline plays for the recording.
+      if (mode === 'house' && !state.ui.watch) setWatch(true);
       await recorder.start(mode, { houseCanvas: $('house') });
     } catch (err) {
       const cancelled = err && err.name === 'NotAllowedError';
