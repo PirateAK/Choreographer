@@ -653,6 +653,21 @@ export function armContours(arm) {
   };
 }
 
+// Torso and neck from the same joints as the rest: hips, a narrower waist and a fuller chest,
+// tapering into a neck under the head. Radii are body units; the chest sits at the shoulder
+// line so the arms root inside its outline. Returned as [neck, torso]: draw the neck first so
+// the torso's fill covers its base and no seam shows.
+export function torsoShapes(j) {
+  const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+  const pelvis = j.pelvis;
+  const chest = j.chest;
+  const head = j.head;
+  return [
+    limbContour([chest, mix(chest, head, 0.5), head], [0.022, 0.019, 0.02]),
+    limbContour([pelvis, mix(pelvis, chest, 0.5), mix(pelvis, chest, 0.85), chest], [0.05, 0.035, 0.047, 0.056]),
+  ];
+}
+
 /* ------------------------------------------------------------------ drawing */
 
 // The figure uses shaped, articulated legs around the solved skeleton; arms and torso
@@ -662,15 +677,6 @@ export function drawPose(ctx, o) {
   const j = joints(spec, facing, turn, pins);
   const X = (bx) => x + bx * h;
   const Y = (by) => y - by * h;
-  const wide = o.width || Math.max(1.2, h * 0.045);
-
-  const stroke = (points, width, colour) => {
-    ctx.beginPath();
-    points.forEach(([bx, by], i) => (i ? ctx.lineTo(X(bx), Y(by)) : ctx.moveTo(X(bx), Y(by))));
-    ctx.lineWidth = width;
-    ctx.strokeStyle = colour;
-    ctx.stroke();
-  };
 
   ctx.save();
   ctx.lineCap = 'round';
@@ -695,9 +701,6 @@ export function drawPose(ctx, o) {
     ctx.fillStyle = body;
     ctx.fill();
   }
-  const torso = [j.pelvis, j.chest];
-  stroke(torso, wide * 1.7, outline);
-  stroke(torso, wide, body);
   for (const arm of j.arms) {
     const { shapes, discs } = armContours(arm);
     for (const shape of shapes) polygon(shape);
@@ -707,6 +710,7 @@ export function drawPose(ctx, o) {
     ctx.fillStyle = body;
     ctx.fill();
   }
+  for (const shape of torsoShapes(j)) polygon(shape);
   for (const foot of footGeometry(spec, j, facing, turn)) {
     polygon(limbContour(foot.points, [0.009, 0.010, 0.009, 0.006]));
   }
@@ -784,26 +788,19 @@ export function poseSvg(o) {
   const j = joints(spec, facing, turn, pins);
   const X = (bx) => x + bx * h;
   const Y = (by) => y - by * h;
-  const wide = Math.max(0.9, h * 0.045);
   const out = [];
-  const width = wide * 1.7;
-  const seg = (points, w, colour) =>
-    `<polyline points="${points.map(([bx, by]) => X(bx).toFixed(1) + ',' + Y(by).toFixed(1)).join(' ')}" fill="none" stroke="${colour}" stroke-width="${w.toFixed(1)}" stroke-linecap="round" stroke-linejoin="round" />`;
-
   const polygon = points => `<polygon points="${points.map(([bx, by]) => X(bx).toFixed(2) + ',' + Y(by).toFixed(2)).join(' ')}" fill="${body}" stroke="${ink}" stroke-width="${Math.max(0.6, h * 0.006).toFixed(2)}" stroke-linejoin="round" />`;
   for (const leg of j.legs) {
     for (const shape of legContours(leg)) out.push(polygon(shape));
     out.push(`<circle cx="${X(leg[1][0]).toFixed(2)}" cy="${Y(leg[1][1]).toFixed(2)}" r="${(h * 0.016).toFixed(2)}" fill="${body}" />`);
   }
-  const torso = [j.pelvis, j.chest];
-  out.push(seg(torso, width, ink));
-  out.push(seg(torso, wide, body));
   for (const arm of j.arms) {
     const { shapes, discs } = armContours(arm);
     for (const shape of shapes) out.push(polygon(shape));
     out.push(`<circle cx="${X(discs[0][0]).toFixed(2)}" cy="${Y(discs[0][1]).toFixed(2)}" r="${(h * 0.012).toFixed(2)}" fill="${body}" />`);
     out.push(`<circle cx="${X(discs[1][0]).toFixed(2)}" cy="${Y(discs[1][1]).toFixed(2)}" r="${(h * 0.0075).toFixed(2)}" fill="${body}" />`);
   }
+  for (const shape of torsoShapes(j)) out.push(polygon(shape));
   for (const foot of footGeometry(spec, j, facing, turn)) {
     out.push(polygon(limbContour(foot.points, [0.009, 0.010, 0.009, 0.006])));
   }
