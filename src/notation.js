@@ -53,6 +53,8 @@ export function notationFor(show, dancer) {
   const sectionLen = g.perBar * SECTION_BARS;
   const beatAt = (k) => beatOf(show, contentOfLocal(show, dancer.id, k.t));
   const lines = [];
+  // Counts restart at 1 in every section of sixteen. `rel` is a count's place in its own section.
+  const rel = (c) => ((c - 1) % sectionLen) + 1;
   for (const run of phraseRuns(dancer)) {
     const stations = keys.slice(run.start, run.end + 1);
     const departure = keys[run.start - 1];
@@ -60,17 +62,23 @@ export function notationFor(show, dancer) {
     // whole phrase, not just its arrivals.
     const from = beatAt(departure) + 1;
     const to = Math.max(from, beatAt(keys[run.end]) + 1);
+    const index = Math.floor((from - 1) / sectionLen);
+    const crosses = Math.floor((to - 1) / sectionLen) !== index;
     const moving = legsMove(stations);
     const words = stations.map((k) => {
-      const n = beatAt(k) + 1 - from + 1;
+      const n = rel(beatAt(k) + 1);
       return stations.length > 1 ? `${pointWords(k)} [${n}]` : pointWords(k);
     }).join(', ');
+    // A phrase that crosses a section line is written as two runs of counts, each restarting.
+    let counts;
+    if (crosses) counts = `${rel(from)}–${sectionLen}, 1–${rel(to)}`;
+    else counts = from === to ? String(rel(from)) : `${rel(from)}–${rel(to)}`;
     // Port de bras and notes are set on the phrase's first station.
     const port = stations[0].port || '';
     const portText = port ? (moving ? `(${port})` : port) : '';
     lines.push({
       from,
-      counts: from === to ? String(from) : `${from}–${to}`,
+      counts,
       text: portText ? `${words} — ${portText}` : words,
       notes: stations[0].notes || '',
     });
@@ -85,7 +93,7 @@ export function notationFor(show, dancer) {
       const startBeat = index * sectionLen;
       sec = {
         index,
-        counts: `${startBeat + 1}–${startBeat + sectionLen}`,
+        counts: `1–${sectionLen}`,
         at: g.origin + startBeat * g.count,
         lines: [],
       };

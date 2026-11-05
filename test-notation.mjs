@@ -107,4 +107,38 @@ assert.equal(clockOf(65500), '01:05.5');
   assert.deepEqual(phraseRuns(d), [{ start: 1, end: d.keys.length - 1 }]);
 }
 
+// Counts restart at 1 in each section of sixteen. A phrase crossing a section line is written as
+// two runs of counts, and the next section starts at 1 with its own timestamp.
+{
+  const show = createShow();
+  show.prefs.tempo = 120; show.prefs.beatsPerBar = 4; show.prefs.downbeat = 0;
+  const d = { id: 'd5', name: 'Dancer E', keys: [
+    { t: 7000, x: 0, y: 0, dur: 0, step: 'walk', pose: 'none', level: 'flat' },          // count 15
+    { t: 8000, x: 1, y: 0, dur: 1000, step: 'chasse', pose: 'none', level: 'flat', phraseEnd: true }, // count 17
+    { t: 9000, x: 2, y: 0, dur: 1000, step: 'walk', pose: 'none', level: 'flat', phraseEnd: true },   // count 19
+  ] };
+  show.cast.push(d);
+  const plan = notationFor(show, d);
+  assert.equal(plan.sections.length, 2);
+  assert.equal(plan.sections[0].lines[0].counts, '15–16, 1–1');
+  assert.equal(plan.sections[1].at, 8000);
+  assert.equal(plan.sections[1].lines[0].counts, '1–3');
+}
+
+// A hand-placed station is a run boundary: addPhrase closes the run before it, so the phrase that
+// follows starts a run of its own and carries its port and notes.
+{
+  const show = createShow();
+  show.prefs.tempo = 120; show.prefs.beatsPerBar = 4; show.prefs.downbeat = 0;
+  const d = { id: 'd6', name: 'Dancer F', keys: [
+    { t: 0, x: 0, y: 0, dur: 0, step: 'walk', pose: 'none', level: 'flat' },
+    { t: 1000, x: 1, y: 0, dur: 1000, step: 'walk', pose: 'none', level: 'flat' }, // hand-placed, no phrase end
+  ] };
+  show.cast.push(d);
+  addPhrase(show, d, { step: 'chasse', pose: 'none', level: 'flat', counts: 2, snap: 0, port: 'arms 2nd' });
+  assert.equal(d.keys[1].phraseEnd, true);
+  assert.deepEqual(phraseRuns(d).map((r) => r.start), [1, 2]);
+  assert.equal(d.keys[2].port, 'arms 2nd');
+}
+
 console.log('test-notation: ok');

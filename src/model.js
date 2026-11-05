@@ -676,9 +676,10 @@ export function phrasePlan(show, dancer, opts = {}) {
 }
 
 // The phrases on a dancer's path, as runs of station indices. A phrase is the stations from one
-// addPhrase call: it starts after the previous phrase's last station (or at the first point
-// after the start) and ends at its own phraseEnd, or at the last station. Stations placed by hand
-// with no phrase end join the run that follows them. Station 0 is the starting position, not a step.
+// addPhrase call: it starts after the previous run's last station (or at the first point after the
+// start) and ends at its own phraseEnd, or at the last station. addPhrase closes the run before it,
+// so a hand-placed station is a run boundary once a phrase follows it. Station 0 is the starting
+// position, not a step.
 export function phraseRuns(dancer) {
   const keys = (dancer && dancer.keys) || [];
   const runs = [];
@@ -704,9 +705,15 @@ export function addPhrase(show, dancer, opts = {}) {
   // Where it begins, decided once here and handed down: a phrase put on a bar of the music may
   // begin well after her path ends, and then the leg into it is a long one rather than a join.
   const start = phraseStart(show, dancer, opts);
-  const linked = last.phraseEnd === true && start.t <= last.t + 1;
+  // Every station after the starting position is the end of a run, whether a phrase placed it or
+  // it was put down by hand. A hand-placed station is a boundary like any other, so a phrase that
+  // follows it links on the same rule. Station 0 is the starting position, not a step, so it is
+  // never treated as a phrase end.
+  const boundary = last.phraseEnd === true || keys.length > 1;
+  const linked = boundary && start.t <= last.t + 1;
   const added = phraseStations(show, dancer, { ...opts, startLocal: start.t });
   if (!added.length) return { added, linked: false, counts: 0, ms: 0, start };
+  if (keys.length > 1) last.phraseEnd = true;
   if (linked) {
     // The station is passed through: the position is reached exactly at it and left straight
     // away, instead of arriving a third of a leg early and holding.
