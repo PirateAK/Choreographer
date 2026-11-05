@@ -61,26 +61,40 @@ export function notationFor(show, dancer) {
     // Counts run from the count she leaves on to the count she lands on, so the line shows the
     // whole phrase, not just its arrivals.
     const from = beatAt(departure) + 1;
-    const to = Math.max(from, beatAt(keys[run.end]) + 1);
-    const index = Math.floor((from - 1) / sectionLen);
-    const crosses = Math.floor((to - 1) / sectionLen) !== index;
     const moving = legsMove(stations);
-    const words = stations.map((k) => {
-      const n = rel(beatAt(k) + 1);
-      return stations.length > 1 ? `${pointWords(k)} [${n}]` : pointWords(k);
-    }).join(', ');
-    // A phrase that crosses a section line is written as two runs of counts, each restarting.
-    let counts;
-    if (crosses) counts = `${rel(from)}–${sectionLen}, 1–${rel(to)}`;
-    else counts = from === to ? String(rel(from)) : `${rel(from)}–${rel(to)}`;
-    // Port de bras and notes are set on the phrase's first station.
-    const port = stations[0].port || '';
-    const portText = port ? (moving ? `(${port})` : port) : '';
-    lines.push({
-      from,
-      counts,
-      text: portText ? `${words} — ${portText}` : words,
-      notes: stations[0].notes || '',
+    const multi = stations.length > 1;
+    // A phrase that crosses a section line is written as one line per section, each restarting at 1.
+    // Each line is filed by the section its arrivals fall in. Port and notes go on the first line.
+    const parts = [];
+    for (const k of stations) {
+      const c = beatAt(k) + 1;
+      const idx = Math.floor((c - 1) / sectionLen);
+      let part = parts[parts.length - 1];
+      if (!part || part.idx !== idx) {
+        part = { idx, stations: [] };
+        parts.push(part);
+      }
+      part.stations.push({ k, c });
+    }
+    parts.forEach((part, pi) => {
+      const first = part.stations[0].c;
+      const last = part.stations[part.stations.length - 1].c;
+      // The first line starts at the departure count when it is in the same section; otherwise at
+      // the section's own count 1.
+      const startC = pi === 0 ? Math.max(from, part.idx * sectionLen + 1) : part.idx * sectionLen + 1;
+      const words = part.stations.map(({ k, c }) => {
+        const n = rel(c);
+        return multi ? `${pointWords(k)} [${n}]` : pointWords(k);
+      }).join(', ');
+      const counts = startC === last ? String(rel(startC)) : `${rel(startC)}–${rel(last)}`;
+      const port = pi === 0 ? (stations[0].port || '') : '';
+      const portText = port ? (moving ? `(${port})` : port) : '';
+      lines.push({
+        from: startC,
+        counts,
+        text: portText ? `${words} — ${portText}` : words,
+        notes: pi === 0 ? (stations[0].notes || '') : '',
+      });
     });
   }
   // Sections are numbered from the origin, sixteen counts each. A line sits in the section its

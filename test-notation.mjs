@@ -108,7 +108,7 @@ assert.equal(clockOf(65500), '01:05.5');
 }
 
 // Counts restart at 1 in each section of sixteen. A phrase crossing a section line is written as
-// two runs of counts, and the next section starts at 1 with its own timestamp.
+// one line per section, and each line's counts stay inside its own section.
 {
   const show = createShow();
   show.prefs.tempo = 120; show.prefs.beatsPerBar = 4; show.prefs.downbeat = 0;
@@ -119,10 +119,27 @@ assert.equal(clockOf(65500), '01:05.5');
   ] };
   show.cast.push(d);
   const plan = notationFor(show, d);
+  // Both arrivals land in section two, so both lines file there, counting from 1 at its timestamp.
+  assert.equal(plan.sections.length, 1);
+  assert.equal(plan.sections[0].at, 8000);
+  assert.deepEqual(plan.sections[0].lines.map((l) => l.counts), ['1', '1–3']);
+}
+
+// A phrase whose stations straddle a section line splits: each part restarts at 1 in its section.
+{
+  const show = createShow();
+  show.prefs.tempo = 120; show.prefs.beatsPerBar = 4; show.prefs.downbeat = 0;
+  const d = { id: 'd7', name: 'Dancer G', keys: [
+    { t: 6500, x: 0, y: 0, dur: 0, step: 'walk', pose: 'none', level: 'flat' },                   // count 14
+    { t: 7000, x: 1, y: 0, dur: 500, step: 'walk', pose: 'none', level: 'flat', port: 'arms 1st' }, // count 15
+    { t: 8000, x: 2, y: 0, dur: 1000, step: 'chasse', pose: 'none', level: 'flat', phraseEnd: true }, // count 17
+  ] };
+  show.cast.push(d);
+  const plan = notationFor(show, d);
   assert.equal(plan.sections.length, 2);
-  assert.equal(plan.sections[0].lines[0].counts, '15–16, 1–1');
-  assert.equal(plan.sections[1].at, 8000);
-  assert.equal(plan.sections[1].lines[0].counts, '1–3');
+  assert.deepEqual(plan.sections[0].lines.map((l) => l.counts), ['14–15']);
+  assert.match(plan.sections[0].lines[0].text, / — \(arms 1st\)$/);
+  assert.match(plan.sections[1].lines[0].text, /^chassé \[1\]$/);
 }
 
 // A hand-placed station is a run boundary: addPhrase closes the run before it, so the phrase that
