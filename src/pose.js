@@ -670,6 +670,20 @@ export function torsoShapes(j) {
 
 /* ------------------------------------------------------------------ drawing */
 
+// Pointe shoes, drawn from the same foot points as the bare foot: a satin shoe over heel to toe,
+// a darker box at the tip, and one ribbon running up the shin from the ankle. A foot that rises
+// onto the pointe lengthens into the box, so the shoe follows the foot rather than a separate pose.
+export const POINTE_SHOE = { satin: '#f2b5c6', box: '#e291aa', ribbon: '#d9869f' };
+export function pointeShoeShapes(foot, knee) {
+  const [heel, ankle, ball, toe] = foot.points;
+  const along = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+  return [
+    { shape: limbContour([heel, ankle, ball, toe], [0.012, 0.0105, 0.0095, 0.0068]), fill: POINTE_SHOE.satin },
+    { shape: limbContour([ball, toe], [0.0098, 0.0072]), fill: POINTE_SHOE.box },
+    { shape: limbContour([ankle, along(ankle, knee, 0.42)], [0.0028, 0.0022]), fill: POINTE_SHOE.ribbon },
+  ];
+}
+
 // Head furniture in head units: origin at the head centre, radius 1, y down. One function for
 // the screen and the print so the hair and face cannot disagree. The face turns with the head
 // (headTurn, degrees): eyes, nose and mouth show only while the face looks towards the viewer,
@@ -703,11 +717,11 @@ export function drawPose(ctx, o) {
   ctx.lineJoin = 'round';
 
   const outline = 'rgba(0,0,0,.45)';
-  const polygon = points => {
+  const polygon = (points, fill = body) => {
     ctx.beginPath();
     points.forEach(([bx, by], i) => i ? ctx.lineTo(X(bx), Y(by)) : ctx.moveTo(X(bx), Y(by)));
     ctx.closePath();
-    ctx.fillStyle = body;
+    ctx.fillStyle = fill;
     ctx.strokeStyle = outline;
     ctx.lineWidth = Math.max(0.6, h * 0.006);
     ctx.fill();
@@ -731,10 +745,9 @@ export function drawPose(ctx, o) {
     ctx.fill();
   }
   for (const shape of torsoShapes(j)) polygon(shape);
-  for (const foot of footGeometry(spec, j, facing, turn)) {
-    polygon(limbContour(foot.points, [0.009, 0.010, 0.009, 0.006]));
-  }
-
+  footGeometry(spec, j, facing, turn).forEach((foot, i) => {
+    for (const { shape, fill } of pointeShoeShapes(foot, j.legs[i][1])) polygon(shape, fill);
+  });
   const headR = j.headR * h;
   const hx = X(j.head[0]);
   const hy = Y(j.head[1]);
@@ -835,7 +848,7 @@ export function poseSvg(o) {
   const X = (bx) => x + bx * h;
   const Y = (by) => y - by * h;
   const out = [];
-  const polygon = points => `<polygon points="${points.map(([bx, by]) => X(bx).toFixed(2) + ',' + Y(by).toFixed(2)).join(' ')}" fill="${body}" stroke="${ink}" stroke-width="${Math.max(0.6, h * 0.006).toFixed(2)}" stroke-linejoin="round" />`;
+  const polygon = (points, fill = body) => `<polygon points="${points.map(([bx, by]) => X(bx).toFixed(2) + ',' + Y(by).toFixed(2)).join(' ')}" fill="${fill}" stroke="${ink}" stroke-width="${Math.max(0.6, h * 0.006).toFixed(2)}" stroke-linejoin="round" />`;
   for (const leg of j.legs) {
     for (const shape of legContours(leg)) out.push(polygon(shape));
     out.push(`<circle cx="${X(leg[1][0]).toFixed(2)}" cy="${Y(leg[1][1]).toFixed(2)}" r="${(h * 0.016).toFixed(2)}" fill="${body}" />`);
@@ -847,9 +860,9 @@ export function poseSvg(o) {
     out.push(`<circle cx="${X(discs[1][0]).toFixed(2)}" cy="${Y(discs[1][1]).toFixed(2)}" r="${(h * 0.0075).toFixed(2)}" fill="${body}" />`);
   }
   for (const shape of torsoShapes(j)) out.push(polygon(shape));
-  for (const foot of footGeometry(spec, j, facing, turn)) {
-    out.push(polygon(limbContour(foot.points, [0.009, 0.010, 0.009, 0.006])));
-  }
+  footGeometry(spec, j, facing, turn).forEach((foot, i) => {
+    for (const { shape, fill } of pointeShoeShapes(foot, j.legs[i][1])) out.push(polygon(shape, fill));
+  });
 
   const headR = j.headR * h;
   const hx = X(j.head[0]);
