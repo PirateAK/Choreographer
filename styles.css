@@ -303,7 +303,7 @@ table.cast span.dim { color: #8a8578; }
   border-bottom: 1px solid var(--line);
 }
 #actTabs { row-gap: 5px; }
-#actTabs .stage-tools { flex: 1 0 100%; justify-content: flex-start; }
+#actTabs .stage-tools { flex: 0 1 auto; justify-content: flex-start; }
 .act-tabs[aria-label="Scenes in this act"]:empty { display: none; }
 .act-picker { min-width: 0; }
 #actSelect {

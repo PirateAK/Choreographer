@@ -958,7 +958,7 @@ function rebuildPanels() {
       const r = ranges[i];
       const from = fmtTime(displayOfContent(state.show, r.start));
       const to = fmtTime(displayOfContent(state.show, r.end));
-      return `<option value="${a.id}" title="${esc(a.name)} — ${from} to ${to}">${i + 1}. ${esc(a.name || 'Act')}</option>`;
+      return `<option value="${a.id}" title="${esc(a.name)} — ${from} to ${to}">${esc(a.name || 'Act')}</option>`;
     })
     .join('');
   $('actSelect').value = activeAct ? activeAct.id : '';
@@ -2173,7 +2173,7 @@ function bindPanelEvents() {
       act.name = e.target.value;
       // Keep the act picker in step while typing, without rebuilding the list under the cursor.
       const option = $('actSelect').querySelector(`option[value="${act.id}"]`);
-      if (option) option.textContent = `${state.show.acts.indexOf(act) + 1}. ${act.name || 'Act'}`;
+      if (option) option.textContent = act.name || 'Act';
       persist();
       return;
     }
