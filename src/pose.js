@@ -628,8 +628,8 @@ export function legContours(leg) {
   const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
   const [hip, knee, ankle] = leg;
   return [
-    limbContour([hip, mix(hip, knee, 0.38), mix(hip, knee, 0.72), knee], [0.030, 0.032, 0.025, 0.016]),
-    limbContour([knee, mix(knee, ankle, 0.32), mix(knee, ankle, 0.64), ankle], [0.016, 0.024, 0.018, 0.009]),
+    limbContour([hip, mix(hip, knee, 0.34), mix(hip, knee, 0.7), knee], [0.034, 0.037, 0.029, 0.017]),
+    limbContour([knee, mix(knee, ankle, 0.3), mix(knee, ankle, 0.62), ankle], [0.017, 0.026, 0.02, 0.01]),
   ];
 }
 
@@ -645,8 +645,8 @@ export function armContours(arm) {
   const hand = [wrist[0] + dir[0] * 0.07, wrist[1] + dir[1] * 0.07];
   return {
     shapes: [
-      limbContour([shoulder, mix(shoulder, elbow, 0.35), mix(shoulder, elbow, 0.7), elbow], [0.019, 0.017, 0.014, 0.012]),
-      limbContour([elbow, mix(elbow, wrist, 0.35), mix(elbow, wrist, 0.7), wrist], [0.012, 0.011, 0.009, 0.0075]),
+      limbContour([shoulder, mix(shoulder, elbow, 0.32), mix(shoulder, elbow, 0.68), elbow], [0.021, 0.019, 0.015, 0.012]),
+      limbContour([elbow, mix(elbow, wrist, 0.32), mix(elbow, wrist, 0.68), wrist], [0.012, 0.011, 0.009, 0.0075]),
       limbContour([wrist, mix(wrist, hand, 0.5), hand], [0.0075, 0.0068, 0.0045]),
     ],
     discs: [elbow, wrist],
@@ -664,7 +664,7 @@ export function torsoShapes(j) {
   const head = j.head;
   return [
     limbContour([chest, mix(chest, head, 0.5), head], [0.022, 0.019, 0.02]),
-    limbContour([pelvis, mix(pelvis, chest, 0.5), mix(pelvis, chest, 0.85), chest], [0.05, 0.035, 0.047, 0.056]),
+    limbContour([pelvis, mix(pelvis, chest, 0.34), mix(pelvis, chest, 0.68), mix(pelvis, chest, 0.88), chest], [0.047, 0.043, 0.036, 0.045, 0.054]),
   ];
 }
 
