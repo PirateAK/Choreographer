@@ -214,11 +214,33 @@ export function countGrid(show) {
   const perBar = Number.isFinite(bpb) ? Math.max(1, Math.min(16, Math.round(bpb))) : DEFAULT_BEATS;
   // Bars are counted from where the band starts, which is where the first music track begins:
   // a show whose music enters after the house lights still has its bar one at the entry.
+  // A downbeat set by hand (or by tapping) is the moment of count one, and it wins over the track.
+  const downbeat = Number(prefs.downbeat);
   const tracks = (show && show.musicTracks) || [];
   const first = tracks.length ? Number(tracks[0].start) : 0;
-  const origin = Number.isFinite(first) ? Math.max(0, first) : 0;
+  const origin = Number.isFinite(downbeat) && prefs.downbeat !== null
+    ? Math.max(0, downbeat)
+    : Number.isFinite(first) ? Math.max(0, first) : 0;
   const count = 60000 / tempo;
   return { tempo, perBar, count, bar: count * perBar, origin };
+}
+
+// The tempo a run of taps asks for. Taps are the moments the performer pressed (ms on the same
+// clock); the tempo is the median of the recent gaps, so one late tap does not move it much.
+// Gaps outside the 20–300 bpm range are not beats and are ignored. Returns null until there are
+// two usable taps.
+export function tempoFromTaps(taps) {
+  const list = (Array.isArray(taps) ? taps : []).map(Number).filter(Number.isFinite).slice(-9);
+  const gaps = [];
+  for (let i = 1; i < list.length; i++) {
+    const gap = list[i] - list[i - 1];
+    if (gap >= 60000 / 300 && gap <= 60000 / 20) gaps.push(gap);
+  }
+  if (!gaps.length) return null;
+  gaps.sort((a, b) => a - b);
+  const mid = gaps.length >> 1;
+  const median = gaps.length % 2 ? gaps[mid] : (gaps[mid - 1] + gaps[mid]) / 2;
+  return Math.max(20, Math.min(300, Math.round(60000 / median)));
 }
 
 // Where a moment falls in the music: which bar, and which count of that bar. Read from the show's

@@ -20,7 +20,7 @@ import {
   POSE_LABEL, STEP_LABEL, LEVEL_LABEL, EASES, EASE_LABEL,
   plantsOf, plantProblem, footSkate, legOverreach, PLANT_LABEL, rolesOf, setRole,
   scanOverlaps, overlapFix, applyOverlapFix, pathsKey, CLEARANCE,
-  phraseShape, addPhrase, countGrid, localAtCount, phrasePlan, timelineScrollRange,
+  phraseShape, addPhrase, countGrid, tempoFromTaps, localAtCount, phrasePlan, timelineScrollRange,
 } from './model.js';
 import { StageView } from './stage.js';
 import { MoveSheet } from './cheatsheet.js';
@@ -65,6 +65,17 @@ let coachMark = true;
 // nothing, and thirty animated canvases are not free.
 let moves = null;
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// What the count is right now: the tempo, and where count one falls. Shown under the tempo field
+// so a tap session can be read without leaving the settings.
+function refreshCountReadout(taps) {
+  const el = document.getElementById('countReadout');
+  if (!el) return;
+  const g = countGrid(state.show);
+  const set = Number.isFinite(Number(state.show.prefs.downbeat)) && state.show.prefs.downbeat !== null;
+  const where = set ? `count 1 at ${fmtTime(g.origin)}` : 'count 1 at the first music track';
+  el.textContent = `${g.tempo} bpm · ${where}` + (taps ? ` · ${taps} tap${taps === 1 ? '' : 's'}` : '');
+}
 
 const app = {
   stage: null,
@@ -962,6 +973,7 @@ function rebuildPanels() {
   $('prefEndFade').value = +(prefs.endFade / 1000).toFixed(1);
   $('prefTempo').value = prefs.tempo;
   $('prefBeats').value = prefs.beatsPerBar;
+  refreshCountReadout();
   $('castCount').textContent = String(state.show.cast.length + (state.show.castGroups || []).length);
 
   // The running order: a compact picker for switching act, with all acts in its menu.
@@ -4156,6 +4168,42 @@ function boot() {
   };
   bindTempo('prefTempo', 'tempo', 20, 300);
   bindTempo('prefBeats', 'beatsPerBar', 1, 16);
+
+  // Tap tempo. The first tap of a session is count one: it fixes the downbeat at the playhead
+  // (press it as the music starts, or on the bar's first beat while it plays). Every tap after
+  // that sets the tempo from the gaps. A pause of more than 2.5 s starts a new session.
+  let tapSession = null;
+  $('btnTapTempo').addEventListener('click', () => {
+    const now = performance.now();
+    if (!tapSession || now - tapSession.last > 2500) {
+      commit();
+      tapSession = { taps: [], last: now };
+      state.show.prefs.downbeat = Math.round(state.ui.playhead || 0);
+    }
+    tapSession.last = now;
+    tapSession.taps.push(now);
+    const bpm = tempoFromTaps(tapSession.taps);
+    if (bpm) state.show.prefs.tempo = bpm;
+    state.ui.dirtyPanels = true;
+    persist();
+    refreshCountReadout(tapSession.taps.length);
+  });
+  $('btnSetDownbeat').addEventListener('click', () => {
+    tapSession = null;
+    commit();
+    state.show.prefs.downbeat = Math.round(state.ui.playhead || 0);
+    state.ui.dirtyPanels = true;
+    persist();
+    refreshCountReadout();
+  });
+  $('btnClearDownbeat').addEventListener('click', () => {
+    tapSession = null;
+    commit();
+    state.show.prefs.downbeat = null;
+    state.ui.dirtyPanels = true;
+    persist();
+    refreshCountReadout();
+  });
 
   // stage settings
   const bindStage = (id, key, min, max) => {

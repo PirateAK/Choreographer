@@ -166,6 +166,9 @@ main {
 
 .field { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
 .field label { color: var(--dim); font-size: 12px; }
+.tap-count { justify-content: flex-start; flex-wrap: wrap; }
+.tap-count button { font-size: 12px; }
+
 .field input {
   width: 78px;
   background: var(--panel2);

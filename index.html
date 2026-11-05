@@ -56,6 +56,8 @@
       <div class="field"><label>End fade (s)</label><input id="prefEndFade" type="number" min="0" max="120" step="0.5" title="How long the music takes to come down before the show ends; 0 stops it dead" /></div>
       <div class="field"><label>Tempo (bpm)</label><input id="prefTempo" type="number" min="20" max="300" step="1" title="The music's tempo. A count is one beat, and a phrase's counts are laid against it" /></div>
       <div class="field"><label>Counts per bar</label><input id="prefBeats" type="number" min="1" max="16" step="1" title="How many counts make a bar: 4 in common time, 3 for a waltz" /></div>
+      <div class="field tap-count"><button id="btnTapTempo" type="button" title="Tap along with the music. The first tap is count one at the playhead; later taps set the tempo from the gaps. A pause of 2.5 s starts over">Tap tempo</button><button id="btnSetDownbeat" type="button" class="ghost" title="Count one is the playhead right now">Count 1 here</button><button id="btnClearDownbeat" type="button" class="ghost" title="Count one goes back to the first music track">Clear</button></div>
+      <p id="countReadout" class="hint"></p>
       <p class="hint">The length a cue is given when it is placed, before it is dragged into shape. These travel with the show, so a reopened file flies and fades the same way. <b>End fade</b> is how long the music takes to come down into an end marker; <b>0</b> stops it dead on the moment. <b>Tempo</b> and <b>counts per bar</b> are the music's clock: a phrase is placed by counts of it, and the bars are drawn under the tracks and counted from where the first track begins.</p>
     </section>
 
@@ -296,14 +298,14 @@
 
 <script type="importmap">
 {"imports": {
-  "./src/app.js": "./src/app.js?v=scroll58",
+  "./src/app.js": "./src/app.js?v=scroll59",
   "./src/music.js": "./src/music.js?v=cap3",
   "./src/stage.js": "./src/stage.js?v=guide23",
   "./src/cheatsheet.js": "./src/cheatsheet.js?v=guide23",
   "./src/placement-guide.js": "./src/placement-guide.js?v=guide20",
   "./src/pose.js": "./src/pose.js?v=silhouette1",
   "./src/limb-shape.js": "./src/limb-shape.js?v=legs1",
-  "./src/model.js": "./src/model.js?v=trajectory18",
+  "./src/model.js": "./src/model.js?v=trajectory19",
   "./src/narration.js": "./src/narration.js?v=narr7",
   "./src/narration-bundle.js": "./src/narration-bundle.js?v=narr2",
   "./src/conventions.js": "./src/conventions.js?v=conv14",
