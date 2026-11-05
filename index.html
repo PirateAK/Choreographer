@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Choreographer</title>
 <link rel="icon" type="image/png" href="favicon.png" />
-<link rel="stylesheet" href="styles.css?v=scroll34" />
+<link rel="stylesheet" href="styles.css?v=scroll35" />
 </head>
 <body>
 <header>
@@ -119,7 +119,6 @@
         <button id="btnStations" class="view-btn on" aria-pressed="true" title="Show or hide station points">Stations</button>
         <button id="btnCostumes" class="view-btn" aria-pressed="false" title="Show or hide overhead costume shapes">Costumes</button>
         <button id="btnTilt" class="view-btn" aria-pressed="false" title="Drag vertically on the stage to tilt the view; dancer editing is disabled while active">Tilt view</button>
-        <button id="btnResetOverhead" class="view-btn" title="Return to directly overhead and leave tilt mode">Reset overhead</button>
       </div>
     </div>
     <div id="sceneTabs" class="act-tabs scene-tabs" aria-label="Scenes in this act"></div>
@@ -275,8 +274,8 @@
       <button id="btnAboutClose" class="ghost">Close</button>
     </header>
     <div class="moves-body">
-      <p><strong>Version 0.4.4</strong> <span class="about-build">Release date: <time datetime="2026-11-05">5 November 2026</time></span></p>
-      <p>Plan and Elevation are separate tabs, so the plan takes the whole stage area when shown.</p>
+      <p><strong>Version 0.4.5</strong> <span class="about-build">Release date: <time datetime="2026-11-05">5 November 2026</time></span></p>
+      <p>Plan and Elevation are separate tabs, so the plan takes the whole stage area when shown. Stage controls sit on a dedicated toolbar row; Tilt view becomes Reset while active.</p>
       <p>Legs and feet preview: shaped thighs/calves and articulated heel, ball and toe rendering. Movement technique remains under review.</p>
       <p>Includes Mirror path and Cast tools. Show-video recording is disabled; music and voice recording remain available.</p>
       <p>Show files are JSON; music and voice recordings are stored separately in this browser. Keep a copy of your show file when moving between browsers or computers.</p>
@@ -298,7 +297,7 @@
 
 <script type="importmap">
 {"imports": {
-  "./src/app.js": "./src/app.js?v=scroll50",
+  "./src/app.js": "./src/app.js?v=scroll53",
   "./src/music.js": "./src/music.js?v=cap3",
   "./src/stage.js": "./src/stage.js?v=guide22",
   "./src/cheatsheet.js": "./src/cheatsheet.js?v=guide23",

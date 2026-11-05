@@ -3091,6 +3091,10 @@ function paintView() {
   }
   $('btnCostumes').classList.toggle('on', state.ui.showCostumes === true);
   $('btnCostumes').setAttribute('aria-pressed', String(state.ui.showCostumes === true));
+  $('btnTilt').textContent = state.ui.tiltMode ? 'Reset' : 'Tilt view';
+  $('btnTilt').title = state.ui.tiltMode
+    ? 'Return directly overhead and leave tilt mode'
+    : 'Drag vertically on the stage to tilt the view; dancer editing is disabled while active';
   $('btnTilt').classList.toggle('on', !!state.ui.tiltMode);
   $('btnTilt').setAttribute('aria-pressed', String(!!state.ui.tiltMode));
   $('stage').style.cursor = state.ui.tiltMode ? 'ns-resize' : '';
@@ -3294,7 +3298,7 @@ function updateTransport() {
   const sh = $('stageHint');
   if (sh) {
     const text = state.ui.fill === 'plan' && state.ui.tiltMode
-      ? 'Tilt view: drag down to angle the stage, up for overhead (0–55°) · toggle Tilt view off to edit'
+      ? 'Tilt view: drag down to angle the stage, up for overhead (0–55°) · select Reset to return overhead and edit'
       : state.ui.hint || (coachMark ? STAGE_HINT : '');
     if (sh.textContent !== text) sh.textContent = text;
     sh.hidden = !text;
@@ -4598,13 +4602,14 @@ function boot() {
     paintView(); saveView(); app.stage.draw();
   });
   $('btnTilt').addEventListener('click', () => {
-    state.ui.tiltMode = !state.ui.tiltMode;
     if (state.ui.fill !== 'plan') setFill('plan');
+    if (state.ui.tiltMode) {
+      state.ui.planTilt = 0; state.ui.tiltMode = false;
+      paintView(); saveView(); app.stage.draw();
+      return;
+    }
+    state.ui.tiltMode = true;
     paintView();
-  });
-  $('btnResetOverhead').addEventListener('click', () => {
-    state.ui.planTilt = 0; state.ui.tiltMode = false;
-    paintView(); saveView(); app.stage.draw();
   });
   $('stage').addEventListener('viewtiltchange', saveView);
   $('btnFillElev').addEventListener('click', () => setFill('elevation'));

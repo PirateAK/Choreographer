@@ -288,7 +288,7 @@ table.cast span.dim { color: #8a8578; }
    The act strip sits above both, because switching act is switching the moment. */
 #center {
   min-width: 0; min-height: 0; background: #080b10;
-  display: grid; grid-template-rows: minmax(40px, auto) auto minmax(0, 1fr) 186px;
+  display: grid; grid-template-rows: auto auto minmax(0, 1fr) 186px;
 }
 
 .act-tabs {
@@ -302,6 +302,8 @@ table.cast span.dim { color: #8a8578; }
   background: #0b0f16;
   border-bottom: 1px solid var(--line);
 }
+#actTabs { row-gap: 5px; }
+#actTabs .stage-tools { flex: 1 0 100%; justify-content: flex-start; }
 .act-tabs[aria-label="Scenes in this act"]:empty { display: none; }
 .act-picker { min-width: 0; }
 #actSelect {
