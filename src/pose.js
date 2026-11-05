@@ -1,4 +1,5 @@
 import { riseFor, conventionValue } from './conventions.js';
+import { limbContour } from './limb-shape.js';
 
 // Ballet positions, drawn as a jointed figure rather than a symbol. A station has
 // always carried a position — first, arabesque, pirouette — but nothing drew it, so a
@@ -597,11 +598,45 @@ export function feetPlaceOf(spec, facing = 1, turn = 0) {
   });
 }
 
+// Foot roll is appearance geometry around the solved ankle, not another contact solver.
+// The existing rise lifts hip AND ankle equally: thigh/shin lengths are already fixed.
+// Model a heel, metatarsal/ball and toe beneath that ankle so the rise is visible.
+// For lifted/unreachable ankles the entire shoe follows the ankle; it never snaps to a floor target.
+export function footGeometry(spec, figure, facing = 1, turn = 0) {
+  const a = (Number(turn) || 0) * Math.PI / 180;
+  const squash = 0.42 + 0.58 * Math.abs(Math.cos(a));
+  const mirror = (facing < 0 ? -1 : 1) * (Math.cos(a) < 0 ? -1 : 1);
+  const spin = Math.sin(a) * (facing < 0 ? -1 : 1);
+  const lift = Math.max(0, Number(spec.rise) || 0);
+  const roll = Math.min(1, lift / 0.06);
+  const project = p => [p[0] * squash + p[2] * spin, p[1]];
+  return figure.legs3.map((leg, i) => {
+    const ankle = leg[2];
+    const [dx, dz] = toeDirection(spec, i);
+    const point = (distance, height) => [ankle[0] + dx * mirror * distance,
+      ankle[1] - FLOOR_REF - lift + height, ankle[2] + dz * distance];
+    const heel = point(-0.025 * (1 - roll), lift * 0.88);
+    const ball = point(0.027 * (1 - roll), Math.max(0, lift - 0.03) * 0.55);
+    const toe = point(TOE_LENGTH * (1 - roll), 0);
+    return { ankle, heel, ball, toe, points: [heel, ankle, ball, toe].map(project), roll };
+  });
+}
+
+// Shared silhouette samples for screen and print. Radii are body units, independent
+// of costume, zoom and contact solving; the knee/ankle centers stay untouched.
+export function legContours(leg) {
+  const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+  const [hip, knee, ankle] = leg;
+  return [
+    limbContour([hip, mix(hip, knee, 0.38), mix(hip, knee, 0.72), knee], [0.030, 0.032, 0.025, 0.016]),
+    limbContour([knee, mix(knee, ankle, 0.32), mix(knee, ankle, 0.64), ankle], [0.016, 0.024, 0.018, 0.009]),
+  ];
+}
+
 /* ------------------------------------------------------------------ drawing */
 
-// The figure, drawn as a jointed stick: dark outline first so the dancer reads on a
-// dark stage and on white paper, then the body colour over it. Returns the head box so
-// a caller can put a name above it without recomputing the pose.
+// The figure uses shaped, articulated legs around the solved skeleton; arms and torso
+// retain the simple jointed drawing for now. Returns the head box for labels.
 export function drawPose(ctx, o) {
   const { spec, x, y, h, facing = 1, turn = 0, headTurn = turn, body, skirt, hair, pins } = o;
   const j = joints(spec, facing, turn, pins);
@@ -622,20 +657,29 @@ export function drawPose(ctx, o) {
   ctx.lineJoin = 'round';
 
   const outline = 'rgba(0,0,0,.45)';
-  const limbs = [j.legs[0], j.legs[1], j.arms[0], j.arms[1], [j.pelvis, j.chest]];
-  // Outline pass, then colour: a single pass vanishes wherever the floor is pale.
+  const polygon = points => {
+    ctx.beginPath();
+    points.forEach(([bx, by], i) => i ? ctx.lineTo(X(bx), Y(by)) : ctx.moveTo(X(bx), Y(by)));
+    ctx.closePath();
+    ctx.fillStyle = body;
+    ctx.strokeStyle = outline;
+    ctx.lineWidth = Math.max(0.6, h * 0.006);
+    ctx.fill();
+    ctx.stroke();
+  };
+  for (const leg of j.legs) {
+    for (const shape of legContours(leg)) polygon(shape);
+    // Cover the two segment end seams with the same rounded joint in canvas and print.
+    ctx.beginPath();
+    ctx.arc(X(leg[1][0]), Y(leg[1][1]), h * 0.016, 0, Math.PI * 2);
+    ctx.fillStyle = body;
+    ctx.fill();
+  }
+  const limbs = [j.arms[0], j.arms[1], [j.pelvis, j.chest]];
   for (const seg of limbs) stroke(seg, wide * 1.7, outline);
   for (const seg of limbs) stroke(seg, wide, body);
-
-  // Feet: a short toe from each ankle, turned out, so a tendu reads as a point.
-  ctx.lineWidth = Math.max(1, wide * 0.8);
-  ctx.strokeStyle = body;
-  for (const [, , ankle] of j.legs) {
-    const toeX = ankle[0] + 0.05 * (ankle[0] < 0 ? -1 : 1);
-    ctx.beginPath();
-    ctx.moveTo(X(ankle[0]), Y(ankle[1]));
-    ctx.lineTo(X(toeX), Y(ankle[1] + 0.01));
-    ctx.stroke();
+  for (const foot of footGeometry(spec, j, facing, turn)) {
+    polygon(limbContour(foot.points, [0.009, 0.010, 0.009, 0.006]));
   }
 
   // Head, then hair over the crown.
@@ -718,15 +762,16 @@ export function poseSvg(o) {
   const seg = (points, w, colour) =>
     `<polyline points="${points.map(([bx, by]) => X(bx).toFixed(1) + ',' + Y(by).toFixed(1)).join(' ')}" fill="none" stroke="${colour}" stroke-width="${w.toFixed(1)}" stroke-linecap="round" stroke-linejoin="round" />`;
 
-  const limbs = [j.legs[0], j.legs[1], j.arms[0], j.arms[1], [j.pelvis, j.chest]];
+  const polygon = points => `<polygon points="${points.map(([bx, by]) => X(bx).toFixed(2) + ',' + Y(by).toFixed(2)).join(' ')}" fill="${body}" stroke="${ink}" stroke-width="${Math.max(0.6, h * 0.006).toFixed(2)}" stroke-linejoin="round" />`;
+  for (const leg of j.legs) {
+    for (const shape of legContours(leg)) out.push(polygon(shape));
+    out.push(`<circle cx="${X(leg[1][0]).toFixed(2)}" cy="${Y(leg[1][1]).toFixed(2)}" r="${(h * 0.016).toFixed(2)}" fill="${body}" />`);
+  }
+  const limbs = [j.arms[0], j.arms[1], [j.pelvis, j.chest]];
   for (const s of limbs) out.push(seg(s, width, ink));
   for (const s of limbs) out.push(seg(s, wide, body));
-
-  for (const [, , ankle] of j.legs) {
-    const toeX = ankle[0] + 0.05 * (ankle[0] < 0 ? -1 : 1);
-    out.push(
-      `<line x1="${X(ankle[0]).toFixed(1)}" y1="${Y(ankle[1]).toFixed(1)}" x2="${X(toeX).toFixed(1)}" y2="${Y(ankle[1] + 0.01).toFixed(1)}" stroke="${body}" stroke-width="${Math.max(0.8, wide * 0.8).toFixed(1)}" stroke-linecap="round" />`
-    );
+  for (const foot of footGeometry(spec, j, facing, turn)) {
+    out.push(polygon(limbContour(foot.points, [0.009, 0.010, 0.009, 0.006])));
   }
 
   const headR = j.headR * h;
