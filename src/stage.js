@@ -5,7 +5,7 @@ import {
   addStation, objectShown, wingBays, findObject, propPosOfContent, carrierOf, sceneryStateAt,
   clothSpan, clothX, clothDepth, clothThick, clampClothX, curtainLegW, POSE_LABEL, lightLevelAt,
   lightSpot, costumeOf, legPoints, curveAt, BEND_LIMIT,
-  footAtLocal, footSkate, legOverreach, dancerHeight, overheadPoseAtLocal,
+  footAtLocal, footSkate, legOverreach, dancerHeight, overheadPoseAtLocal, isProp, autoPlaceKey, autoPlaceEnabled,
 } from './model.js';
 import { darker } from './pose.js';
 import { placementRange } from './placement-guide.js';
@@ -1263,8 +1263,19 @@ export class StageView {
       commit();
       const armed = state.ui.stationGuide;
       const guide = armed && armed.id === sel.id ? armed : null;
-      const key = addStation(sel, Math.max(-mx, Math.min(mx, x)), Math.max(0.35, Math.min(st.depth - 0.35, y)),
-        guide ? { step: guide.step, pose: guide.pose, dur: guide.durationMs } : {});
+      // With auto-place on, a dancer's new station goes on the beat and a stride from her last
+      // station; the click then only chooses the dancer, so the stage does not stack stations.
+      const auto = !isProp(sel) && sel.keys.length && autoPlaceEnabled(state.show)
+        ? autoPlaceKey(state.show, sel, guide ? { durMs: guide.durationMs } : {})
+        : null;
+      const base = guide ? { step: guide.step, pose: guide.pose, dur: guide.durationMs } : {};
+      const key = addStation(
+        sel,
+        auto ? auto.x : Math.max(-mx, Math.min(mx, x)),
+        auto ? auto.y : Math.max(0.35, Math.min(st.depth - 0.35, y)),
+        auto ? { ...base, dur: auto.dur } : base,
+      );
+      if (auto) state.ui.playhead = contentOfLocal(state.show, sel.id, key.t);
       if (guide) {
         key.level = guide.level;
         if (guide.port) key.port = guide.port;

@@ -7,6 +7,7 @@ import { contactFrame } from './contact-frame.js';
 import { conventionValue } from './conventions.js';
 import { sampleFootTrajectory, validateFootTrajectory } from './foot-trajectory.js';
 import { compileFootSchedule } from './foot-scheduler.js';
+import { placementRange } from './placement-guide.js';
 
 // The four things a station can stand on. Kept here rather than beside the contact code so a
 // show read from a file can be tidied before anything else in the module has been evaluated.
@@ -1353,6 +1354,9 @@ export function normalise(show) {
   };
   out.prefs = {
     cueDur: dur(prefs.cueDur, 1500),
+    // New stations and keys are placed on the beat and a stride from the last one unless
+    // the choreographer turns this off; a show from before this existed gets it on.
+    autoPlace: prefs.autoPlace !== false,
     fadeDur: dur(prefs.fadeDur, 2000),
     lightDur: dur(prefs.lightDur, 2000),
     // A hold or a pause of nothing would be a marker that does nothing, so these
@@ -2635,6 +2639,68 @@ export function addStation(dancer, x, y, opts = {}) {
   keys.push(key);
   keys.sort((a, b) => a.t - b.t);
   return key;
+}
+
+// The next beat marker after a content time, over every music track, or null when no track
+// has beats yet. Beat markers are track-relative, so each is `track.start + marker`.
+export function nextBeatContent(show, afterContent) {
+  let best = null;
+  for (const track of (show && show.musicTracks) || []) {
+    const markers = Array.isArray(track.beatMarkers) ? track.beatMarkers : [];
+    const start = Number(track.start) || 0;
+    for (const m of markers) {
+      const at = start + Number(m);
+      if (Number.isFinite(at) && at > afterContent && (best === null || at < best)) best = at;
+    }
+  }
+  return best;
+}
+
+export function autoPlaceEnabled(show) {
+  return !(show && show.prefs && show.prefs.autoPlace === false);
+}
+
+// Where a new station goes when the choreographer does not place it by hand: the next beat
+// after the dancer's last station (or exactly `opts.durMs` later when a duration is given),
+// and a comfortable mid-stride from that station. The stride comes from the draft walk band
+// for this dancer's height and the time available, so a short dancer and a quick count both
+// take shorter steps. Direction is the way she was already travelling; with no travel yet, or
+// when that way is blocked by the stage edge, it is downstage (y falls towards 0). Returns null
+// when there is no station to start from, or no beat to land on and no duration given.
+const STAGE_EDGE = 0.35;
+export function autoPlaceKey(show, dancer, opts = {}) {
+  const keys = dancer.keys || [];
+  const last = keys[keys.length - 1];
+  if (!last) return null;
+  const prev = keys.length > 1 ? keys[keys.length - 2] : null;
+  const lastCt = contentOfLocal(show, dancer.id, last.t);
+  let ct;
+  if (Number.isFinite(opts.durMs) && opts.durMs > 0) ct = lastCt + opts.durMs;
+  else {
+    ct = nextBeatContent(show, lastCt);
+    if (ct === null) return null;
+  }
+  const durMs = ct - lastCt;
+  const t = Math.round(localOfContent(show, dancer.id, ct));
+  const band = placementRange({ step: 'walk', height: dancerHeight(show, dancer), durationMs: durMs });
+  const stride = band ? (band.comfortableMin + band.comfortableMax) / 2 : 0.5;
+  const st = show.stage;
+  const mx = st.width / 2 + st.wingDepth - 0.4;
+  const maxY = st.depth - STAGE_EDGE;
+  const travel = [];
+  if (prev) {
+    const vx = last.x - prev.x;
+    const vy = last.y - prev.y;
+    const n = Math.hypot(vx, vy);
+    if (n > 0.05) travel.push([vx / n, vy / n]);
+  }
+  travel.push([0, -1]);
+  for (const [dx, dy] of travel) {
+    const x = Math.max(-mx, Math.min(mx, last.x + dx * stride));
+    const y = Math.max(STAGE_EDGE, Math.min(maxY, last.y + dy * stride));
+    if (Math.hypot(x - last.x, y - last.y) > 0.05) return { t, x, y, dur: t - last.t, durMs };
+  }
+  return { t, x: last.x, y: last.y, dur: t - last.t, durMs };
 }
 
 // Give every key after the first a concrete transition duration, so editing

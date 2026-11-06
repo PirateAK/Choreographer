@@ -221,7 +221,10 @@
     </label>
     <span id="timeDisplay" class="time">00:00.000</span>
     <span class="divider"></span>
-    <button id="btnKey" title="Add a keyframe at the playhead">+ Key</button>
+    <button id="btnKey" title="Add a keyframe: on the next beat and a stride from the last station">+ Key</button>
+    <label class="toggle" title="When on, new keys and stations go on the next beat, a comfortable stride from the dancer's last station. Turn off to place them by hand.">
+      <input id="autoPlace" type="checkbox" checked />Auto-place
+    </label>
     <button id="btnPath" title="Place path stations: select a dancer, then click points on the stage in order">+ Stations</button>
     <button id="btnMirrorPath" title="Mirror the selected dancer's path left to right across stage centre, keeping its timing and order">⇄ Mirror path</button>
     <button id="btnHold" title="Hold the selected track for a moment">+ Hold</button>
@@ -298,14 +301,14 @@
 
 <script type="importmap">
 {"imports": {
-  "./src/app.js": "./src/app.js?v=height1",
+  "./src/app.js": "./src/app.js?v=autoplace1",
   "./src/music.js": "./src/music.js?v=beat1",
-  "./src/stage.js": "./src/stage.js?v=height1",
+  "./src/stage.js": "./src/stage.js?v=autoplace1",
   "./src/cheatsheet.js": "./src/cheatsheet.js?v=guide24",
   "./src/placement-guide.js": "./src/placement-guide.js?v=guide20",
   "./src/pose.js": "./src/pose.js?v=silhouette1",
   "./src/limb-shape.js": "./src/limb-shape.js?v=legs1",
-  "./src/model.js": "./src/model.js?v=height1",
+  "./src/model.js": "./src/model.js?v=autoplace1",
   "./src/narration.js": "./src/narration.js?v=narr7",
   "./src/narration-bundle.js": "./src/narration-bundle.js?v=narr2",
   "./src/conventions.js": "./src/conventions.js?v=conv14",

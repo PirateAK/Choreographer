@@ -16,7 +16,7 @@ import {
   addLight, removeLight, addLightCue, updateLightCue, removeLightCue, lightLevelAt,
   LIGHT_TYPES, LIGHT_GOBOS, LIGHT_GELS, LIGHT_SPREAD_BY_TYPE,
   scenesOf, sceneAt, sceneRanges, addScene, removeScene, clampSceneOffsets, updateCue,
-  addCostume, removeCostume, COSTUME_STYLES, BEND_LIMIT, LEVELS, AIR_LIFT, LIFT_MAX, levelOf, ABSORB_MAX, DANCER_HEIGHT_MIN, DANCER_HEIGHT_MAX,
+  addCostume, removeCostume, COSTUME_STYLES, BEND_LIMIT, LEVELS, AIR_LIFT, LIFT_MAX, levelOf, ABSORB_MAX, DANCER_HEIGHT_MIN, DANCER_HEIGHT_MAX, autoPlaceKey, autoPlaceEnabled,
   POSE_LABEL, STEP_LABEL, LEVEL_LABEL, EASES, EASE_LABEL,
   plantsOf, plantProblem, footSkate, legOverreach, PLANT_LABEL, rolesOf, setRole,
   scanOverlaps, overlapFix, applyOverlapFix, pathsKey, CLEARANCE,
@@ -975,6 +975,7 @@ function rebuildPanels() {
   $('stGrid').value = state.show.stage.grid;
   $('stOpening').value = state.show.stage.openingH;
   $('stDancerH').value = state.show.stage.dancerH;
+  $('autoPlace').checked = autoPlaceEnabled(state.show);
   // The lengths a placed cue is given. Shown in seconds, like every other timing
   // the panels edit, and stored in milliseconds like everything else.
   const prefs = state.show.prefs;
@@ -3234,6 +3235,18 @@ function addKeyAtPlayhead() {
     return;
   }
   commit();
+  // A dancer with a path gets the next key on the beat and a stride from her last station,
+  // so a second press does not stack on the first. Props and an empty path keep the playhead.
+  if (!isProp(d) && d.keys.length && autoPlaceEnabled(state.show)) {
+    const auto = autoPlaceKey(state.show, d);
+    if (auto) {
+      d.keys.push({ t: auto.t, x: auto.x, y: auto.y, dur: auto.dur });
+      d.keys.sort((a, b) => a.t - b.t);
+      state.ui.playhead = contentOfLocal(state.show, d.id, auto.t);
+      app.rebuild();
+      return;
+    }
+  }
   const lt = contentOfLocal(state.show, d.id, state.ui.playhead);
   const p = (isProp(d)
     ? propPosOfContent(state.show, d, state.ui.playhead)
@@ -4836,6 +4849,10 @@ function boot() {
     narration.stopAll();
   });
   $('btnKey').addEventListener('click', addKeyAtPlayhead);
+  $('autoPlace').addEventListener('change', (e) => {
+    state.show.prefs.autoPlace = e.target.checked;
+    persist();
+  });
   $('btnPath').addEventListener('click', () => {
     state.ui.placingStations = !state.ui.placingStations;
     state.ui.stationGuide = null;
