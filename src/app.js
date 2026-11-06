@@ -38,7 +38,7 @@ import { storeAudio, readAudio } from './audiostore.js';
 import { buildBundle, bundleFileName, checkBundle, applyBundle } from './narration-bundle.js';
 import { HouseView } from './house.js';
 import { VideoEngine } from './video.js';
-import { addVideo, removeVideo, videoSpan, videoAt, addImage, addSlideCue, removeSlideCue, projectionAt, slideLayersAt } from './model.js';
+import { addVideo, removeVideo, videoSpan, videoAt, addImage, addSlideCue, removeSlideCue, projectionAt, slideLayersAt, propPlacementHint } from './model.js';
 import { SlideEngine } from './slides.js';
 const slides = new SlideEngine();
 const video = new VideoEngine();
@@ -4355,7 +4355,8 @@ function boot() {
   });
   $('btnAddProp').addEventListener('click', () => {
     commit();
-    addScenery(state.show, 'prop');
+    const prop = addScenery(state.show, 'prop');
+    state.ui.hint = propPlacementHint(state.show, prop);
     app.rebuild();
   });
   $('btnAddLeftLeg').addEventListener('click', () => {

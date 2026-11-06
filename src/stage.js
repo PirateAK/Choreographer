@@ -6,6 +6,7 @@ import {
   clothSpan, clothX, clothDepth, clothThick, clampClothX, curtainLegW, POSE_LABEL, lightLevelAt,
   lightSpot, costumeOf, legPoints, curveAt, BEND_LIMIT,
   footAtLocal, footSkate, legOverreach, dancerHeight, overheadPoseAtLocal, isProp, autoPlaceKey, autoPlaceEnabled,
+  propPlacementHint,
 } from './model.js';
 import { darker } from './pose.js';
 import { placementRange } from './placement-guide.js';
@@ -1581,6 +1582,7 @@ export class StageView {
   onUp() {
     if (!this.grab) return;
     const kind = this.grab.type;
+    const grabbedProp = this.grab.prop;
     this.grab = null;
     if (kind === 'tilt') {
       this.canvas.dispatchEvent(new Event('viewtiltchange'));
@@ -1588,7 +1590,12 @@ export class StageView {
     }
     // A moved leg, light or cloth changes the numbers in the panel, so redraw that too.
     if (kind === 'leg' || kind === 'cloth' || kind === 'light') this.app.rebuild();
-    else if (kind === 'bend') {
+    else if (kind === 'prop') {
+      // A prop reports its clash with the paths the moment it is put down.
+      persist();
+      state.ui.hint = propPlacementHint(state.show, grabbedProp);
+      this.app.rebuild();
+    } else if (kind === 'bend') {
       // The station strip and the inspector show the bow as a number, so they are stale
       // the moment it is dragged.
       persist();

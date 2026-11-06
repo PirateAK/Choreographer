@@ -4,7 +4,7 @@
 
 import {
   state, commit, findObject, mirrorPathLeftRight, scanOverlaps,
-  posOfContent, pathsKey, CLEARANCE, scanClothCrossings, clothCovers, clothDepth,
+  posOfContent, pathsKey, CLEARANCE, scanClothCrossings, clothCovers, clothDepth, scanPropClashes,
 } from './model.js';
 
 const ZOOM_MIN = 0.6;
@@ -148,19 +148,22 @@ function currentScan(show) {
 function renderWarnings(show) {
   const scan = currentScan(show);
   const curtains = scanClothCrossings(show);
-  const all = [...scan, ...curtains].sort((a, b) => a.at - b.at);
+  const props = (show.scenery || []).filter((s) => s.kind === 'prop').flatMap((p) => scanPropClashes(show, p));
+  const all = [...scan, ...curtains, ...props].sort((a, b) => a.at - b.at);
   ui.warnings = all;
   warnCount.textContent = all.length ? String(all.length) : 'none';
   warnEl.innerHTML = all.map((o) => {
     if (o.sceneryId) {
       const d = findObject(show, o.dancerId);
       const who = escapeHtml((d && d.name) || 'Dancer');
-      const what = o.kind === 'curtain' ? 'curtain closed' : (o.kind === 'screen' ? 'screen hanging' : 'drop hanging');
+      const isProp = o.kind === 'prop';
+      const what = isProp ? 'on path' : (o.kind === 'curtain' ? 'curtain closed' : (o.kind === 'screen' ? 'screen hanging' : 'drop hanging'));
       return `<div class="studio-row warn curtain" data-warn="${o.id}" role="button" tabindex="0">
-        <span class="studio-name">${who} through ${escapeHtml(o.name)}</span>
+        <span class="studio-name">${who} ${isProp ? 'at' : 'through'} ${escapeHtml(o.name)}</span>
         <span class="studio-count">${(o.at / 1000).toFixed(2)} s · ${what}</span>
       </div>`;
     }
+
     const names = o.ids.map((id) => {
       const d = findObject(show, id);
       return escapeHtml((d && d.name) || 'Dancer');

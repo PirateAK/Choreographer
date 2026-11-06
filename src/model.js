@@ -3800,7 +3800,53 @@ export function scanClothCrossings(show) {
   return out.sort((a, b) => a.at - b.at).map((o, i) => ({ ...o, id: 'cu' + i }));
 }
 
+// Every stretch of the running order in which a dancer comes within the clearance of a prop.
+// A prop is a point on the floor, or one that moves on its own stations or with a carrier.
+// The dancer carrying it is not checked against it. Each stretch is reported once, at the
+// moment of closest approach, the same way the overlap scan reports a pass.
+export function scanPropClashes(show, prop) {
+  if (!isProp(prop)) return [];
+  const dancers = (show.cast || []).filter((d) => !isProp(d) && (d.keys || []).length);
+  if (!dancers.length) return [];
+  const end = Math.max(1000, endContent(show) + 500);
+  const step = Math.max(80, Math.round(end / 5000));
+  const out = [];
+  for (const d of dancers) {
+    let run = null;
+    for (let ct = 0; ct <= end; ct += step) {
+      const p = posOfContent(show, d, ct);
+      const q = propPosOfContent(show, prop, ct);
+      const carrying = carrierIdOf(prop, ct) === d.id;
+      const gap = p && q && !carrying ? Math.hypot(p.x - q.x, p.y - q.y) : Infinity;
+      if (gap < CLEARANCE) {
+        if (!run) run = { dancerId: d.id, at: ct, gap, x: p.x, y: p.y };
+        else if (gap < run.gap) Object.assign(run, { at: ct, gap, x: p.x, y: p.y });
+      } else if (run) {
+        out.push(run);
+        run = null;
+      }
+    }
+    if (run) out.push(run);
+  }
+  return out
+    .sort((a, b) => a.at - b.at)
+    .map((r, i) => ({ ...r, kind: 'prop', id: 'pc' + i, sceneryId: prop.id, ids: [r.dancerId], name: prop.name || 'Prop' }));
+}
 
+// A line for the hint bar after a prop is placed or moved: where it sits, and whether any
+// dancer's path comes within the clearance of it.
+export function propPlacementHint(show, prop) {
+  const name = (prop && prop.name) || 'Prop';
+  const hits = scanPropClashes(show, prop);
+  if (!hits.length) return `${name} is clear of every dancer's path`;
+  const first = hits[0];
+  const d = (show.cast || []).find((x) => x.id === first.dancerId);
+  const who = (d && d.name) || 'a dancer';
+  const more = hits.length > 1 ? ` · ${hits.length} clashes in all` : '';
+  return `${name} is on ${who}'s path at ${(first.at / 1000).toFixed(2)} s, ${first.gap.toFixed(2)} m away${more}`;
+}
+
+// Where everybody but one dancer stands, sampled once across the running order at a fixed set of
 // moments. A candidate fix changes one path and puts it back; the other bodies do not move, so their
 // floor is measured once and the candidate costs one walk of her own path rather than of the whole
 // show. It is dropped whenever the show changes (the revision counter in `persist`), because a
