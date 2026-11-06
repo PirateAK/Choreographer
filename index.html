@@ -3,9 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+
 <title>Choreographer</title>
 <link rel="icon" type="image/png" href="favicon.png" />
-<link rel="stylesheet" href="styles.css?v=studio2" />
+<link rel="stylesheet" href="styles.css?v=staging1" />
 </head>
 <body>
 <section id="studio" class="studio" role="dialog" aria-label="Path studio" hidden>
@@ -25,11 +26,29 @@
       <h3>Dancers</h3>
       <div id="studioCast" class="list"></div>
     </aside>
+    <aside class="studio-stage" aria-label="Staging tools">
+      <h3>Routine staging</h3>
+      <div class="studio-toolbar">
+        <button class="view-btn" data-tool="select" aria-pressed="true" title="Select and move draft objects">Select</button>
+        <button class="view-btn" data-tool="obstacle" aria-pressed="false" title="Click the plan to place a draft prop, curtain or drop">Place obstacle</button>
+        <button class="view-btn" data-tool="route" aria-pressed="false" title="Draw a smooth route for the selected dancer">Draw route</button>
+      </div>
+      <div class="studio-field"><label for="studioObstacleKind">Obstacle</label><select id="studioObstacleKind"><option value="prop">Prop</option><option value="curtain">Curtain</option><option value="drop">Drop / screen</option></select><button id="studioAddObstacle" class="view-btn">+ Add to plan</button></div>
+      <div class="studio-field"><label for="studioDraftDancer">Dancer</label><select id="studioDraftDancer"><option value="">Unassigned draft</option></select></div>
+      <div class="studio-field"><label for="studioRouteStart">Route starts at count (0 is music origin)</label><input id="studioRouteStart" type="number" min="0" step="1" value="0"></div>
+      <div class="studio-field"><label for="studioRouteBeats">Beat length</label><input id="studioRouteBeats" type="number" min="1" max="256" step="1" value="8"></div>
+      <button id="studioSampleRoute" class="view-btn">Snap route to beats</button>
+      <p class="hint">Place scenery and props in this draft plan, then draw a route. Its smooth shape is sampled at each beat into dancer stations; ballet positions and moves are authored separately afterward. Nothing here changes the show until you send it.</p>
+      <div id="studioKeyframeEditor" class="studio-keyframe"></div>
+      <button id="studioSendDraft" class="view-btn" disabled>Send routine to stage…</button>
+      <span id="studioDraftStatus" class="hint" role="status"></span>
+    </aside>
     <div class="studio-plan"><canvas id="studioCanvas" aria-label="Stage plan with dancers' paths"></canvas></div>
     <aside class="studio-side" aria-label="Collisions">
       <h3>Collisions <span id="studioWarnCount" class="count">—</span></h3>
       <div class="btn-row studio-overlap-tools"><button id="btnScanOverlaps" class="view-btn" title="Scan the whole running order for dancer-to-dancer overlaps">Find overlaps</button></div>
       <p class="hint studio-overlap-hint">A whole-show scan finds moments when two dancers come within 0.55 m. Click a warning to go to that moment; Fix applies the suggested path change, and Undo restores it.</p>
+      <div id="studioDraftReview" class="list"></div>
       <div id="studioWarn" class="list"></div>
     </aside>
   </div>
@@ -320,7 +339,8 @@
 <script type="importmap">
 {"imports": {
   "./src/app.js": "./src/app.js?v=studio6",
-  "./src/path-studio.js": "./src/path-studio.js?v=studio6",
+  "./src/path-studio.js": "./src/path-studio.js?v=staging1",
+  "./src/routine-draft.js": "./src/routine-draft.js?v=staging1",
   "./src/music.js": "./src/music.js?v=beat1",
   "./src/stage.js": "./src/stage.js?v=studio5",
   "./src/cheatsheet.js": "./src/cheatsheet.js?v=guide24",
