@@ -1,5 +1,6 @@
 import { storeAudio, readAudio, dropAudio } from './audiostore.js';
 import { videoAt } from './model.js';
+import { clampReviewRate } from './music.js';
 
 const PREFIX = 'video-';
 const RESYNC_SECONDS = 0.08;
@@ -29,6 +30,7 @@ export class VideoEngine {
     this.loadToken = 0;
     this.playheadMs = 0;
     this.lastSyncPlayheadMs = null;
+    this.playbackRate = 1;
     this.playing = false;
     this.playRequested = false;
     this.playPending = false;
@@ -147,8 +149,10 @@ export class VideoEngine {
     return missing;
   }
 
-  sync(clips, playheadMs, playing) {
+  sync(clips, playheadMs, playing, playbackRate = 1) {
+    const rate = clampReviewRate(playbackRate);
     const clip = activeClip(clips, playheadMs);
+    this.playbackRate = rate;
     this.playheadMs = playheadMs;
     const previousPlayheadMs = this.lastSyncPlayheadMs;
     this.lastSyncPlayheadMs = playheadMs;
@@ -175,12 +179,12 @@ export class VideoEngine {
     const timelineJump = previousPlayheadMs !== null
       && Math.abs(playheadMs - previousPlayheadMs) > TIMELINE_JUMP_MS;
     if (timelineJump) {
-      video.playbackRate = 1;
+      video.playbackRate = rate;
       this.seekTo(clip, playheadMs);
     } else if (playing) {
       this.correctDrift(clip, playheadMs);
     } else {
-      video.playbackRate = 1;
+      video.playbackRate = rate;
       this.seekTo(clip, playheadMs);
     }
     if (playing) this.play();
@@ -221,7 +225,7 @@ export class VideoEngine {
         this.releaseSource();
         return;
       }
-      video.playbackRate = 1;
+      video.playbackRate = this.playbackRate;
       this.seekTo(current, this.playheadMs);
       this.applyAudio(current);
       if (this.playing) this.play();
@@ -248,12 +252,12 @@ export class VideoEngine {
     const drift = this.sourceTime(clip, playheadMs) - video.currentTime;
     const magnitude = Math.abs(drift);
     if (magnitude > HARD_RESYNC_SECONDS) {
-      video.playbackRate = 1;
+      video.playbackRate = this.playbackRate;
       this.seekTo(clip, playheadMs);
     } else if (magnitude > RESYNC_SECONDS) {
-      video.playbackRate = 1 + Math.max(-MAX_RATE_ADJUSTMENT, Math.min(MAX_RATE_ADJUSTMENT, drift * 0.1));
+      video.playbackRate = this.playbackRate + Math.max(-MAX_RATE_ADJUSTMENT, Math.min(MAX_RATE_ADJUSTMENT, drift * 0.1));
     } else {
-      video.playbackRate = 1;
+      video.playbackRate = this.playbackRate;
     }
   }
 

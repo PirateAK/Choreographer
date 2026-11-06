@@ -1,0 +1,32 @@
+[
+  {
+    "id": "1",
+    "content": "[data-1] phraseRuns helper in model.js and per-phrase port/notes fields",
+    "status": "in_progress"
+  },
+  {
+    "id": "2",
+    "content": "[ui-2] station list inputs for port de bras and notes on each phrase start",
+    "status": "pending"
+  },
+  {
+    "id": "3",
+    "content": "[notation-3] src/notation.js generates teacher-format lines (counts, brackets, parens, braces, 16-count sections)",
+    "status": "pending"
+  },
+  {
+    "id": "4",
+    "content": "[print-4] add notation section to print page render",
+    "status": "pending"
+  },
+  {
+    "id": "5",
+    "content": "[test-5] node tests for runs and notation lines, browser check of fields and print page",
+    "status": "pending"
+  },
+  {
+    "id": "6",
+    "content": "[commit-6] syntax, regressions, local commit (no push)",
+    "status": "pending"
+  }
+]

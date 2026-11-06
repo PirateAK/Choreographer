@@ -5,7 +5,7 @@ import {
   contentOfLocal, localOfContent, endContent, ensureDurations, reflowKeys, removeStation, toggleVisibility, displayOfContent,
   endMarker, setEnd,
   removeFromStation, truncateAfter, addWingLeg, removeWingLeg, canAddWingLeg,
-  findObject, isProp, propPosOfContent, CARRY_OFFSET, carrierOf, carrierIdOf,
+  findObject, isProp, mirrorPathLeftRight, pathStationTranslationDelta, translatePathStation, pathTranslationDelta, translatePathTrack, addCastGroup, removeCastGroup, propPosOfContent, CARRY_OFFSET, carrierOf, carrierIdOf,
   addCarryHandoff, removeCarryHandoff, addSceneryCue, removeSceneryCue, clothSpan, clampClothX, maxClothSpan,
   musicLevelAt, addMusicCue, removeMusicCue, updateMusicCue, audibleLevel,
   clothDepth, dropStack, actRanges, actAt, addAct, removeAct, actHasWork, ACT_MIN_MS, ACT_MAX_MS, sceneryStateAt, totalActLength,
@@ -16,13 +16,13 @@ import {
   addLight, removeLight, addLightCue, updateLightCue, removeLightCue, lightLevelAt,
   LIGHT_TYPES, LIGHT_GOBOS, LIGHT_GELS, LIGHT_SPREAD_BY_TYPE,
   scenesOf, sceneAt, sceneRanges, addScene, removeScene, clampSceneOffsets, updateCue,
-  addCostume, removeCostume, COSTUME_STYLES, BEND_LIMIT, LEVELS, AIR_LIFT, LIFT_MAX, levelOf, ABSORB_MAX,
+  addCostume, removeCostume, COSTUME_STYLES, BEND_LIMIT, LEVELS, AIR_LIFT, LIFT_MAX, levelOf, ABSORB_MAX, DANCER_HEIGHT_MIN, DANCER_HEIGHT_MAX, autoPlaceKey, autoPlaceEnabled,
   POSE_LABEL, STEP_LABEL, LEVEL_LABEL, EASES, EASE_LABEL,
   plantsOf, plantProblem, footSkate, legOverreach, PLANT_LABEL, rolesOf, setRole,
-  scanOverlaps, overlapFix, applyOverlapFix, pathsKey, CLEARANCE,
-  phraseShape, addPhrase, countGrid, localAtCount, phrasePlan, timelineScrollRange,
+  phraseShape, addPhrase, countGrid, tempoFromTaps, phraseRuns, localAtCount, phrasePlan, timelineScrollRange,
 } from './model.js';
 import { StageView } from './stage.js';
+import { initPathStudio, renderPathStudio } from './path-studio.js';
 import { MoveSheet } from './cheatsheet.js';
 import { conventionRows, setConvention, resetConvention, getApprover, setApprover, approveConvention, revokeApproval, previewSummary } from './conventions.js';
 import { specOf } from './pose.js';
@@ -31,12 +31,13 @@ import { Timeline, GUTTER } from './timeline.js';
 import { CompanyLine } from './company.js';
 import { fmtTime } from './draw.js';
 import { music, dropStored } from './music.js';
+import { makeBeatGridMarkers, tempoFromMarkers, translateCountToMs } from './beat-map.js';
 import { narration } from './narration.js';
 import { storeAudio, readAudio } from './audiostore.js';
 import { buildBundle, bundleFileName, checkBundle, applyBundle } from './narration-bundle.js';
 import { HouseView } from './house.js';
 import { VideoEngine } from './video.js';
-import { addVideo, removeVideo, videoSpan, videoAt, addImage, addSlideCue, removeSlideCue, projectionAt, slideLayersAt } from './model.js';
+import { addVideo, removeVideo, videoSpan, videoAt, addImage, addSlideCue, removeSlideCue, projectionAt, slideLayersAt, propPlacementHint } from './model.js';
 import { SlideEngine } from './slides.js';
 const slides = new SlideEngine();
 const video = new VideoEngine();
@@ -55,7 +56,7 @@ let pendingMusicAt = 0;
 let pendingVoiceAt = 0;
 // The moment the take in progress began at, which is where it lands.
 let voiceTakeAt = 0;
-const STAGE_HINT = 'Click a point to edit it · drag to move it · drag the line to bow it · right-click deletes it and everything after';
+const STAGE_HINT = 'Select a dancer and a station: arrows nudge that station only; with no station selected, arrows shift the whole track · Shift+arrow moves twice the grid · right-click deletes from a point onward';
 // The standing instruction is a coach mark: read once, then out of the way. It sits over
 // the front of the stage, which is exactly where a scene card stands and a downstage
 // path ends, so it retires on the first click there (or after a while) rather than
@@ -65,6 +66,17 @@ let coachMark = true;
 // nothing, and thirty animated canvases are not free.
 let moves = null;
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// What the count is right now: the tempo, and where count one falls. Shown under the tempo field
+// so a tap session can be read without leaving the settings.
+function refreshCountReadout(taps) {
+  const el = document.getElementById('countReadout');
+  if (!el) return;
+  const g = countGrid(state.show);
+  const set = Number.isFinite(Number(state.show.prefs.downbeat)) && state.show.prefs.downbeat !== null;
+  const where = set ? `count 1 at ${fmtTime(g.origin)}` : 'count 1 at the first music track';
+  el.textContent = `${g.tempo} bpm · ${where}` + (taps ? ` · ${taps} tap${taps === 1 ? '' : 's'}` : '');
+}
 
 const app = {
   stage: null,
@@ -100,6 +112,10 @@ const app = {
     // else cancels it rather than putting it on whoever happens to be picked next.
     state.ui.phraseArmed = null;
     if (state.ui.selectedId !== id) {
+      clearTimeout(state.ui.trackNudgeTimer);
+      state.ui.trackNudgeCommitted = false;
+      state.ui.trackNudgeDancerId = null;
+      state.ui.trackNudgeMode = null;
       if (state.ui.stationGuide) {
         state.ui.stationGuide = null;
         state.ui.placingStations = false;
@@ -134,6 +150,18 @@ const app = {
     this.select(dancer.id);
     const key = dancer.keys[index];
     if (!key) return;
+    if (state.ui.stationIdx !== index) {
+      clearTimeout(state.ui.trackNudgeTimer);
+      state.ui.trackNudgeCommitted = false;
+      state.ui.trackNudgeDancerId = null;
+      state.ui.trackNudgeMode = null;
+    }
+    if (state.ui.stationIdx !== index) {
+      clearTimeout(state.ui.trackNudgeTimer);
+      state.ui.trackNudgeCommitted = false;
+      state.ui.trackNudgeDancerId = null;
+      state.ui.trackNudgeMode = null;
+    }
     state.ui.stationIdx = index;
     state.ui.playhead = contentOfLocal(state.show, dancer.id, key.t);
     state.ui.dirtyPanels = true;
@@ -164,7 +192,7 @@ const app = {
     }
     const d = findObject(state.show, state.ui.selectedId);
     const i = state.ui.stationIdx;
-    const key = d && Number.isInteger(i) ? d.keys[i] : null;
+    const key = d && !isProp(d) && Number.isInteger(i) ? d.keys[i] : null;
     moves.open(key ? { pose: key.pose, step: key.step, level: key.level || 'flat' } : null);
     moves.say(key ? `point ${i + 1} of ${d.name}` : 'no point picked');
     moves.phraseWhere(this.phraseLead());
@@ -233,6 +261,7 @@ const app = {
       state.ui.phraseArmed = null;
       state.ui.stationGuide = {
         id: d.id, step: opts.step || 'walk', pose: opts.pose || 'none', level: opts.level || 'flat',
+        port: opts.port || '', notes: opts.notes || '',
         durationMs: Math.max(1, Number(opts.counts) || 1) * countGrid(state.show).count,
       };
       state.ui.placingStations = true;
@@ -295,6 +324,8 @@ const app = {
       pose: opts.pose,
       level: opts.level,
       counts: Math.max(1, Number(opts.counts) || phraseShape(step).counts),
+      port: opts.port || '',
+      notes: opts.notes || '',
     };
     moves.close();
     state.ui.hint = `Double-click a count on the ruler to start ${d.name}'s ${label} there · Shift for the bar · Esc cancels`;
@@ -340,6 +371,8 @@ const app = {
       pose: armed.pose,
       level: armed.level,
       counts: armed.counts,
+      port: armed.port,
+      notes: armed.notes,
       at: contentMs,
       atBar: !!byBar,
     });
@@ -613,9 +646,16 @@ function musicItem(t) {
         <button class="tag pick" data-music="trim" title="End this track where the playhead is">end here</button>
       </div>
       <div class="row">
+        <span class="label">count 1</span>
+        <select data-f="music-beat-one" aria-label="Choose beat marker as count one">${(t.beatMarkers || []).slice(0, 64).map((v, i) => `<option value="${i}"${i === (Number(t.beatOne) || 0) ? ' selected' : ''}>beat ${i + 1} · ${fmtTime(v)}</option>`).join('') || '<option value="0">no markers</option>'}</select>
+        <span class="label">next count</span><span class="tag">${fmtTime(translateCountToMs(state.show, t, 1, 2) || 0)}</span>
+      </div>
+      <div class="row">
         <span class="tag">${missing ? 'file missing' : t.length ? fmtTime(t.length) + ' of file' : 'no length'}</span>
         ${musicSpan(t) !== t.length ? `<span class="tag">trimmed to ${fmtTime(musicSpan(t))}</span>` : ''}
         <button class="tag pick" data-music="replace" title="Attach the audio for this track">replace</button>
+        <button class="tag pick" data-music="beats" title="Analyze the attached audio and replace this track's estimated beat markers">analyze beats</button>
+        <button class="tag pick" data-music="tap-grid" title="Replace estimates with an even grid using the show's tapped tempo">tap-tempo grid</button>
       </div>
       ${missing ? '<p class="hint">The audio for this track is not in this browser. Attach it again to hear it — the track keeps its place.</p>' : ''}
       ${short ? `<p class="hint">The track runs to ${fmtTime(t.start + t.length)} but the acts end at ${fmtTime(totalActLength(state.show))}, so the show — and the music — stop there. <button class="tag pick" data-music="fit" title="Lengthen the last act to cover this track">Fit the running order</button></p>` : ''}
@@ -713,6 +753,24 @@ function renderNarration() {
   const list = state.show.narration || [];
   const badge = $('voiceCount');
   if (badge) badge.textContent = list.length ? String(list.length) : 'none';
+  const mic = $('voiceMic');
+  if (mic) {
+    const devices = narration.devices || [];
+    const value = narration.deviceId || '';
+    mic.innerHTML = '<option value="">Default microphone</option>' + devices.map((d, i) => `<option value="${esc(d.deviceId)}">${esc(d.label || `Microphone ${i + 1}`)}</option>`).join('');
+    mic.value = value;
+    mic.disabled = narration.recording || narration.starting || devices.length === 0;
+  }
+  const meter = $('voiceInputLevel');
+  if (meter) meter.value = Math.min(1, Math.max(0, narration.inputLevel * 5));
+  const inputStatus = $('voiceInputStatus');
+  if (inputStatus) {
+    const level = narration.recording ? narration.inputLevel : 0;
+    if (narration.recording) inputStatus.textContent = level > 0.01 ? 'Mic live · signal detected' : 'Mic live · no signal';
+    else if (narration.inputError) inputStatus.textContent = narration.inputError;
+    else if (narration.lastRecordingLevel > 0) inputStatus.textContent = `Last take peak · ${(20 * Math.log10(narration.lastRecordingLevel)).toFixed(0)} dBFS`;
+    else inputStatus.textContent = 'Input idle';
+  }
   const btn = $('btnRecord');
   if (btn) {
     // While the mic is open the button is the way out of it, and says for how
@@ -833,14 +891,29 @@ function toggleRecording(at) {
   voiceTakeAt = Math.round(at / 100) * 100;
   pendingVoiceAt = voiceTakeAt;
   state.ui.hint = 'Opening the microphone…';
+  app.rebuild();
   narration
     .startRecording()
-    .then(() => {
+    .then(async () => {
+      await refreshVoiceInputs();
       state.ui.hint = 'Recording from ' + fmtTime(voiceTakeAt) + ' — speak, then press Stop';
+      $('voiceInputStatus').textContent = 'Mic live · speak now';
       app.rebuild();
     })
-    .catch(() => {
-      state.ui.hint = 'The microphone is blocked, or not there. Check this page\u2019s permission.';
+    .catch((err) => {
+      const name = err && err.name || 'Error';
+      const detail = err && err.message ? `: ${err.message}` : '';
+      const help = name === 'NotAllowedError'
+        ? 'Firefox denied microphone access. Recheck this site’s permission and system microphone privacy settings.'
+        : name === 'NotFoundError'
+          ? 'Firefox could not find a microphone input. Check that one is connected and enabled.'
+          : name === 'NotReadableError' || name === 'AbortError'
+            ? 'Firefox could not open the microphone. It may be unavailable or in use by another app.'
+            : name === 'OverconstrainedError'
+              ? 'The selected microphone is unavailable. Choose Default microphone or another input.'
+              : 'Check Firefox’s microphone permission and available input devices.';
+      state.ui.hint = `${help} (${name}${detail})`;
+      $('voiceInputStatus').textContent = `${name}: ${err && err.message || 'Microphone unavailable'}`;
       app.rebuild();
     });
 }
@@ -895,6 +968,7 @@ function renderSlides() {
 }
 
 function rebuildPanels() {
+  renderPathStudio();
   $('showName').value = state.show.name;
   $('stWidth').value = state.show.stage.width;
   $('stDepth').value = state.show.stage.depth;
@@ -902,6 +976,7 @@ function rebuildPanels() {
   $('stGrid').value = state.show.stage.grid;
   $('stOpening').value = state.show.stage.openingH;
   $('stDancerH').value = state.show.stage.dancerH;
+  $('autoPlace').checked = autoPlaceEnabled(state.show);
   // The lengths a placed cue is given. Shown in seconds, like every other timing
   // the panels edit, and stored in milliseconds like everything else.
   const prefs = state.show.prefs;
@@ -913,25 +988,23 @@ function rebuildPanels() {
   $('prefEndFade').value = +(prefs.endFade / 1000).toFixed(1);
   $('prefTempo').value = prefs.tempo;
   $('prefBeats').value = prefs.beatsPerBar;
-  $('castCount').textContent = String(state.show.cast.length);
+  refreshCountReadout();
+  $('castCount').textContent = String(state.show.cast.length + (state.show.castGroups || []).length);
 
-  // The running order: tabs for switching act, a list for editing them.
+  // The running order: a compact picker for switching act, with all acts in its menu.
   const acts = state.show.acts || [];
   const ranges = actRanges(state.show);
   const activeAct = actAt(state.show, state.ui.playhead);
   $('actCount').textContent = String(acts.length);
-  $('actTabs').innerHTML =
-    acts
-      .map((a, i) => {
-        const r = ranges[i];
-        const from = fmtTime(displayOfContent(state.show, r.start));
-        const to = fmtTime(displayOfContent(state.show, r.end));
-        return `<button class="act-tab${activeAct && activeAct.id === a.id ? ' on' : ''}" data-id="${a.id}" title="${esc(a.name)} — ${from} to ${to}">
-          <span class="act-no">${i + 1}</span><span class="act-name">${esc(a.name)}</span>
-        </button>`;
-      })
-      .join('') +
-    '<button class="act-tab add" data-add="1" title="Add an act after the last one">+ Act</button>';
+  $('actSelect').innerHTML = acts
+    .map((a, i) => {
+      const r = ranges[i];
+      const from = fmtTime(displayOfContent(state.show, r.start));
+      const to = fmtTime(displayOfContent(state.show, r.end));
+      return `<option value="${a.id}" title="${esc(a.name)} — ${from} to ${to}">${esc(a.name || 'Act')}</option>`;
+    })
+    .join('');
+  $('actSelect').value = activeAct ? activeAct.id : '';
 
   // Scenes of the act the playhead is in: named moments inside that act.
   const activeScenes = activeAct ? scenesOf(acts.find((a) => a.id === activeAct.id)) : [];
@@ -942,9 +1015,9 @@ function rebuildPanels() {
           const at = activeAct.start + s.offset;
           return `<button class="scene-tab${activeScene && activeScene.id === s.id ? ' on' : ''}" data-id="${s.id}" title="${esc(s.name)} — ${fmtTime(displayOfContent(state.show, at))}">${esc(s.name)}</button>`;
         })
-        .join('') +
-      '<button class="scene-tab add" data-add="1" title="Add a scene at the playhead">+ Scene</button>'
+        .join('')
     : '';
+  $('sceneTabs').hidden = !activeScenes.length;
 
   renderMusic();
   renderNarration();
@@ -1237,9 +1310,8 @@ function rebuildPanels() {
   const actWord = here ? here.name : 'this act';
 
   const cl = $('castList');
-  cl.innerHTML = state.show.cast
-    .map(
-      (d) => `<div class="item ${d.id === state.ui.selectedId ? 'sel' : ''}" data-id="${d.id}" data-kind="cast">
+  cl.innerHTML = (state.show.cast || []).map(
+    (d) => `<div class="item ${d.id === state.ui.selectedId ? 'sel' : ''}" data-id="${d.id}" data-kind="cast">
         <div class="row">
           <button class="eye ${d.visible ? '' : 'off'}" data-act="eye">${d.visible ? '◉' : '○'}</button>
           <span class="swatch" style="background:${d.color}"></span>
@@ -1253,24 +1325,20 @@ function rebuildPanels() {
         </div>
         ${costumes.length ? `<div class="row dress"><span class="label">wears</span><select data-act="dress" title="What this performer is dressed in">${dressOptions(d)}</select></div>` : ''}
       </div>`
-    )
-    .join('');
+  ).join('') + (state.show.castGroups || []).map((group) => `<div class="item cast-group" data-id="${group.id}" data-kind="cast-group">
+    <div class="row"><span class="swatch" style="background:#687477"></span>
+      <label class="label" for="group-name-${esc(group.id)}">Group</label>
+      <input id="group-name-${esc(group.id)}" type="text" data-group-field="name" maxlength="80" value="${esc(group.name)}" aria-label="Group name">
+      <button class="del" data-act="delete-group" title="Remove this cast group">×</button></div>
+    <div class="row"><label class="label" for="group-type-${esc(group.id)}">Type</label>
+      <select id="group-type-${esc(group.id)}" data-group-field="type" aria-label="Group type">
+        ${[['audience','Audience'],['chorus','Chorus'],['crew','Crew'],['extras','Extras'],['other','Other']].map(([v,label]) => `<option value="${v}"${group.type === v ? ' selected' : ''}>${label}</option>`).join('')}
+      </select>
+      <input type="text" data-group-field="role" maxlength="80" value="${esc(group.role)}" placeholder="Optional role / notes" aria-label="Group role or notes">
+    </div>
+  </div>`).join('');
 
-  // The overlaps: what the whole-show scan found, each with the one fix worth offering. A scan is
-  // only good for the show it was read from — a fix names stations by their place in a path, so a
-  // list left over from before an edit could move the wrong point. Once the show has changed the
-  // list stands down and says so, rather than offering a fix that no longer means anything.
-  const scan = state.ui.overlaps;
-  const stale = scan && scan.key !== pathsKey(state.show);
-  const fresh = stale ? null : scan;
-  $('overlapCount').textContent = fresh ? String(fresh.list.length) : '\u2014';
-  $('overlapList').innerHTML = stale
-    ? '<p class="hint">The show has changed since the last look. Look again to run the fixes over what is there now.</p>'
-    : !fresh
-      ? '<p class="hint">Not looked yet.</p>'
-      : fresh.list.length
-        ? fresh.list.map((o) => overlapRow(o)).join('')
-        : '<p class="hint">No two performers come inside the clearance anywhere in this show.</p>';
+  // Scan results are now presented in Path Studio alongside cloth and prop warnings.
 
   // The wardrobe. A costume says how many are wearing it, because a costume nobody
   // wears is a note to self rather than part of the show.
@@ -1485,6 +1553,11 @@ function inspectorHTML() {
         <select data-f="fill">${FILLS.map((f) => `<option value="${f}" ${f === d.fill ? 'selected' : ''}>${f}</option>`).join('')}</select>
       </div>
       <div class="row">
+        <span class="label">Height</span>
+        <input type="number" data-f="heightM" min="1" max="2.4" step="0.01" value="${Number.isFinite(Number(d.heightM)) && Number(d.heightM) > 0 ? Number(d.heightM) : ''}" placeholder="${state.show.stage.dancerH.toFixed(2)}" style="max-width:72px" aria-label="Dancer height in metres" title="Height in metres. Blank uses the show's dancer height (${state.show.stage.dancerH.toFixed(2)} m)" />
+        <span class="label">m</span>
+      </div>
+      <div class="row">
         <span class="label">${d.keys.length} keyframes</span>
         <button class="del" data-act="del-dancer">remove</button>
       </div>
@@ -1643,6 +1716,7 @@ function stationsHTML(d) {
       ? '<p class="hint">A prop with no stations is stage dressing, so it stays off the timer.</p>'
       : '<p class="hint">No stations yet. Press <b>+ Stations</b>, then click the stage in order to lay this dancer path.</p>';
   }
+  const runStart = new Set(isP ? [] : phraseRuns(d).map((r) => r.start));
   const rows = d.keys
     .map(function (k, i) {
       const secs = i === 0 || !Number.isFinite(k.dur) ? '' : (k.dur / 1000).toFixed(2);
@@ -1705,6 +1779,12 @@ function stationsHTML(d) {
             '<div class="row"><span class="label">bow</span>' +
             '<input type="number" data-f="bend" data-i="' + i + '" step="0.1" value="' + (Number(k.bend) || 0) + '" ' + dis + ' title="How far the path bows to the left of the straight line at its middle, in metres" />' +
             '<span class="label">m</span></div>') +
+        (runStart.has(i)
+          ? '<div class="row"><span class="label">port de bras</span>' +
+            '<input type="text" data-f="port" data-i="' + i + '" value="' + esc(k.port || '') + '" placeholder="—" title="The arm work for this phrase. In the paper plan it goes in brackets when the legs also move" /></div>' +
+            '<div class="row"><span class="label">notes</span>' +
+            '<input type="text" data-f="notes" data-i="' + i + '" value="' + esc(k.notes || '') + '" placeholder="head, eyes, tilt…" title="Miscellaneous notes for this phrase: head, eyes, focus. Printed in braces under the line" /></div>'
+          : '') +
         '</div>';
     })
     .join('');
@@ -2104,19 +2184,19 @@ function bindPanelEvents() {
     state.ui.dirtyPanels = true;
   };
 
-  $('actTabs').addEventListener('click', (e) => {
-    const btn = e.target.closest('.act-tab');
-    if (!btn) return;
-    if (btn.dataset.add) {
-      commit();
-      const act = addAct(state.show);
-      const range = actRanges(state.show).find((r) => r.id === act.id);
-      gotoTimes(range ? range.start : 0);
+  $('actSelect').addEventListener('change', () => {
+    const range = actRanges(state.show).find((r) => r.id === $('actSelect').value);
+    if (range) {
+      gotoTimes(range.start);
       app.rebuild();
-      return;
     }
-    const range = actRanges(state.show).find((r) => r.id === btn.dataset.id);
-    if (range) gotoTimes(range.start);
+  });
+  $('btnAddAct').addEventListener('click', () => {
+    commit();
+    const act = addAct(state.show);
+    const range = actRanges(state.show).find((r) => r.id === act.id);
+    gotoTimes(range ? range.start : 0);
+    app.rebuild();
   });
 
   const actsList = $('actsList');
@@ -2132,9 +2212,9 @@ function bindPanelEvents() {
     if (!act) return;
     if (e.target.dataset.f === 'name') {
       act.name = e.target.value;
-      // Keep the tab in step while typing, without rebuilding the list under the cursor.
-      const name = $('actTabs').querySelector(`.act-tab[data-id="${act.id}"] .act-name`);
-      if (name) name.textContent = act.name || 'Act';
+      // Keep the act picker in step while typing, without rebuilding the list under the cursor.
+      const option = $('actSelect').querySelector(`option[value="${act.id}"]`);
+      if (option) option.textContent = act.name || 'Act';
       persist();
       return;
     }
@@ -2206,34 +2286,67 @@ function bindPanelEvents() {
   $('sceneTabs').addEventListener('click', (e) => {
     const btn = e.target.closest('.scene-tab');
     if (!btn) return;
-    if (btn.dataset.add) {
-      if (!actAt(state.show, state.ui.playhead)) return;
-      commit();
-      const scene = addScene(state.show, state.ui.playhead);
-      state.ui.hint = scene ? null : 'There is already a scene at this moment';
-      app.rebuild();
-      return;
-    }
     const range = sceneRanges(state.show).find((s) => s.id === btn.dataset.id);
     if (range) gotoTimes(range.start);
   });
+  $('btnAddScene').addEventListener('click', () => {
+    if (!actAt(state.show, state.ui.playhead)) return;
+    commit();
+    const scene = addScene(state.show, state.ui.playhead);
+    state.ui.hint = scene ? null : 'There is already a scene at this moment';
+    app.rebuild();
+  });
+
 
   const castList = $('castList');
   castList.addEventListener('click', (e) => {
+    const host = e.target.closest('[data-id]');
+    if (!host) return;
+    if (host.dataset.kind === 'cast-group') {
+      if (e.target.closest('[data-act="delete-group"]')) {
+        commit();
+        removeCastGroup(state.show, host.dataset.id);
+        app.rebuild();
+      }
+      return;
+    }
     // The costume picker and the role field are controls inside the row: using one must
     // not select the dancer and rebuild the panel under the pointer.
     if (e.target.closest('[data-act="dress"]') || e.target.closest('[data-act="role"]')) return;
-    const host = e.target.closest('[data-id]');
-    if (!host) return;
     const d = state.show.cast.find((x) => x.id === host.dataset.id);
     if (!d) return;
-    if (e.target.closest('[data-act="eye"]')) {
+    if (e.target.closest('button[data-act="eye"]')) {
       toggleVisibility(d, e.ctrlKey || e.metaKey);
       app.rebuild();
       app.select(state.ui.selectedId);
       return;
     }
+    // Picking the dancer again is an explicit "whole track" choice: drop any focused station
+    // so the arrow keys move the track, not the last point that was edited.
+    if (state.ui.selectedId === d.id) {
+      clearTimeout(state.ui.trackNudgeTimer);
+      state.ui.trackNudgeCommitted = false;
+      state.ui.trackNudgeDancerId = null;
+      state.ui.trackNudgeMode = null;
+      state.ui.stationIdx = null;
+      state.ui.dirtyPanels = true;
+    }
     app.select(d.id);
+  });
+
+  // Group fields are production metadata, not movement/rendering objects.
+  castList.addEventListener('change', (e) => {
+    const host = e.target.closest('[data-kind="cast-group"]');
+    if (!host || !e.target.dataset.groupField) return;
+    const group = (state.show.castGroups || []).find((item) => item.id === host.dataset.id);
+    if (!group) return;
+    commit();
+    const field = e.target.dataset.groupField;
+    group[field] = field === 'type'
+      ? (['audience', 'chorus', 'crew', 'extras', 'other'].includes(e.target.value) ? e.target.value : 'other')
+      : String(e.target.value).slice(0, field === 'name' || field === 'role' ? 80 : 0);
+    persist();
+    app.rebuild();
   });
 
   // Dressing is one choice on the performer's own row, because that is where you are
@@ -2261,43 +2374,7 @@ function bindPanelEvents() {
     }
   });
 
-  // ---- the overlaps. A scan of the whole running order, then one ranked fix per overlap.
-  // The stamp of the show it was read from travels with it, so a list cannot outlive the paths it
-  // describes. `say` replaces the count for a moment, which is how a fix reports itself.
-  const scanNow = (say) => {
-    const list = scanOverlaps(state.show).map((o) => ({ ...o, fix: overlapFix(state.show, o) }));
-    state.ui.overlaps = { list, key: pathsKey(state.show) };
-    state.ui.hint = say || (list.length
-      ? `${list.length} overlap${list.length === 1 ? '' : 's'} in this show`
-      : `No two performers come inside ${CLEARANCE.toFixed(2)} m anywhere in this show`);
-    app.rebuild();
-  };
-  $('btnScanOverlaps').addEventListener('click', () => scanNow());
-
-  const overlapList = $('overlapList');
-  overlapList.addEventListener('click', (e) => {
-    const scan = state.ui.overlaps;
-    if (!scan || scan.key !== pathsKey(state.show)) return;
-    const host = e.target.closest('[data-overlap]');
-    if (!host) return;
-    const o = scan.list.find((x) => x.id === host.dataset.overlap);
-    if (!o) return;
-    if (e.target.closest('[data-act="fix"]')) {
-      if (!o.fix) return;
-      const label = o.fix.label;
-      commit();
-      applyOverlapFix(state.show, o.fix);
-      persist();
-      // The floor has changed around her, so the list is looked at again rather than patched: the
-      // fix may have moved a station that other overlaps were counted against, and a fix that only
-      // tidy one collision into another is not one.
-      scanNow('Fixed: ' + label + ' — Undo puts it back');
-      return;
-    }
-    // The row itself is a way into the moment, so the stage can be judged before changing it.
-    gotoTimes(o.at);
-    app.rebuild();
-  });
+  // ---- the overlaps. The studio owns the whole-show scan and its fix controls.
 
   // The green room. A costume is edited in place, and every view redraws from it, so
   // a colour is changed by watching the plan rather than by pressing apply.
@@ -2525,6 +2602,17 @@ function bindPanelEvents() {
     // A field carrying a station index belongs to that station: a select here fires
     // `input` as well as `change`, and the station's own handler writes it.
     if (e.target.dataset.i != null) return;
+    if (f === 'heightM') {
+      // Blank hands the dancer back to the show's height; a number is clamped to the
+      // range the body model is drawn and measured in.
+      const raw = String(e.target.value).trim();
+      const v = Number(raw);
+      if (raw === '') delete d.heightM;
+      else if (Number.isFinite(v) && v > 0) d.heightM = Math.max(DANCER_HEIGHT_MIN, Math.min(DANCER_HEIGHT_MAX, v));
+      else return;
+      persist();
+      return;
+    }
     if (f === 'w' || f === 'd') d[f] = Math.max(0.2, Number(e.target.value) || 0.2);
     else if (f === 'h') d.h = Math.max(0.1, Math.min(6, Number(e.target.value) || 0.8));
     else d[f] = e.target.value;
@@ -2578,6 +2666,17 @@ function bindPanelEvents() {
       commit();
       d.keys[Number(i)].ease = EASE_LABEL[e.target.value] ? e.target.value : 'even';
       app.rebuild();
+      return;
+    }
+    // Port de bras and notes belong to the phrase, and live on its first station. An emptied
+    // field is absent rather than blank, so a reopened show reads the same as a fresh one.
+    if (i != null && (e.target.dataset.f === 'port' || e.target.dataset.f === 'notes')) {
+      commit();
+      const text = String(e.target.value).trim();
+      const field = e.target.dataset.f;
+      if (text) d.keys[Number(i)][field] = text;
+      else delete d.keys[Number(i)][field];
+      persist();
       return;
     }
     if (e.target.dataset.f === 'color') commit();
@@ -2706,7 +2805,7 @@ function advance(dt) {
   const show = state.show;
 
   if (ui.activePause) {
-    ui.activePause.remaining -= dt;
+    ui.activePause.remaining -= dt * (ui.playbackRate || 1);
     if (ui.activePause.remaining <= 0) {
       ui.activePause = null;
       ui.playhead += 1;
@@ -2792,7 +2891,7 @@ function setWatch(on) {
     pause();
     play();
   } else {
-    state.ui.fill = state.ui.beforeWatchFill ?? null;
+    state.ui.fill = state.ui.beforeWatchFill ?? 'plan';
     pause();
     if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
   }
@@ -2984,7 +3083,8 @@ const VIEW_KEY = 'choreographer.view.v1';
 function loadView() {
   try {
     const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || '{}');
-    if (['plan', 'elevation', 'house'].includes(saved.fill)) state.ui.fill = saved.fill;
+    // One view at a time: an unset or old split setting opens on the plan.
+    state.ui.fill = ['plan', 'elevation', 'house'].includes(saved.fill) ? saved.fill : 'plan';
     if (saved.depth === false) state.ui.depth = false;
     state.ui.showPaths = saved.showPaths !== false;
     state.ui.showStations = saved.showStations !== false;
@@ -3019,8 +3119,7 @@ function paintView() {
     if (!b) continue;
     const on = filling === which;
     b.classList.toggle('on', on);
-    b.setAttribute('aria-pressed', on ? 'true' : 'false');
-    b.textContent = on ? '⛶ Both' : which === 'plan' ? 'Top-down' : '⛶ Fill';
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
   }
   for (const [id, key] of [['btnPaths', 'showPaths'], ['btnStations', 'showStations']]) {
     const on = state.ui[key] !== false;
@@ -3029,6 +3128,10 @@ function paintView() {
   }
   $('btnCostumes').classList.toggle('on', state.ui.showCostumes === true);
   $('btnCostumes').setAttribute('aria-pressed', String(state.ui.showCostumes === true));
+  $('btnTilt').textContent = state.ui.tiltMode ? 'Reset' : 'Tilt view';
+  $('btnTilt').title = state.ui.tiltMode
+    ? 'Return directly overhead and leave tilt mode'
+    : 'Drag vertically on the stage to tilt the view; dancer editing is disabled while active';
   $('btnTilt').classList.toggle('on', !!state.ui.tiltMode);
   $('btnTilt').setAttribute('aria-pressed', String(!!state.ui.tiltMode));
   $('stage').style.cursor = state.ui.tiltMode ? 'ns-resize' : '';
@@ -3042,8 +3145,13 @@ function paintView() {
 // Filling is not watching: one view takes the centre and the other stands down, so
 // the plan can be worked on at twice the size and put back with the same click.
 // Only one can be full, because the point of filling is having the room to yourself.
+// Plan and elevation are tabs: choosing one shows that view alone, and the other
+// stands down. Choosing the open tab again does nothing, so the view never goes blank.
 function setFill(which) {
-  state.ui.fill = state.ui.fill === which ? null : which;
+  // House is a toggle: pressing it again returns to the plan. Plan and elevation are tabs.
+  const next = which === 'house' ? (state.ui.fill === 'house' ? 'plan' : 'house') : which;
+  if (state.ui.fill === next) return;
+  state.ui.fill = next;
   paintView();
   saveView();
   // The row heights are the fit's business, so it has to be told the layout moved.
@@ -3078,6 +3186,18 @@ function addKeyAtPlayhead() {
     return;
   }
   commit();
+  // A dancer with a path gets the next key on the beat and a stride from her last station,
+  // so a second press does not stack on the first. Props and an empty path keep the playhead.
+  if (!isProp(d) && d.keys.length && autoPlaceEnabled(state.show)) {
+    const auto = autoPlaceKey(state.show, d);
+    if (auto) {
+      d.keys.push({ t: auto.t, x: auto.x, y: auto.y, dur: auto.dur });
+      d.keys.sort((a, b) => a.t - b.t);
+      state.ui.playhead = contentOfLocal(state.show, d.id, auto.t);
+      app.rebuild();
+      return;
+    }
+  }
   const lt = contentOfLocal(state.show, d.id, state.ui.playhead);
   const p = (isProp(d)
     ? propPosOfContent(state.show, d, state.ui.playhead)
@@ -3153,12 +3273,8 @@ function updateTransport() {
   // Whichever act the playhead is in is the lit tab, so playing through a
   // boundary changes act on the stage as well as on the clock.
   const act = actAt(state.show, state.ui.playhead);
-  const tabs = $('actTabs');
-  if (tabs) {
-    for (const tab of tabs.querySelectorAll('.act-tab[data-id]')) {
-      tab.classList.toggle('on', !!act && tab.dataset.id === act.id);
-    }
-  }
+  const actSelect = $('actSelect');
+  if (actSelect && actSelect.value !== (act ? act.id : '')) actSelect.value = act ? act.id : '';
   // Inside an act, the scene the playhead stands in is lit too.
   const scene = sceneAt(state.show, state.ui.playhead);
   const sceneTabs = $('sceneTabs');
@@ -3231,7 +3347,7 @@ function updateTransport() {
   const sh = $('stageHint');
   if (sh) {
     const text = state.ui.fill === 'plan' && state.ui.tiltMode
-      ? 'Tilt view: drag down to angle the stage, up for overhead (0–55°) · toggle Tilt view off to edit'
+      ? 'Tilt view: drag down to angle the stage, up for overhead (0–55°) · select Reset to return overhead and edit'
       : state.ui.hint || (coachMark ? STAGE_HINT : '');
     if (sh.textContent !== text) sh.textContent = text;
     sh.hidden = !text;
@@ -3544,6 +3660,17 @@ function render() {
   if (state.ui.dirtyPanels) {
     rebuildPanels();
     state.ui.dirtyPanels = false;
+    if (!narration.recording) {
+      const status = $('voiceInputStatus');
+      if (status) {
+        if (narration.lastRecordingLevel > 0) {
+          const db = (20 * Math.log10(narration.lastRecordingLevel)).toFixed(0);
+          status.textContent = `Saved mic peak ${db} dBFS · ${narration.lastRecordingMime || 'audio'}`;
+        } else if (narration.lastRecordingMime) {
+          status.textContent = `No input signal detected · ${narration.lastRecordingMime}`;
+        }
+      }
+    }
     // The sheet's phrase caption is a promise about where the next phrase lands, so it
     // follows the path while the sheet is open: an undone or deleted phrase must not leave
     // a stale address behind.
@@ -3557,7 +3684,7 @@ function render() {
   }
   const projection = projectionAt(state.show, state.ui.playhead);
   const videoClips = projection.kind === 'video' ? [projection.clip] : [];
-  video.sync(videoClips, state.ui.playhead, state.ui.playing && !state.ui.activePause);
+  video.sync(videoClips, state.ui.playhead, state.ui.playing && !state.ui.activePause, state.ui.playbackRate || 1);
   const layers = slideLayersAt(state.show, state.ui.playhead);
   slides.sync(state.show.images, layers);
   const screens = state.show.scenery.filter((s) => s.screen);
@@ -3634,7 +3761,8 @@ function frame(now) {
     state.show,
     state.ui.playhead,
     state.ui.playing && !state.ui.activePause,
-    state.show.trackVis.narration === false
+    state.show.trackVis.narration === false,
+    state.ui.playbackRate || 1
   );
   if (state.ui.playing) {
     // Whatever stopped the track (a pause marker the playhead was dragged out
@@ -3767,7 +3895,7 @@ function boot() {
 
   // Projector files and cues stay separate from the screen's fly cues.
   $('btnHouse').addEventListener('click', () => setFill('house'));
-  $('btnHouseBack').addEventListener('click', () => setFill('house'));
+  $('btnHouseBack').addEventListener('click', () => setFill('plan'));
   $('btnAddScreen').disabled = false;
   $('screenStatus').textContent = 'Screen controls ready · add a screen to reveal its settings and timeline row.';
   $('btnAddScreen').addEventListener('click', () => {
@@ -4052,6 +4180,66 @@ function boot() {
   bindTempo('prefTempo', 'tempo', 20, 300);
   bindTempo('prefBeats', 'beatsPerBar', 1, 16);
 
+  // Tap tempo. The first tap of a session is count one: it fixes the downbeat at the playhead
+  // (press it as the music starts, or on the bar's first beat while it plays). Every tap after
+  // that sets the tempo from the gaps and rebuilds the active track's grid from that derived
+  // tempo, still anchored to the first tap — steady tapping refines the spacing without moving
+  // count one. A pause of more than 2.5 s starts a new session; hand-dragged markers made
+  // between sessions are left alone.
+  let tapSession = null;
+  $('btnTapTempo').addEventListener('click', () => {
+    const now = performance.now();
+    if (!tapSession || now - tapSession.last > 2500) {
+      commit();
+      tapSession = {
+        taps: [now],
+        last: now,
+        anchorMs: Math.round(state.ui.playhead || 0),
+        trackId: (activeMusicAt(state.show, state.ui.playhead) || {}).id || null,
+      };
+      state.show.prefs.downbeat = tapSession.anchorMs;
+      state.ui.dirtyPanels = true;
+      persist();
+      refreshCountReadout(1);
+      return; // one tap only names count one; tempo needs a second
+    }
+    tapSession.last = now;
+    tapSession.taps.push(now);
+    const bpm = tempoFromTaps(tapSession.taps);
+    if (bpm) {
+      state.show.prefs.tempo = bpm;
+      const active = tapSession.trackId ? trackById(tapSession.trackId) : null;
+      if (active) {
+        // Rebuild from the session's fixed phase; taps during playback advance the playhead,
+        // but count one must remain where the first tap placed it.
+        const offset = Math.max(0, tapSession.anchorMs - active.start);
+        active.beatMarkers = makeBeatGridMarkers(active.length || musicSpan(active), bpm, offset);
+        active.beatOne = active.beatMarkers.length
+          ? active.beatMarkers.reduce((best, v, i) => Math.abs(v - offset) < Math.abs(active.beatMarkers[best] - offset) ? i : best, 0)
+          : 0;
+      }
+    }
+    state.ui.dirtyPanels = true;
+    persist();
+    refreshCountReadout(tapSession.taps.length);
+  });
+  $('btnSetDownbeat').addEventListener('click', () => {
+    tapSession = null;
+    commit();
+    state.show.prefs.downbeat = Math.round(state.ui.playhead || 0);
+    state.ui.dirtyPanels = true;
+    persist();
+    refreshCountReadout();
+  });
+  $('btnClearDownbeat').addEventListener('click', () => {
+    tapSession = null;
+    commit();
+    state.show.prefs.downbeat = null;
+    state.ui.dirtyPanels = true;
+    persist();
+    refreshCountReadout();
+  });
+
   // stage settings
   const bindStage = (id, key, min, max) => {
     $(id).addEventListener('change', (e) => {
@@ -4116,7 +4304,8 @@ function boot() {
   });
   $('btnAddProp').addEventListener('click', () => {
     commit();
-    addScenery(state.show, 'prop');
+    const prop = addScenery(state.show, 'prop');
+    state.ui.hint = propPlacementHint(state.show, prop);
     app.rebuild();
   });
   $('btnAddLeftLeg').addEventListener('click', () => {
@@ -4133,6 +4322,11 @@ function boot() {
     commit();
     const d = addCast(state.show);
     app.select(d.id);
+    app.rebuild();
+  });
+  $('btnAddCastGroup').addEventListener('click', () => {
+    commit();
+    addCastGroup(state.show, 'Audience', 'audience');
     app.rebuild();
   });
 
@@ -4167,6 +4361,8 @@ function boot() {
           before.key = info.key;
           before.name = info.name;
           before.length = info.length;
+          before.beatMarkers = info.beatMarkers || [];
+          before.beatOne = 0;
           // A new file is played whole; a trim that belonged to the old audio would
           // otherwise silently cut the replacement short.
           before.play = info.length;
@@ -4175,6 +4371,8 @@ function boot() {
           // At the playhead, which is where the change of music belongs — the
           // running order only decides it if the picker was opened at the very top.
           const t = addMusicTrack(state.show, { key: info.key, name: info.name, length: info.length, start: at });
+          t.beatMarkers = info.beatMarkers || [];
+          t.beatOne = 0;
           state.ui.selectedTrack = t.id;
           // Say where it landed: the file picker can take a while, and "at the
           // playhead" is only reassuring if the moment is named.
@@ -4215,6 +4413,12 @@ function boot() {
       const ms = Math.max(0, Math.round(secs * 1000));
       m.play = m.length > 0 ? Math.min(ms, m.length) : ms;
       if (state.ui.playing) music.seek(state.ui.playhead);
+      app.rebuild();
+    } else if (f === 'music-beat-one') {
+      commit();
+      m.beatOne = Math.max(0, Math.min(Math.max(0, (m.beatMarkers || []).length - 1), Number(e.target.value) || 0));
+      state.show.prefs.downbeat = m.start + ((m.beatMarkers || [])[m.beatOne] || 0);
+      persist();
       app.rebuild();
     } else if (f === 'fade-edit') {
       const row = e.target.closest('[data-music-cue]');
@@ -4261,6 +4465,41 @@ function boot() {
     if (e.target.closest('[data-music="replace"]')) {
       // A replacement keeps the row's own place, so there is no new moment to read.
       pickMusicFor(m.id, m.start);
+      return;
+    }
+    if (e.target.closest('[data-music="tap-grid"]')) {
+      commit();
+      const downbeat = Number.isFinite(Number(state.show.prefs.downbeat)) && state.show.prefs.downbeat !== null
+        ? Number(state.show.prefs.downbeat)
+        : m.start;
+      const phase = downbeat - m.start;
+      m.beatMarkers = makeBeatGridMarkers(m.length || musicSpan(m), state.show.prefs.tempo, phase);
+      m.beatOne = m.beatMarkers.length
+        ? m.beatMarkers.reduce((best, v, i) => Math.abs(v - phase) < Math.abs(m.beatMarkers[best] - phase) ? i : best, 0)
+        : 0;
+      state.ui.hint = `Replaced estimates with ${Math.round(countGrid(state.show).tempo)} bpm grid`;
+      persist();
+      app.rebuild();
+      return;
+    }
+    if (e.target.closest('[data-music="beats"]')) {
+      state.ui.hint = 'Analyzing ' + m.name + '…';
+      app.rebuild();
+      music.analyze(m).then((beatMarkers) => {
+        commit();
+        m.beatMarkers = beatMarkers;
+        m.beatOne = 0;
+        const estimatedTempo = tempoFromMarkers(beatMarkers);
+        if (estimatedTempo) state.show.prefs.tempo = estimatedTempo;
+        state.ui.hint = beatMarkers.length
+          ? `Estimated ${beatMarkers.length} beat markers · drag them on the timeline to correct`
+          : 'No reliable beat pattern detected; use tap tempo and the manual grid';
+        persist();
+        app.rebuild();
+      }).catch((err) => {
+        state.ui.hint = err && err.message ? err.message : 'Could not analyze this audio';
+        app.rebuild();
+      });
       return;
     }
     if (e.target.closest('[data-music="eye"]')) {
@@ -4318,6 +4557,33 @@ function boot() {
 
   // narration: both ways in are module functions, because the track menu starts a
   // take (or a picker) at the moment it was right-clicked rather than at the
+  // playhead.
+  const renderVoiceInputs = (devices) => {
+    const select = $('voiceMic');
+    if (!select) return;
+    const current = narration.deviceId;
+    select.innerHTML = '<option value="">Default microphone</option>' + devices.map((d, i) => `<option value="${esc(d.deviceId)}">${esc(d.label || `Microphone ${i + 1}`)}</option>`).join('');
+    select.value = current;
+    select.disabled = narration.recording || narration.starting;
+  };
+  const refreshVoiceInputs = async () => renderVoiceInputs(await narration.listInputs());
+
+  narration.devicesCallback = renderVoiceInputs;
+  narration.levelCallback = (level) => {
+    const meter = $('voiceInputLevel');
+    const status = $('voiceInputStatus');
+    if (meter) meter.value = Math.min(1, Math.max(0, level * 5));
+    if (status && narration.recording) status.textContent = level > 0.01 ? 'Mic live · signal detected' : 'Mic live · no signal';
+  };
+  $('voiceMic').addEventListener('change', (e) => {
+    narration.selectInput(e.target.value);
+    state.ui.hint = e.target.value ? 'Microphone selected' : 'Using the browser default microphone';
+  });
+  $('voiceMic').addEventListener('focus', refreshVoiceInputs);
+  $('btnRecord').addEventListener('focus', refreshVoiceInputs);
+  navigator.mediaDevices?.addEventListener?.('devicechange', refreshVoiceInputs);
+  refreshVoiceInputs();
+
   // playhead.
   $('btnRecord').addEventListener('click', () => toggleRecording(state.ui.playhead));
   $('btnVoiceFile').addEventListener('click', () => attachVoiceFile(state.ui.playhead));
@@ -4476,7 +4742,6 @@ function boot() {
   $('btnFoldAll').addEventListener('click', foldAllSections);
 
   // one view at a time, and how the elevation reads distance
-  $('btnTopDown').addEventListener('click', () => setFill('plan'));
   $('btnFillPlan').addEventListener('click', () => setFill('plan'));
   for (const [id, key] of [['btnPaths', 'showPaths'], ['btnStations', 'showStations']]) {
     $(id).addEventListener('click', () => {
@@ -4491,20 +4756,21 @@ function boot() {
     paintView(); saveView(); app.stage.draw();
   });
   $('btnTilt').addEventListener('click', () => {
-    state.ui.tiltMode = !state.ui.tiltMode;
     if (state.ui.fill !== 'plan') setFill('plan');
+    if (state.ui.tiltMode) {
+      state.ui.planTilt = 0; state.ui.tiltMode = false;
+      paintView(); saveView(); app.stage.draw();
+      return;
+    }
+    state.ui.tiltMode = true;
     paintView();
-  });
-  $('btnResetOverhead').addEventListener('click', () => {
-    state.ui.planTilt = 0; state.ui.tiltMode = false;
-    paintView(); saveView(); app.stage.draw();
   });
   $('stage').addEventListener('viewtiltchange', saveView);
   $('btnFillElev').addEventListener('click', () => setFill('elevation'));
   $('btnDepth').addEventListener('click', () => setDepth(state.ui.depth === false));
   paintView();
 
-  // watch mode: the stage alone, playing, with a bar that can end it
+  // Watch mode: the stage alone, playing, with a bar that can end it.
   $('btnWatch').addEventListener('click', () => setWatch(true));
   $('wPlay').addEventListener('click', togglePlay);
   $('wRestart').addEventListener('click', () => {
@@ -4518,13 +4784,51 @@ function boot() {
   // transport
   $('btnPlay').addEventListener('click', togglePlay);
   $('btnStop').addEventListener('click', stop);
+  let storedReviewRate = 1;
+  try { storedReviewRate = Number(localStorage.getItem('choreographer.reviewSpeed.v1')) || 1; } catch (_) { /* storage blocked */ }
+  const savedReviewRate = Math.max(1, Math.min(4, storedReviewRate));
+  state.ui.playbackRate = savedReviewRate;
+  music.setPlaybackRate(savedReviewRate);
+  $('reviewSpeed').value = String(savedReviewRate);
+  $('reviewSpeedValue').value = `${savedReviewRate}×`;
+  $('reviewSpeed').addEventListener('input', (e) => {
+    const rate = Math.max(1, Math.min(4, Number(e.target.value) || 1));
+    state.ui.playbackRate = rate;
+    music.setPlaybackRate(rate);
+    $('reviewSpeedValue').value = `${rate}×`;
+    try { localStorage.setItem('choreographer.reviewSpeed.v1', String(rate)); } catch (_) { /* preference storage optional */ }
+    // Restart active narration clips at their exact show-time offsets using the new rate.
+    narration.stopAll();
+  });
   $('btnKey').addEventListener('click', addKeyAtPlayhead);
+  $('autoPlace').addEventListener('change', (e) => {
+    state.show.prefs.autoPlace = e.target.checked;
+    persist();
+  });
   $('btnPath').addEventListener('click', () => {
     state.ui.placingStations = !state.ui.placingStations;
     state.ui.stationGuide = null;
     state.ui.dirtyPanels = true;
   });
+  $('btnMirrorPath').addEventListener('click', () => {
+    const d = findObject(state.show, state.ui.selectedId);
+    if (!d || !state.show.cast.some((x) => x.id === d.id)) {
+      state.ui.hint = 'Select a dancer to mirror their path';
+      state.ui.dirtyPanels = true;
+      return;
+    }
+    if (!d.keys || !d.keys.length) {
+      state.ui.hint = `${d.name || 'This dancer'} has no path to mirror`;
+      state.ui.dirtyPanels = true;
+      return;
+    }
+    commit();
+    mirrorPathLeftRight(d);
+    state.ui.hint = `Mirrored ${d.name || 'dancer'}'s path left to right across centre stage. Timing and station order are unchanged.`;
+    app.rebuild();
+  });
   $('btnHold').addEventListener('click', addHold);
+  initPathStudio({ rebuild: () => app.rebuild() });
   $('btnPause').addEventListener('click', addPause);
   $('btnEnd').addEventListener('click', addEnd);
   $('zoomIn').addEventListener('click', () => {
@@ -4542,7 +4846,14 @@ function boot() {
   });
 
   $('btnMoves').addEventListener('click', () => app.openMoves());
+  $('studioMoves').addEventListener('click', () => app.openMoves());
   $('btnMovesClose').addEventListener('click', () => moves && moves.close());
+  const aboutSheet = $('aboutSheet');
+  const closeAbout = () => { aboutSheet.hidden = true; $('btnAbout').focus(); };
+  $('btnAbout').addEventListener('click', () => { aboutSheet.hidden = false; $('btnAboutClose').focus(); });
+  $('btnAboutClose').addEventListener('click', closeAbout);
+  aboutSheet.addEventListener('pointerdown', (e) => { if (e.target === aboutSheet) closeAbout(); });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !aboutSheet.hidden) closeAbout(); });
   $('btnSchool').addEventListener('click', openSchool);
   $('btnSchoolClose').addEventListener('click', closeSchool);
   $('schoolSheet').addEventListener('click', (e) => { if (e.target === $('schoolSheet')) closeSchool(); });
@@ -4555,6 +4866,9 @@ function boot() {
 
   window.addEventListener('keydown', (e) => {
     const tag = (e.target && e.target.tagName) || '';
+    // Arrows do nothing on a focused button or link, so a button click (Undo, a toolbar tool)
+    // must not stop the track or station nudge from taking the arrow keys.
+    const isTyping = ['INPUT', 'SELECT', 'TEXTAREA'].includes(tag) || e.target?.isContentEditable;
     // While the cheat sheet is up it owns the keyboard: Escape closes it, and the space bar
     // does not start a show playing behind a curtain nobody can see through.
     if (moves && moves.isOpen) {
@@ -4565,6 +4879,68 @@ function boot() {
       return;
     }
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') && state.ui.selectedId && !state.ui.watch && !state.ui.placingStations && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      const dancer = findObject(state.show, state.ui.selectedId);
+      const selectedStationIndex = Number.isInteger(state.ui.stationIdx) && dancer && !isProp(dancer) && dancer.keys[state.ui.stationIdx]
+        ? state.ui.stationIdx : null;
+      const mode = selectedStationIndex != null ? `station:${selectedStationIndex}` : 'track';
+      if (dancer && !isProp(dancer) && dancer.keys?.length && !isTyping) {
+        e.preventDefault();
+        const grid = Number(state.show.stage.grid) || 0.5;
+        const step = grid * (e.shiftKey ? 2 : 1);
+        const delta = {
+          ArrowLeft: [-step, 0], ArrowRight: [step, 0],
+          ArrowUp: [0, step], ArrowDown: [0, -step],
+        }[e.key];
+        if (state.ui.trackNudgeCommitted && (state.ui.trackNudgeDancerId !== dancer.id || state.ui.trackNudgeMode !== mode)) {
+          clearTimeout(state.ui.trackNudgeTimer);
+          state.ui.trackNudgeCommitted = false;
+          state.ui.trackNudgeDancerId = null;
+          state.ui.trackNudgeMode = null;
+          persist();
+        }
+        if (!state.ui.trackNudgeCommitted) {
+          let allowed;
+          if (selectedStationIndex != null) {
+            const key = dancer.keys[selectedStationIndex];
+            allowed = { x: delta[0], y: delta[1] };
+            const stage = state.show.stage;
+            const minX = -(stage.width / 2 + (Number(stage.wingDepth) || 0));
+            const maxX = -minX;
+            if (key.x + allowed.x < minX) allowed.x = minX - key.x;
+            if (key.x + allowed.x > maxX) allowed.x = maxX - key.x;
+            if (key.y + allowed.y < -0.5) allowed.y = -0.5 - key.y;
+            if (key.y + allowed.y > stage.depth + 0.5) allowed.y = stage.depth + 0.5 - key.y;
+            if (!allowed.x && !allowed.y) return;
+          } else {
+            allowed = pathTranslationDelta(dancer, delta[0], delta[1], state.show);
+            if (!allowed) return;
+          }
+          commit();
+          state.ui.trackNudgeCommitted = true;
+          state.ui.trackNudgeDancerId = dancer.id;
+          state.ui.trackNudgeMode = mode;
+        }
+        const moved = selectedStationIndex != null
+          ? translatePathStation(dancer, selectedStationIndex, delta[0], delta[1], state.show)
+          : translatePathTrack(dancer, delta[0], delta[1], state.show);
+        if (moved) {
+          state.ui.dirtyPanels = true;
+          app.stage.draw();
+          app.elevation.draw();
+          app.timeline.draw();
+          persist();
+          clearTimeout(state.ui.trackNudgeTimer);
+          state.ui.trackNudgeTimer = setTimeout(() => {
+            state.ui.trackNudgeCommitted = false;
+            state.ui.trackNudgeDancerId = null;
+            persist();
+            app.rebuild();
+          }, 250);
+        }
+        return;
+      }
+    }
     if (e.key === 'Escape' && state.ui.stationGuide) {
       e.preventDefault();
       state.ui.stationGuide = null;
@@ -4584,6 +4960,12 @@ function boot() {
       togglePlay();
     } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
       e.preventDefault();
+      if (state.ui.trackNudgeCommitted) {
+        clearTimeout(state.ui.trackNudgeTimer);
+        state.ui.trackNudgeCommitted = false;
+        state.ui.trackNudgeDancerId = null;
+        persist();
+      }
       state.ui.stationIdx = null;
       if (e.shiftKey) redo();
       else undo();

@@ -1,0 +1,17 @@
+[
+  {
+    "content": "[integration-1] Confirm latest checkout, local server, working tree, and saved show/c curtain source are preserved — self",
+    "id": "i1",
+    "status": "completed"
+  },
+  {
+    "content": "[integration-2] Apply only Mirror path to latest checkout and establish About version identification — self",
+    "id": "i2",
+    "status": "completed"
+  },
+  {
+    "content": "[integration-3] Run regressions and browser test, then switch preview to latest checkout — self",
+    "id": "i3",
+    "status": "completed"
+  }
+]

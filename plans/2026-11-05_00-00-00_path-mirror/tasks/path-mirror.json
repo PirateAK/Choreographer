@@ -1,0 +1,17 @@
+[
+  {
+    "content": "[path-1] Trace path model and editing controls to identify safe mirror operation (self)",
+    "id": "path-1",
+    "status": "completed"
+  },
+  {
+    "content": "[path-2] Implement in-place left/right mirror for selected dancer path and UI affordance (self)",
+    "id": "path-2",
+    "status": "completed"
+  },
+  {
+    "content": "[path-3] Add regression tests preserving timing and choreography order; run tests and commit (self)",
+    "id": "path-3",
+    "status": "completed"
+  }
+]

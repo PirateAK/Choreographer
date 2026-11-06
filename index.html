@@ -3,11 +3,57 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+
 <title>Choreographer</title>
 <link rel="icon" type="image/png" href="favicon.png" />
-<link rel="stylesheet" href="styles.css?v=scroll27" />
+<link rel="stylesheet" href="styles.css?v=staging2" />
 </head>
 <body>
+<section id="studio" class="studio" role="dialog" aria-label="Path studio" hidden>
+  <header class="studio-head">
+    <strong class="studio-title">Path studio</strong>
+    <span id="studioSub" class="hint"></span>
+    <div class="studio-tools">
+      <button id="studioMoves" class="view-btn" title="The movement cheat sheet: click a position, step or level to put it on the point being edited">Moves</button>
+      <button id="studioMirror" class="view-btn" title="Mirror the selected dancer's path left to right across centre stage">⇄ Mirror path</button>
+      <button id="studioZoomOut" class="view-btn" title="Zoom out">−</button>
+      <button id="studioZoomIn" class="view-btn" title="Zoom in">+</button>
+    </div>
+    <button id="studioClose" class="view-btn" title="Back to the show (Esc)">Done</button>
+  </header>
+  <div class="studio-body">
+    <aside class="studio-side" aria-label="Dancers">
+      <h3>Dancers</h3>
+      <div id="studioCast" class="list"></div>
+    </aside>
+    <aside class="studio-stage" aria-label="Staging tools">
+      <h3>Routine staging</h3>
+      <div class="studio-toolbar">
+        <button class="view-btn" data-tool="select" aria-pressed="true" title="Select and move draft objects">Select</button>
+        <button class="view-btn" data-tool="obstacle" aria-pressed="false" title="Click the plan to place a draft prop, curtain or drop">Place obstacle</button>
+        <button class="view-btn" data-tool="route" aria-pressed="false" title="Draw a smooth route for the selected dancer">Draw route</button>
+      </div>
+      <div class="studio-field"><label for="studioObstacleKind">Obstacle</label><select id="studioObstacleKind"><option value="prop">Prop</option><option value="curtain">Curtain</option><option value="drop">Drop / screen</option></select><button id="studioAddObstacle" class="view-btn">+ Add to plan</button></div>
+      <div class="studio-field"><label for="studioDraftDancer">Dancer</label><select id="studioDraftDancer"><option value="">Unassigned draft</option></select></div>
+      <div class="studio-field"><label for="studioRouteStart">Route starts at count (0 is music origin)</label><input id="studioRouteStart" type="number" min="0" step="1" value="0"></div>
+      <div class="studio-field"><label for="studioRouteBeats">Beat length</label><input id="studioRouteBeats" type="number" min="1" max="256" step="1" value="8"></div>
+      <button id="studioSampleRoute" class="view-btn">Snap route to beats</button>
+      <p class="hint">Place scenery and props in this draft plan, then draw a route. Its smooth shape is sampled at each beat into dancer stations; ballet positions and moves are authored separately afterward. Nothing here changes the show until you send it.</p>
+      <div id="studioKeyframeEditor" class="studio-keyframe"></div>
+      <div id="studioRouteEditor" class="studio-route-editor"></div>
+      <button id="studioSendDraft" class="view-btn" disabled>Send routine to stage…</button>
+      <span id="studioDraftStatus" class="hint" role="status"></span>
+    </aside>
+    <div class="studio-plan"><canvas id="studioCanvas" aria-label="Stage plan with dancers' paths"></canvas></div>
+    <aside class="studio-side" aria-label="Collisions">
+      <h3>Collisions <span id="studioWarnCount" class="count">—</span></h3>
+      <div class="btn-row studio-overlap-tools"><button id="btnScanOverlaps" class="view-btn" title="Scan the whole running order for dancer-to-dancer overlaps">Find overlaps</button></div>
+      <p class="hint studio-overlap-hint">A whole-show scan finds moments when two dancers come within 0.55 m. Click a warning to go to that moment; Fix applies the suggested path change, and Undo restores it.</p>
+      <div id="studioDraftReview" class="list"></div>
+      <div id="studioWarn" class="list"></div>
+    </aside>
+  </div>
+</section>
 <header>
   <h1>Choreographer</h1>
   <input id="showName" class="show-name" value="Untitled show" aria-label="Show name" />
@@ -19,8 +65,8 @@
   <button id="btnSave" class="ghost" title="Save the whole show: writes the browser's copy first, then a JSON file you choose">Save</button>
   <button id="btnReload" class="ghost" title="Reload a show from a JSON file">Reload</button>
   <button id="btnClear" class="ghost" title="Clear the stage for a new show — keeps dancers, costumes, props, cloth, lanterns, music, voice and every setting. Undo brings it back">Clear</button>
-  <button id="btnTopDown" class="ghost" title="Open the overhead stage plan">Top-down</button>
   <button id="btnWatch" class="ghost watch-link" title="Watch the show: the stage alone, with its music, from the top">▶ Watch</button>
+  <button id="btnAbout" class="ghost" title="About this version of Choreographer">About</button>
   <a id="btnPrint" class="ghost print-link" href="print.html" target="_blank" rel="noopener" title="Open the printable stage plot, paths and cue sheet in a new tab">Print plan</a>
   <input id="fileImport" type="file" accept="application/json" hidden />
   <input id="fileMusic" type="file" accept="audio/*" hidden />
@@ -56,6 +102,8 @@
       <div class="field"><label>End fade (s)</label><input id="prefEndFade" type="number" min="0" max="120" step="0.5" title="How long the music takes to come down before the show ends; 0 stops it dead" /></div>
       <div class="field"><label>Tempo (bpm)</label><input id="prefTempo" type="number" min="20" max="300" step="1" title="The music's tempo. A count is one beat, and a phrase's counts are laid against it" /></div>
       <div class="field"><label>Counts per bar</label><input id="prefBeats" type="number" min="1" max="16" step="1" title="How many counts make a bar: 4 in common time, 3 for a waltz" /></div>
+      <div class="field tap-count"><button id="btnTapTempo" type="button" title="Tap along with the music. The first tap is count one at the playhead; later taps set the tempo from the gaps. A pause of 2.5 s starts over">Tap tempo</button><button id="btnSetDownbeat" type="button" class="ghost" title="Count one is the playhead right now">Count 1 here</button><button id="btnClearDownbeat" type="button" class="ghost" title="Count one goes back to the first music track">Clear</button></div>
+      <p id="countReadout" class="hint"></p>
       <p class="hint">The length a cue is given when it is placed, before it is dragged into shape. These travel with the show, so a reopened file flies and fades the same way. <b>End fade</b> is how long the music takes to come down into an end marker; <b>0</b> stops it dead on the moment. <b>Tempo</b> and <b>counts per bar</b> are the music's clock: a phrase is placed by counts of it, and the bars are drawn under the tracks and counted from where the first track begins.</p>
     </section>
 
@@ -105,26 +153,32 @@
   </aside>
 
   <section id="center">
-    <div id="actTabs" class="act-tabs" aria-label="Acts"></div>
-    <div id="sceneTabs" class="act-tabs scene-tabs" aria-label="Scenes in this act"></div>
-    <div id="stage-wrap">
-      <canvas id="stage"></canvas>
-      <div class="view-tools">
+    <div id="actTabs" class="act-tabs" aria-label="Act and stage controls">
+      <label class="act-picker"><select id="actSelect" aria-label="Select act"></select></label>
+      <button id="btnAddAct" class="view-btn act-action" title="Add an act after the last one">+ Act</button>
+      <button id="btnAddScene" class="view-btn act-action" title="Add a scene at the playhead">+ Scene</button>
+      <div class="view-tabs" role="tablist" aria-label="Choose a view">
+        <button id="btnFillPlan" class="view-tab on" role="tab" aria-selected="true" title="Overhead stage plan">Plan</button>
+        <button id="btnFillElev" class="view-tab" role="tab" aria-selected="false" title="Side elevation: heights, levels and flying">Elevation</button>
+      </div>
+      <div class="stage-tools" aria-label="Overhead stage controls">
+        <button id="btnStudio" class="view-btn" aria-pressed="false" title="Path studio: a full-screen plan to draw, hide and check each dancer's path">Path studio</button>
         <button id="btnPaths" class="view-btn on" aria-pressed="true" title="Show or hide movement lines">Paths</button>
         <button id="btnStations" class="view-btn on" aria-pressed="true" title="Show or hide station points">Stations</button>
         <button id="btnCostumes" class="view-btn" aria-pressed="false" title="Show or hide overhead costume shapes">Costumes</button>
         <button id="btnTilt" class="view-btn" aria-pressed="false" title="Drag vertically on the stage to tilt the view; dancer editing is disabled while active">Tilt view</button>
-        <button id="btnResetOverhead" class="view-btn" title="Return to directly overhead and leave tilt mode">Reset overhead</button>
-        <button id="btnFillPlan" class="view-btn" aria-pressed="false" title="Enlarge the overhead stage plan">Top-down</button>
       </div>
+    </div>
+    <div id="sceneTabs" class="act-tabs scene-tabs" aria-label="Scenes in this act"></div>
+    <div id="stage-wrap">
+      <canvas id="stage"></canvas>
       <div id="pointStrip" class="point-strip" hidden></div>
-      <div id="stageHint" class="stage-hint">Click a point to edit it · drag to move it · drag the line to bow it · right-click deletes it and everything after</div>
+      <div id="stageHint" class="stage-hint">Select a dancer and station: arrow keys move that station only · no station selected: arrow keys shift the whole track · Shift+arrow moves twice the grid</div>
     </div>
     <div id="elevation-wrap">
       <canvas id="elevation"></canvas>
       <div class="view-tools">
         <button id="btnDepth" class="view-btn on" aria-pressed="true" title="Shrink figures the further upstage they stand, as the house sees them — turn it off when judging heights">Depth</button>
-        <button id="btnFillElev" class="view-btn" aria-pressed="false" title="Give the elevation the whole centre, for watching from the house">⛶ Fill</button>
       </div>
     </div>
     <div id="house-wrap" hidden>
@@ -154,19 +208,10 @@
       <p class="hint">A slide stays until the next slide, video or off cue. Set crossfade to <b>0</b> for an instant change. Screen fly cues remain separate. Images stay in this browser; show JSON carries references only.</p>
     </section>
     <section class="cast-section">
-      <h2>Performers <span id="castCount" class="count">0</span></h2>
-      <div class="btn-row"><button id="btnAddDancer">+ Dancer</button></div>
+      <h2>Cast <span id="castCount" class="count">0</span></h2>
+      <div class="btn-row"><button id="btnAddDancer">+ Dancer</button><button id="btnAddCastGroup">+ Group</button></div>
       <div id="castList" class="list"></div>
-      <p class="hint">Ctrl-click an eye to keep more than one performer on stage.</p>
-    </section>
-
-    <section class="overlap-section">
-      <h2>Overlaps <span id="overlapCount" class="count">—</span></h2>
-      <div class="btn-row">
-        <button id="btnScanOverlaps" title="Look through the whole running order for two performers inside the clearance">Find overlaps</button>
-      </div>
-      <div id="overlapList" class="list"></div>
-      <p class="hint">Two bodies closer than 0.55 m — the same test the run-through stops on, but read across the whole show instead of only where the clock happens to run. A fix moves the least it can and re-checks the feet it might pull: it is a normal edit, so <b>Undo</b> puts the path back exactly as it was.</p>
+      <p class="hint">Dancers are movement tracks. Groups (such as Audience) are organizational cast entries for now, not stage objects. Ctrl-click an eye to keep more than one dancer on stage.</p>
     </section>
 
     <section class="green-room">
@@ -188,6 +233,10 @@
       <div id="voiceRow" class="list"></div>
       <div class="btn-row">
         <button id="btnRecord" title="Record a voice piece with the microphone, starting at the playhead">◉ Record</button>
+        <label class="label" for="voiceMic">Mic</label>
+        <select id="voiceMic" aria-label="Microphone input"><option value="">Default microphone</option></select>
+        <meter id="voiceInputLevel" min="0" max="1" value="0" aria-label="Microphone input level"></meter>
+        <span id="voiceInputStatus" class="hint">Input idle</span>
         <button id="btnVoiceFile" title="Attach a voice recording from disk, at the playhead">+ Voice file</button>
         <button id="btnVoiceFolder" title="Import a folder of numbered recordings (01, 02, …) in order, after the narration already in the show. Each starts unattached until you choose its speaker">+ Folder</button>
         <button id="btnVoiceSave" title="Save this show's voice audio to one file, tied to the show's name and ID">Save voice</button>
@@ -205,10 +254,17 @@
   <div id="transport">
     <button id="btnPlay" class="primary" title="Play / pause (Space)">▶</button>
     <button id="btnStop" title="Return to start">■</button>
+    <label class="review-speed" for="reviewSpeed">Review speed <output id="reviewSpeedValue">1×</output>
+      <input id="reviewSpeed" type="range" min="1" max="4" step="0.25" value="1" aria-label="Review playback speed" title="Review faster without changing the show's authored timings" />
+    </label>
     <span id="timeDisplay" class="time">00:00.000</span>
     <span class="divider"></span>
-    <button id="btnKey" title="Add a keyframe at the playhead">+ Key</button>
+    <button id="btnKey" title="Add a keyframe: on the next beat and a stride from the last station">+ Key</button>
+    <label class="toggle" title="When on, new keys and stations go on the next beat, a comfortable stride from the dancer's last station. Turn off to place them by hand.">
+      <input id="autoPlace" type="checkbox" checked />Auto-place
+    </label>
     <button id="btnPath" title="Place path stations: select a dancer, then click points on the stage in order">+ Stations</button>
+    <button id="btnMirrorPath" title="Mirror the selected dancer's path left to right across stage centre, keeping its timing and order">⇄ Mirror path</button>
     <button id="btnHold" title="Hold the selected track for a moment">+ Hold</button>
     <button id="btnPause" title="Pause the whole show">+ Pause</button>
     <button id="btnEnd" title="End the show at the playhead — the clock stops here, and dragging the red line moves it">+ End</button>
@@ -252,6 +308,23 @@
   </div>
 </div>
 
+<div id="aboutSheet" class="moves-sheet" hidden>
+  <div class="moves-panel about-panel" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+    <header class="moves-head">
+      <h2 id="aboutTitle">About Choreographer</h2>
+      <span class="moves-where">A theatre planner for shaping a show, one cue at a time.</span>
+      <button id="btnAboutClose" class="ghost">Close</button>
+    </header>
+    <div class="moves-body">
+      <p><strong>Version 0.4.6</strong> <span class="about-build">Release date: <time datetime="2026-11-05">5 November 2026</time></span></p>
+      <p>Plan and Elevation are separate tabs, so the plan takes the whole stage area when shown. Stage controls sit on a dedicated toolbar row; Tilt view becomes Reset while active.</p>
+      <p>Legs and feet preview: shaped thighs/calves and articulated heel, ball and toe rendering. Movement technique remains under review.</p>
+      <p>Includes Mirror path and Cast tools. Show-video recording is disabled; music and voice recording remain available.</p>
+      <p>Show files are JSON; music and voice recordings are stored separately in this browser. Keep a copy of your show file when moving between browsers or computers.</p>
+    </div>
+  </div>
+</div>
+
 <div id="schoolSheet" class="moves-sheet" hidden>
   <div class="moves-panel school-panel" role="dialog" aria-modal="true" aria-labelledby="schoolTitle">
     <header class="moves-head">
@@ -266,22 +339,27 @@
 
 <script type="importmap">
 {"imports": {
-  "./src/app.js": "./src/app.js?v=scroll33",
-  "./src/stage.js": "./src/stage.js?v=guide22",
-  "./src/cheatsheet.js": "./src/cheatsheet.js?v=guide23",
+  "./src/app.js": "./src/app.js?v=studio7",
+  "./src/path-studio.js": "./src/path-studio.js?v=staging3",
+  "./src/routine-draft.js": "./src/routine-draft.js?v=staging3",
+  "./src/music.js": "./src/music.js?v=beat1",
+  "./src/stage.js": "./src/stage.js?v=studio5",
+  "./src/cheatsheet.js": "./src/cheatsheet.js?v=guide24",
   "./src/placement-guide.js": "./src/placement-guide.js?v=guide20",
-  "./src/pose.js": "./src/pose.js?v=load15",
-  "./src/model.js": "./src/model.js?v=trajectory13",
-  "./src/narration.js": "./src/narration.js?v=narr2",
+  "./src/pose.js": "./src/pose.js?v=silhouette1",
+  "./src/limb-shape.js": "./src/limb-shape.js?v=legs1",
+  "./src/model.js": "./src/model.js?v=studio5",
+  "./src/narration.js": "./src/narration.js?v=narr7",
   "./src/narration-bundle.js": "./src/narration-bundle.js?v=narr2",
   "./src/conventions.js": "./src/conventions.js?v=conv14",
   "./src/chasse-phases.js": "./src/chasse-phases.js?v=chasse1",
-  "./src/elevation.js": "./src/elevation.js?v=move2",
+  "./src/elevation.js": "./src/elevation.js?v=height1",
   "./src/contact-frame.js": "./src/contact-frame.js?v=contacts17",
-  "./src/timeline.js": "./src/timeline.js?v=slides-on11",
-  "./src/house.js": "./src/house.js?v=slides14",
+  "./src/timeline.js": "./src/timeline.js?v=beat-ruler1",
+  "./src/beat-map.js": "./src/beat-map.js?v=estimate1",
+  "./src/house.js": "./src/house.js?v=height1",
   "./src/slides.js": "./src/slides.js?v=slides9",
-  "./src/video.js": "./src/video.js?v=video-sync7"
+  "./src/video.js": "./src/video.js?v=video-sync9"
 }}
 </script>
 <script>

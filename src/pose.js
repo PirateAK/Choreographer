@@ -1,4 +1,5 @@
 import { riseFor, conventionValue } from './conventions.js';
+import { limbContour } from './limb-shape.js';
 
 // Ballet positions, drawn as a jointed figure rather than a symbol. A station has
 // always carried a position — first, arabesque, pirouette — but nothing drew it, so a
@@ -597,51 +598,176 @@ export function feetPlaceOf(spec, facing = 1, turn = 0) {
   });
 }
 
+// Foot roll is appearance geometry around the solved ankle, not another contact solver.
+// The existing rise lifts hip AND ankle equally: thigh/shin lengths are already fixed.
+// Model a heel, metatarsal/ball and toe beneath that ankle so the rise is visible.
+// For lifted/unreachable ankles the entire shoe follows the ankle; it never snaps to a floor target.
+export function footGeometry(spec, figure, facing = 1, turn = 0) {
+  const a = (Number(turn) || 0) * Math.PI / 180;
+  const squash = 0.42 + 0.58 * Math.abs(Math.cos(a));
+  const mirror = (facing < 0 ? -1 : 1) * (Math.cos(a) < 0 ? -1 : 1);
+  const spin = Math.sin(a) * (facing < 0 ? -1 : 1);
+  const lift = Math.max(0, Number(spec.rise) || 0);
+  const roll = Math.min(1, lift / 0.06);
+  const project = p => [p[0] * squash + p[2] * spin, p[1]];
+  return figure.legs3.map((leg, i) => {
+    const ankle = leg[2];
+    const [dx, dz] = toeDirection(spec, i);
+    const point = (distance, height) => [ankle[0] + dx * mirror * distance,
+      ankle[1] - FLOOR_REF - lift + height, ankle[2] + dz * distance];
+    const heel = point(-0.025 * (1 - roll), lift * 0.88);
+    const ball = point(0.027 * (1 - roll), Math.max(0, lift - 0.03) * 0.55);
+    const toe = point(TOE_LENGTH * (1 - roll), 0);
+    return { ankle, heel, ball, toe, points: [heel, ankle, ball, toe].map(project), roll };
+  });
+}
+
+// Shared silhouette samples for screen and print. Radii are body units, independent
+// of costume, zoom and contact solving; the knee/ankle centers stay untouched.
+export function legContours(leg) {
+  const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+  const [hip, knee, ankle] = leg;
+  return [
+    limbContour([hip, mix(hip, knee, 0.34), mix(hip, knee, 0.7), knee], [0.034, 0.037, 0.029, 0.017]),
+    limbContour([knee, mix(knee, ankle, 0.3), mix(knee, ankle, 0.62), ankle], [0.017, 0.026, 0.02, 0.01]),
+  ];
+}
+
+// Shaped arms, same method as the legs: a tapered upper arm, a forearm, and a short
+// hand carried on the forearm's line. Radii are body units and sit well inside the old
+// uniform stroke, so the arm reads as an arm rather than a rod. Also returns the elbow
+// and wrist discs that cover the two seams, as the knee disc does for the leg.
+export function armContours(arm) {
+  const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+  const [shoulder, elbow, wrist] = arm;
+  const len = Math.hypot(wrist[0] - elbow[0], wrist[1] - elbow[1]) || 1;
+  const dir = [(wrist[0] - elbow[0]) / len, (wrist[1] - elbow[1]) / len];
+  const hand = [wrist[0] + dir[0] * 0.07, wrist[1] + dir[1] * 0.07];
+  return {
+    shapes: [
+      limbContour([shoulder, mix(shoulder, elbow, 0.32), mix(shoulder, elbow, 0.68), elbow], [0.021, 0.019, 0.015, 0.012]),
+      limbContour([elbow, mix(elbow, wrist, 0.32), mix(elbow, wrist, 0.68), wrist], [0.012, 0.011, 0.009, 0.0075]),
+      limbContour([wrist, mix(wrist, hand, 0.5), hand], [0.0075, 0.0068, 0.0045]),
+    ],
+    discs: [elbow, wrist],
+  };
+}
+
+// Torso and neck from the same joints as the rest: hips, a narrower waist and a fuller chest,
+// tapering into a neck under the head. Radii are body units; the chest sits at the shoulder
+// line so the arms root inside its outline. Returned as [neck, torso]: draw the neck first so
+// the torso's fill covers its base and no seam shows.
+export function torsoShapes(j) {
+  const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+  const pelvis = j.pelvis;
+  const chest = j.chest;
+  const head = j.head;
+  return [
+    limbContour([chest, mix(chest, head, 0.5), head], [0.022, 0.019, 0.02]),
+    limbContour([pelvis, mix(pelvis, chest, 0.34), mix(pelvis, chest, 0.68), mix(pelvis, chest, 0.88), chest], [0.047, 0.043, 0.036, 0.045, 0.054]),
+  ];
+}
+
 /* ------------------------------------------------------------------ drawing */
 
-// The figure, drawn as a jointed stick: dark outline first so the dancer reads on a
-// dark stage and on white paper, then the body colour over it. Returns the head box so
-// a caller can put a name above it without recomputing the pose.
+// Pointe shoes, drawn from the same foot points as the bare foot: a satin shoe over heel to toe,
+// a darker box at the tip, and one ribbon running up the shin from the ankle. A foot that rises
+// onto the pointe lengthens into the box, so the shoe follows the foot rather than a separate pose.
+export const POINTE_SHOE = { satin: '#f2b5c6', box: '#e291aa', ribbon: '#d9869f' };
+export function pointeShoeShapes(foot, knee) {
+  // The contact points are the centreline of the shoe, so the sole hangs below the floor by about its
+  // thickness. Lift the whole shoe by the sole radius so its underside rests on the floor line.
+  const SOLE = 0.0095;
+  const [heel, ankle, ball, toe] = foot.points.map(([x, y]) => [x, y + SOLE]);
+  const kneeUp = [knee[0], knee[1] + SOLE];
+  const along = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+  return [
+    { shape: limbContour([heel, ankle, ball, toe], [0.012, 0.0105, 0.0095, 0.0068]), fill: POINTE_SHOE.satin },
+    { shape: limbContour([ball, toe], [0.0098, 0.0072]), fill: POINTE_SHOE.box },
+    { shape: limbContour([ankle, along(ankle, kneeUp, 0.42)], [0.0028, 0.0022]), fill: POINTE_SHOE.ribbon },
+  ];
+}
+
+// Head furniture in head units: origin at the head centre, radius 1, y down. One function for
+// the screen and the print so the hair and face cannot disagree. The face turns with the head
+// (headTurn, degrees): eyes, nose and mouth show only while the face looks towards the viewer,
+// the ear shows in profile, and the hair is a pulled-back cap with a bun at the nape.
+export function headFace(headTurn = 0) {
+  const ha = ((Number(headTurn) || 0) * Math.PI) / 180;
+  const fwd = Math.sin(ha);
+  const front = Math.cos(ha);
+  const eye = (u) => ({ x: fwd * 0.25 + u * front, y: -0.05, rx: 0.13 * front, ry: 0.065 });
+  const facing = front > 0.2;
+  return {
+    cap: { x: -fwd * 0.35, y: -1 + (1 - front) / 2, r: 0.75 + (0.25 * (1 - front)) / 2 },
+    bun: { x: -fwd * 0.9, y: -0.15 + 0.85 * Math.max(0, -front), r: 0.36 },
+    ear: front < 0.5 ? { x: -fwd * 0.15, y: 0.05, rx: 0.13, ry: 0.22 } : null,
+    eyes: facing ? [eye(-0.38), eye(0.38)] : [],
+    nose: facing ? { x: fwd * 0.25, y: 0.12, rx: 0.05 * front, ry: 0.07 } : null,
+    mouth: facing ? { x: fwd * 0.25, y: 0.42, rx: 0.2 * front, ry: 0.045 } : null,
+  };
+}
+
+// The figure uses shaped, articulated legs around the solved skeleton; arms and torso
+// retain the simple jointed drawing for now. Returns the head box for labels.
 export function drawPose(ctx, o) {
   const { spec, x, y, h, facing = 1, turn = 0, headTurn = turn, body, skirt, hair, pins } = o;
   const j = joints(spec, facing, turn, pins);
   const X = (bx) => x + bx * h;
   const Y = (by) => y - by * h;
-  const wide = o.width || Math.max(1.2, h * 0.045);
-
-  const stroke = (points, width, colour) => {
-    ctx.beginPath();
-    points.forEach(([bx, by], i) => (i ? ctx.lineTo(X(bx), Y(by)) : ctx.moveTo(X(bx), Y(by))));
-    ctx.lineWidth = width;
-    ctx.strokeStyle = colour;
-    ctx.stroke();
-  };
 
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
   const outline = 'rgba(0,0,0,.45)';
-  const limbs = [j.legs[0], j.legs[1], j.arms[0], j.arms[1], [j.pelvis, j.chest]];
-  // Outline pass, then colour: a single pass vanishes wherever the floor is pale.
-  for (const seg of limbs) stroke(seg, wide * 1.7, outline);
-  for (const seg of limbs) stroke(seg, wide, body);
-
-  // Feet: a short toe from each ankle, turned out, so a tendu reads as a point.
-  ctx.lineWidth = Math.max(1, wide * 0.8);
-  ctx.strokeStyle = body;
-  for (const [, , ankle] of j.legs) {
-    const toeX = ankle[0] + 0.05 * (ankle[0] < 0 ? -1 : 1);
+  const polygon = (points, fill = body) => {
     ctx.beginPath();
-    ctx.moveTo(X(ankle[0]), Y(ankle[1]));
-    ctx.lineTo(X(toeX), Y(ankle[1] + 0.01));
+    points.forEach(([bx, by], i) => i ? ctx.lineTo(X(bx), Y(by)) : ctx.moveTo(X(bx), Y(by)));
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.strokeStyle = outline;
+    ctx.lineWidth = Math.max(0.6, h * 0.006);
+    ctx.fill();
     ctx.stroke();
+  };
+  for (const leg of j.legs) {
+    for (const shape of legContours(leg)) polygon(shape);
+    // Cover the two segment end seams with the same rounded joint in canvas and print.
+    ctx.beginPath();
+    ctx.arc(X(leg[1][0]), Y(leg[1][1]), h * 0.016, 0, Math.PI * 2);
+    ctx.fillStyle = body;
+    ctx.fill();
   }
-
-  // Head, then hair over the crown.
+  for (const arm of j.arms) {
+    const { shapes, discs } = armContours(arm);
+    for (const shape of shapes) polygon(shape);
+    ctx.beginPath();
+    ctx.arc(X(discs[0][0]), Y(discs[0][1]), h * 0.012, 0, Math.PI * 2);
+    ctx.arc(X(discs[1][0]), Y(discs[1][1]), h * 0.0075, 0, Math.PI * 2);
+    ctx.fillStyle = body;
+    ctx.fill();
+  }
+  for (const shape of torsoShapes(j)) polygon(shape);
+  footGeometry(spec, j, facing, turn).forEach((foot, i) => {
+    for (const { shape, fill } of pointeShoeShapes(foot, j.legs[i][1])) polygon(shape, fill);
+  });
   const headR = j.headR * h;
   const hx = X(j.head[0]);
   const hy = Y(j.head[1]);
+  const face = headFace(headTurn);
+  // The bun sits behind the head: drawn first, it only shows where it sticks out (profile, nape).
+  if (hair) {
+    const b = face.bun;
+    ctx.beginPath();
+    ctx.arc(hx + b.x * headR, hy + b.y * headR, b.r * headR * 1.06, 0, Math.PI * 2);
+    ctx.fillStyle = outline;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(hx + b.x * headR, hy + b.y * headR, b.r * headR, 0, Math.PI * 2);
+    ctx.fillStyle = hair;
+    ctx.fill();
+  }
   ctx.beginPath();
   ctx.arc(hx, hy, headR * 1.06, 0, Math.PI * 2);
   ctx.fillStyle = outline;
@@ -650,25 +776,38 @@ export function drawPose(ctx, o) {
   ctx.arc(hx, hy, headR, 0, Math.PI * 2);
   ctx.fillStyle = body;
   ctx.fill();
+  if (face.ear) {
+    const e = face.ear;
+    ctx.beginPath();
+    ctx.ellipse(hx + e.x * headR, hy + e.y * headR, e.rx * headR * 1.12, e.ry * headR * 1.12, 0, 0, Math.PI * 2);
+    ctx.fillStyle = outline;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(hx + e.x * headR, hy + e.y * headR, e.rx * headR, e.ry * headR, 0, 0, Math.PI * 2);
+    ctx.fillStyle = body;
+    ctx.fill();
+  }
   if (hair) {
-    // Hair is the only cue a head this size has: from the front it is a crown on the top,
-    // in profile a mass at the back of the head, and from behind it covers the head
-    // entirely. Spotting is exactly this mass staying put while the body turns.
-    const ha = ((Number(headTurn) || 0) * Math.PI) / 180;
-    const c = Math.cos(ha);
-    const r = headR * (0.62 + 0.18 * (1 - c));
-    const ox = -Math.sin(ha) * headR * 0.62;
-    const oy = -headR * 0.34 * (1 + c) * 0.5;
+    // The cap is clipped to the head: from the front a hairline across the forehead, in profile
+    // the top and back, and from behind the whole head.
+    const c = face.cap;
     ctx.save();
     ctx.beginPath();
     ctx.arc(hx, hy, headR, 0, Math.PI * 2);
     ctx.clip();
     ctx.beginPath();
-    ctx.arc(hx + ox, hy + oy, r, 0, Math.PI * 2);
+    ctx.arc(hx + c.x * headR, hy + c.y * headR, c.r * headR, 0, Math.PI * 2);
     ctx.fillStyle = hair;
     ctx.fill();
     ctx.restore();
   }
+  const features = [...face.eyes, face.nose, face.mouth].filter(Boolean);
+  features.forEach((f, i) => {
+    ctx.beginPath();
+    ctx.ellipse(hx + f.x * headR, hy + f.y * headR, f.rx * headR, f.ry * headR, 0, 0, Math.PI * 2);
+    ctx.fillStyle = i < face.eyes.length ? '#1d1714' : f === face.mouth ? '#a1505f' : outline;
+    ctx.fill();
+  });
 
   // The skirt last, at the hip: a tutu disc, a tunic to mid-thigh, or a plain sash.
   if (skirt) {
@@ -712,41 +851,56 @@ export function poseSvg(o) {
   const j = joints(spec, facing, turn, pins);
   const X = (bx) => x + bx * h;
   const Y = (by) => y - by * h;
-  const wide = Math.max(0.9, h * 0.045);
   const out = [];
-  const width = wide * 1.7;
-  const seg = (points, w, colour) =>
-    `<polyline points="${points.map(([bx, by]) => X(bx).toFixed(1) + ',' + Y(by).toFixed(1)).join(' ')}" fill="none" stroke="${colour}" stroke-width="${w.toFixed(1)}" stroke-linecap="round" stroke-linejoin="round" />`;
-
-  const limbs = [j.legs[0], j.legs[1], j.arms[0], j.arms[1], [j.pelvis, j.chest]];
-  for (const s of limbs) out.push(seg(s, width, ink));
-  for (const s of limbs) out.push(seg(s, wide, body));
-
-  for (const [, , ankle] of j.legs) {
-    const toeX = ankle[0] + 0.05 * (ankle[0] < 0 ? -1 : 1);
-    out.push(
-      `<line x1="${X(ankle[0]).toFixed(1)}" y1="${Y(ankle[1]).toFixed(1)}" x2="${X(toeX).toFixed(1)}" y2="${Y(ankle[1] + 0.01).toFixed(1)}" stroke="${body}" stroke-width="${Math.max(0.8, wide * 0.8).toFixed(1)}" stroke-linecap="round" />`
-    );
+  const polygon = (points, fill = body) => `<polygon points="${points.map(([bx, by]) => X(bx).toFixed(2) + ',' + Y(by).toFixed(2)).join(' ')}" fill="${fill}" stroke="${ink}" stroke-width="${Math.max(0.6, h * 0.006).toFixed(2)}" stroke-linejoin="round" />`;
+  for (const leg of j.legs) {
+    for (const shape of legContours(leg)) out.push(polygon(shape));
+    out.push(`<circle cx="${X(leg[1][0]).toFixed(2)}" cy="${Y(leg[1][1]).toFixed(2)}" r="${(h * 0.016).toFixed(2)}" fill="${body}" />`);
   }
+  for (const arm of j.arms) {
+    const { shapes, discs } = armContours(arm);
+    for (const shape of shapes) out.push(polygon(shape));
+    out.push(`<circle cx="${X(discs[0][0]).toFixed(2)}" cy="${Y(discs[0][1]).toFixed(2)}" r="${(h * 0.012).toFixed(2)}" fill="${body}" />`);
+    out.push(`<circle cx="${X(discs[1][0]).toFixed(2)}" cy="${Y(discs[1][1]).toFixed(2)}" r="${(h * 0.0075).toFixed(2)}" fill="${body}" />`);
+  }
+  for (const shape of torsoShapes(j)) out.push(polygon(shape));
+  footGeometry(spec, j, facing, turn).forEach((foot, i) => {
+    for (const { shape, fill } of pointeShoeShapes(foot, j.legs[i][1])) out.push(polygon(shape, fill));
+  });
 
   const headR = j.headR * h;
   const hx = X(j.head[0]);
   const hy = Y(j.head[1]);
+  const face = headFace(headTurn);
+  const ell = (cx, cy, rx, ry, fill) =>
+    `<ellipse cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" rx="${rx.toFixed(2)}" ry="${ry.toFixed(2)}" fill="${fill}" stroke="none" />`;
+  // The bun first, behind the head, as on screen.
+  if (hair) {
+    const b = face.bun;
+    out.push(
+      `<circle cx="${(hx + b.x * headR).toFixed(2)}" cy="${(hy + b.y * headR).toFixed(2)}" r="${(b.r * headR * 1.06).toFixed(2)}" fill="${ink}" stroke="none" />`,
+      `<circle cx="${(hx + b.x * headR).toFixed(2)}" cy="${(hy + b.y * headR).toFixed(2)}" r="${(b.r * headR).toFixed(2)}" fill="${hair}" stroke="none" />`
+    );
+  }
   out.push(`<circle cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="${(headR * 1.06).toFixed(1)}" fill="${ink}" stroke="none" />`);
   out.push(`<circle cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="${headR.toFixed(1)}" fill="${body}" stroke="none" />`);
+  if (face.ear) {
+    const e = face.ear;
+    out.push(ell(hx + e.x * headR, hy + e.y * headR, e.rx * headR * 1.12, e.ry * headR * 1.12, ink));
+    out.push(ell(hx + e.x * headR, hy + e.y * headR, e.rx * headR, e.ry * headR, body));
+  }
   if (hair) {
-    // The same hair as on screen, clipped to the head: a crown facing front, a mass at the
-    // back in profile, and the whole head from behind.
-    const ha = ((Number(headTurn) || 0) * Math.PI) / 180;
-    const c = Math.cos(ha);
-    const r = headR * (0.62 + 0.18 * (1 - c));
-    const ox = -Math.sin(ha) * headR * 0.62;
-    const oy = -headR * 0.34 * (1 + c) * 0.5;
+    // The same cap as on screen, clipped to the head.
+    const c = face.cap;
     const id = 'head' + ++headClipSeq;
     out.push(
       `<defs><clipPath id="${id}"><circle cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="${headR.toFixed(1)}" /></clipPath></defs>`,
-      `<circle cx="${(hx + ox).toFixed(1)}" cy="${(hy + oy).toFixed(1)}" r="${r.toFixed(1)}" fill="${hair}" stroke="none" clip-path="url(#${id})" />`
+      `<circle cx="${(hx + c.x * headR).toFixed(2)}" cy="${(hy + c.y * headR).toFixed(2)}" r="${(c.r * headR).toFixed(2)}" fill="${hair}" stroke="none" clip-path="url(#${id})" />`
     );
+  }
+  for (const [i, f] of [...face.eyes, face.nose, face.mouth].filter(Boolean).entries()) {
+    const fill = i < face.eyes.length ? '#1d1714' : f === face.mouth ? '#a1505f' : ink;
+    out.push(ell(hx + f.x * headR, hy + f.y * headR, f.rx * headR, f.ry * headR, fill));
   }
 
   if (skirt) {

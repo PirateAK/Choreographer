@@ -5,7 +5,8 @@ import {
   addStation, objectShown, wingBays, findObject, propPosOfContent, carrierOf, sceneryStateAt,
   clothSpan, clothX, clothDepth, clothThick, clampClothX, curtainLegW, POSE_LABEL, lightLevelAt,
   lightSpot, costumeOf, legPoints, curveAt, BEND_LIMIT,
-  footAtLocal, footSkate, legOverreach, dancerHeight, overheadPoseAtLocal,
+  footAtLocal, footSkate, legOverreach, dancerHeight, overheadPoseAtLocal, isProp, autoPlaceKey, autoPlaceEnabled,
+  propPlacementHint,
 } from './model.js';
 import { darker } from './pose.js';
 import { placementRange } from './placement-guide.js';
@@ -95,7 +96,7 @@ export class StageView {
     const st = show.stage;
     const worldW = st.width + st.wingDepth * 2;
     const worldH = st.depth;
-    const pad = this.compact ? 6 : 34;
+    const pad = this.compact ? 6 : 8;
     // The editor picks one scale for the plan and the elevation together, so a metre
     // is the same size in both. Fitting this canvas on its own would make them
     // disagree the moment the panes differed.
@@ -497,7 +498,7 @@ export class StageView {
     const dancer = findObject(state.show, guide.id);
     const origin = dancer && dancer.keys[dancer.keys.length - 1];
     if (!origin) return;
-    const range = placementRange({ ...guide, height: dancerHeight(state.show) });
+    const range = placementRange({ ...guide, height: dancerHeight(state.show, dancer) });
     const ctx = this.ctx;
     ctx.save();
     if (range) {
@@ -528,7 +529,7 @@ export class StageView {
     const text = range
       ? `Draft · ${range.label} · teal ${range.comfortableMin.toFixed(2)}–${range.comfortableMax.toFixed(2)} m · amber to ${range.stretchMax.toFixed(2)} m`
       : 'Draft · no distance estimate for this move';
-    const sub = `${(guide.durationMs / 1000).toFixed(2)} s · ${dancerHeight(state.show).toFixed(2)} m show height · not a technique limit · Esc cancels`;
+    const sub = `${(guide.durationMs / 1000).toFixed(2)} s · ${dancerHeight(state.show, dancer).toFixed(2)} m show height · not a technique limit · Esc cancels`;
     const boxW = Math.max(ctx.measureText(text).width, ctx.measureText(sub).width) + 20;
     ctx.fillStyle = 'rgba(12,20,29,.94)'; ctx.fillRect(12, 12, boxW, 47);
     ctx.fillStyle = '#b9eadd'; ctx.fillText(text, 22, 31);
@@ -737,7 +738,7 @@ export class StageView {
     if (!solved) return;
     const ctx = this.ctx;
     const { at, figure, frame } = solved;
-    const h = dancerHeight(state.show);
+    const h = dancerHeight(state.show, d);
     const angle = (Number(at.turn) || 0) * Math.PI / 180;
     const mirror = at.facing < 0 ? -1 : 1;
     const project = (x, z, height = 0) => {
@@ -943,7 +944,7 @@ export class StageView {
       const p = posOfContent(show, d, state.ui.playhead);
       if (!p) continue;
       const sp = this.w2s(p.x, p.y);
-      const top = this.w2s(p.x, p.y, dancerHeight(show));
+      const top = this.w2s(p.x, p.y, dancerHeight(show, d));
       if (distToSegment(px, py, sp.x, sp.y, top.x, top.y) < Math.max(11, 0.3 * this.scale)) return d;
     }
     return null;
@@ -1263,10 +1264,23 @@ export class StageView {
       commit();
       const armed = state.ui.stationGuide;
       const guide = armed && armed.id === sel.id ? armed : null;
-      const key = addStation(sel, Math.max(-mx, Math.min(mx, x)), Math.max(0.35, Math.min(st.depth - 0.35, y)),
-        guide ? { step: guide.step, pose: guide.pose, dur: guide.durationMs } : {});
+      // With auto-place on, a dancer's new station goes on the beat and a stride from her last
+      // station; the click then only chooses the dancer, so the stage does not stack stations.
+      const auto = !isProp(sel) && sel.keys.length && autoPlaceEnabled(state.show)
+        ? autoPlaceKey(state.show, sel, guide ? { durMs: guide.durationMs } : {})
+        : null;
+      const base = guide ? { step: guide.step, pose: guide.pose, dur: guide.durationMs } : {};
+      const key = addStation(
+        sel,
+        auto ? auto.x : Math.max(-mx, Math.min(mx, x)),
+        auto ? auto.y : Math.max(0.35, Math.min(st.depth - 0.35, y)),
+        auto ? { ...base, dur: auto.dur } : base,
+      );
+      if (auto) state.ui.playhead = contentOfLocal(state.show, sel.id, key.t);
       if (guide) {
         key.level = guide.level;
+        if (guide.port) key.port = guide.port;
+        if (guide.notes) key.notes = guide.notes;
         state.ui.stationGuide = null;
         state.ui.placingStations = false;
         state.ui.hint = 'Next station placed · distance bands are draft planning estimates';
@@ -1568,6 +1582,7 @@ export class StageView {
   onUp() {
     if (!this.grab) return;
     const kind = this.grab.type;
+    const grabbedProp = this.grab.prop;
     this.grab = null;
     if (kind === 'tilt') {
       this.canvas.dispatchEvent(new Event('viewtiltchange'));
@@ -1575,7 +1590,12 @@ export class StageView {
     }
     // A moved leg, light or cloth changes the numbers in the panel, so redraw that too.
     if (kind === 'leg' || kind === 'cloth' || kind === 'light') this.app.rebuild();
-    else if (kind === 'bend') {
+    else if (kind === 'prop') {
+      // A prop reports its clash with the paths the moment it is put down.
+      persist();
+      state.ui.hint = propPlacementHint(state.show, grabbedProp);
+      this.app.rebuild();
+    } else if (kind === 'bend') {
       // The station strip and the inspector show the bow as a number, so they are stale
       // the moment it is dragged.
       persist();

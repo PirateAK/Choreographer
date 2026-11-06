@@ -195,6 +195,8 @@ export class MoveSheet {
         <label>step${'<select id="phraseStep">' + opts(STEPS, step) + '</select>'}</label>
         <label>into${'<select id="phrasePose">' + opts(POSES.filter(([v]) => v !== 'none'), 'arabesque') + '</select>'}</label>
         <label>level${'<select id="phraseLevel">' + opts(LEVELS, 'flat') + '</select>'}</label>
+        <label>port de bras<input id="phrasePort" type="text" placeholder="—" title="The arm work for the whole phrase. In the paper plan it goes in parentheses when the legs also move" /></label>
+        <label>notes<input id="phraseNotes" type="text" placeholder="head, eyes…" title="Miscellaneous notes for the phrase: head, eyes, focus. Printed in braces under the line" /></label>
         <label>counts<input id="phraseCounts" type="number" min="1" max="32" step="1" value="${phraseShape(step).counts}" title="How many counts of the music the whole phrase takes. Its stations divide them in the proportion the step is counted, and the show's tempo says how long a count is" /></label>
         <label>on the${'<select id="phraseSnap"><option value="1">count</option><option value="bar">bar</option><option value="0">path</option></select>'}</label>
         <button id="btnStationGuide" title="Choose the next station yourself on the stage, with a draft distance guide for this step, position and count duration">Next station…</button>
@@ -273,6 +275,8 @@ export class MoveSheet {
         step: stepSel.value,
         pose: body.querySelector('#phrasePose').value,
         level: body.querySelector('#phraseLevel').value,
+        port: body.querySelector('#phrasePort').value.trim(),
+        notes: body.querySelector('#phraseNotes').value.trim(),
         counts: Math.max(1, Number(countsIn.value) || 1),
         snap: snap === 'bar' ? 'bar' : Number(snap),
       };
