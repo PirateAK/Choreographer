@@ -4,8 +4,8 @@
 import {
   state, commit, persist, findObject, mirrorPathLeftRight,
   scanOverlaps, overlapFix, applyOverlapFix, pathsKey, CLEARANCE, displayOfContent,
-  posOfContent, contentOfLocal, scanClothCrossings, clothCovers, clothDepth, scanPropClashes,
-  createShow, addScenery, countGrid, localOfContent, holdsFor,
+  posOfContent, propPosOfContent, contentOfLocal, scanClothCrossings, clothCovers, clothDepth, scanPropClashes,
+  createShow, addScenery, countGrid, localOfContent, holdsFor, POSES, LEVELS, STEPS, EASES, curveAt, countShape,
 } from './model.js';
 import { fmtTime } from './draw.js';
 import {
@@ -31,6 +31,8 @@ const ui = {
   activeTool: 'select',
   drag: null,
   routeDraw: null,
+  routeDragIndex: null,
+  selectedRouteIndex: null,
   selectedStationId: null,
 };
 
@@ -93,9 +95,29 @@ export function initPathStudio(deps) {
   document.getElementById('studioMirror').addEventListener('click', mirrorSelected);
   draftReviewEl.addEventListener('click', (e) => {
     const row = e.target.closest('[data-draft-warning]');
-    if (!row) return;
-    ui.selectedStationId = row.dataset.station;
-    renderPathStudio();
+    if (row?.dataset.station) {
+      ui.selectedStationId = row.dataset.station;
+      renderPathStudio();
+    }
+  });
+  document.getElementById('studioRouteEditor').addEventListener('click', (e) => {
+    const button = e.target.closest('[data-route-point]');
+    if (!button) return;
+    const index = Number(button.dataset.routePoint);
+    if (button.dataset.routeDelete === '1') deleteRoutePoint(index);
+    else if (button.dataset.routeInsert === '1') {
+      const a = ui.draft.route[index], b = ui.draft.route[index + 1];
+      if (a && b) insertRoutePointBetween(index, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+    } else {
+      ui.selectedRouteIndex = index; ui.activeTool = 'route'; ui.routeDraw = null;
+      stageToolEl.querySelectorAll('[data-tool]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tool === 'route')));
+      renderPathStudio();
+    }
+  });
+  document.getElementById('studioRouteEditor').addEventListener('keydown', (e) => {
+    const button = e.target.closest('[data-route-point]');
+    if (!button || (e.key !== 'Delete' && e.key !== 'Backspace')) return;
+    e.preventDefault(); deleteRoutePoint(Number(button.dataset.routePoint));
   });
   scanButton.addEventListener('click', scanNow);
 
@@ -239,6 +261,8 @@ function renderDraftDancers(show) {
   const valid = (show.cast || []).some((d) => d.id === ui.draft?.dancerId);
   draftDancerEl.value = valid ? ui.draft.dancerId : '';
   if (!valid && ui.draft?.dancerId) { ui.draft.dancerId = null; saveDraft(); }
+  if (document.activeElement !== routeStartEl) routeStartEl.value = String(Math.max(0, Math.round(ui.draft.stations[0]?.count ?? 0)));
+  if (document.activeElement !== routeBeatsEl) routeBeatsEl.value = String(Math.max(1, Math.round((ui.draft.stations.at(-1)?.count ?? 8) - (ui.draft.stations[0]?.count ?? 0))));
 }
 
 function renderDraftStatus() {
@@ -247,44 +271,142 @@ function renderDraftStatus() {
   const send = document.getElementById('studioSendDraft');
   if (send) send.disabled = !ui.draft.dancerId || ui.draft.stations.length < 2 || !ui.draft.stations.some((s) => Object.keys(s.keyframe || {}).length);
   const editor = document.getElementById('studioKeyframeEditor');
+  const routeEditor = document.getElementById('studioRouteEditor');
+  const points = ui.draft.route;
+  if (routeEditor) routeEditor.innerHTML = points.length ? `<p class="hint">Route controls · drag a handle on the plan; insert after a point or remove it.</p><div class="route-point-list">${points.map((p, i) => `<button type="button" class="view-btn${ui.selectedRouteIndex === i ? ' on' : ''}" data-route-point="${i}" aria-pressed="${ui.selectedRouteIndex === i}">P${i + 1} · ${p.x.toFixed(1)}, ${p.y.toFixed(1)}</button><button type="button" class="view-btn" data-route-point="${i}" data-route-insert="1" aria-label="Insert route point after point ${i + 1}" ${i === points.length - 1 || points.length >= 512 ? 'disabled' : ''}>+</button><button type="button" class="view-btn" data-route-point="${i}" data-route-delete="1" aria-label="Delete route point ${i + 1}" ${points.length <= 2 ? 'disabled' : ''}>×</button>`).join('')}</div>` : '<p class="hint">Route points appear here after drawing.</p>';
   const station = ui.draft.stations.find((s) => s.id === ui.selectedStationId);
   if (!editor) return;
   if (!station) { editor.innerHTML = '<p class="hint">Draw a route, then select a station on the plan to edit its ballet keyframe.</p>'; return; }
   const key = station.keyframe || {};
   const options = (values, selected) => values.map(([value, text]) => `<option value="${value}" ${value === selected ? 'selected' : ''}>${text}</option>`).join('');
+  const input = (field, label, value, step, min, max, unit = '') => `<label>${label} <span class="field-inline"><input type="number" data-key-field="${field}" value="${value ?? ''}" step="${step}" ${min != null ? `min="${min}"` : ''} ${max != null ? `max="${max}"` : ''}>${unit}</span></label>`;
   editor.innerHTML = `<p class="hint">Station ${ui.draft.stations.indexOf(station) + 1} · ${(station.contentMs / 1000).toFixed(2)}s</p>
-    <label>Pose <select id="draftPose">${options([['none','— none —'],['first','1st position'],['second','2nd position'],['third','3rd position'],['fourth','4th position'],['fifth','5th position'],['tendu','Tendu'],['plie','Plié'],['releve','Relevé'],['arabesque','Arabesque'],['attitude','Attitude'],['pirouette','Pirouette']], key.pose || 'none')}</select></label>
-    <label>Step <select id="draftStep">${options([['walk','Walk'],['chasse','Chassé'],['pas-de-bourree','Pas de bourrée'],['pirouette','Pirouette']], key.step || 'walk')}</select></label>
-    <label>Level <select id="draftLevel">${options([['flat','Flat'],['demi','Demi-pointe'],['pointe','En pointe'],['air','In the air']], key.level || 'flat')}</select></label>
+    <label>Pose <select data-key-field="pose">${options(POSES, key.pose || 'none')}</select></label>
+    <label>Step <select data-key-field="step">${options(STEPS, key.step || 'walk')}</select></label>
+    <label>Level <select data-key-field="level">${options(LEVELS, key.level || 'flat')}</select></label>
+    ${input('lift','Lift',key.lift ?? '',0.05,0,2.5,'m')}
+    ${input('absorb','Landing plié',key.absorb ?? '',0.01,0,0.6,'m')}
+    <label>Plant <select data-key-field="plant">${options([['auto','Auto'],['left','Left foot'],['right','Right foot'],['both','Both feet'],['air','In the air']], key.plant || 'auto')}</select></label>
+    ${input('turn','Turn',key.turn || 0,45,-720,720,'°')}
+    ${input('turnMs','Turn duration',key.turnMs ? (key.turnMs / 1000).toFixed(1) : '',0.5,0,60,'s')}
+    ${input('bend','Path bow',key.bend || 0,0.1,-10,10,'m')}
+    <label>Count shape <select data-key-field="ease">${options(EASES, key.ease || 'even')}</select></label>
+    <label>Pass-through station <input type="checkbox" data-key-field="pass" ${key.pass ? 'checked' : ''} ${ui.draft.stations[0]?.id === station.id ? 'disabled' : ''}></label>
+    ${key.phraseEnd ? `<label>Port de bras <input type="text" data-key-field="port" value="${escapeHtml(key.port || '')}"></label><label>Notes <input type="text" data-key-field="notes" value="${escapeHtml(key.notes || '')}" placeholder="head, eyes, focus"></label>` : '<button type="button" id="draftPhraseNotes" class="view-btn">End phrase / add phrase notes</button>'}
+    ${input('transitionMs','Transition duration',key.dur != null ? (key.dur / 1000).toFixed(2) : '',0.1,0,120,'s')}
     <button id="draftSaveKeyframe" class="view-btn">Save keyframe</button>`;
+  const notesButton = document.getElementById('draftPhraseNotes');
+  if (notesButton) notesButton.addEventListener('click', () => { station.keyframe = { ...station.keyframe, phraseEnd: true }; saveDraft(); renderPathStudio(); });
   document.getElementById('draftSaveKeyframe').addEventListener('click', () => {
-    station.keyframe = { pose: document.getElementById('draftPose').value, step: document.getElementById('draftStep').value, level: document.getElementById('draftLevel').value };
+    const next = { ...station.keyframe };
+    for (const el of editor.querySelectorAll('[data-key-field]')) {
+      const value = el.type === 'checkbox' ? (el.checked ? 'true' : '') : el.value;
+      const field = el.dataset.keyField;
+      if (el.type === 'checkbox') {
+        if (el.checked) next[field] = true; else delete next[field];
+      } else if (el.tagName === 'SELECT') {
+        if (field === 'plant' && value === 'auto') delete next.plant;
+        else if (field === 'ease' && value === 'even') delete next.ease;
+        else next[field] = value;
+      } else if (['port','notes'].includes(field)) {
+        if (value.trim()) next[field] = value.trim(); else delete next[field];
+      } else if (value === '') delete next[field];
+      else {
+        const number = Number(value);
+        if (Number.isFinite(number)) next[field === 'transitionMs' ? 'dur' : field] = ['turnMs','transitionMs'].includes(field) ? Math.round(number * 1000) : number;
+      }
+    }
+    if (Object.hasOwn(next, 'turnMs') && (!Number.isFinite(next.turnMs) || next.turnMs <= 0)) delete next.turnMs;
+    if (Object.hasOwn(next, 'dur') && (!Number.isFinite(next.dur) || next.dur <= 0)) delete next.dur;
+    if (next.turn === 0) delete next.turn;
+    if (next.bend === 0) delete next.bend;
+    station.keyframe = next;
     saveDraft(); renderPathStudio();
   });
 }
 
+function deleteRoutePoint(index) {
+  if (ui.draft.route.length <= 2 || index < 0 || index >= ui.draft.route.length) return;
+  ui.draft.route.splice(index, 1);
+  ui.draft.route = ui.draft.route.map((p, i, a) => ({ ...p, u: a.length > 1 ? i / (a.length - 1) : 0 }));
+  ui.draft.stations = [];
+  ui.selectedStationId = null;
+  ui.selectedRouteIndex = null;
+  saveDraft();
+  renderPathStudio();
+}
+
+function insertRoutePointBetween(aIndex, point) {
+  if (ui.draft.route.length >= 512 || aIndex < 0 || aIndex >= ui.draft.route.length - 1) return;
+  ui.draft.route.splice(aIndex + 1, 0, point);
+  ui.draft.route = ui.draft.route.map((p, i, a) => ({ ...p, u: a.length > 1 ? i / (a.length - 1) : 0 }));
+  ui.draft.stations = [];
+  saveDraft(); renderPathStudio();
+}
+
+function keyframePathAt(left, right, fraction) {
+  if (!left || !right || left === right) return { x: left?.x ?? right?.x ?? 0, y: left?.y ?? right?.y ?? 0 };
+  const shaped = countShape(right.keyframe || {}, fraction);
+  return curveAt(
+    { x: left.x, y: left.y },
+    { x: right.x, y: right.y, bend: right.keyframe?.bend },
+    shaped,
+  );
+}
 
 function renderDraftReview(show) {
-  if (!draftReviewEl || !ui.draft?.stations.length) { if (draftReviewEl) draftReviewEl.innerHTML = ''; return; }
+  if (!draftReviewEl) return;
   const draft = ui.draft;
+  if (!draft?.stations.length) { draftReviewEl.innerHTML = ''; return; }
   const results = [];
-  for (const station of draft.stations) {
+  const route = createRoutineRouteSampler(draft.route);
+  const intervals = Math.min(1024, Math.max(24, (draft.stations.length - 1) * 8));
+  const ordered = [...draft.stations].sort((a, b) => a.contentMs - b.contentMs);
+  const samples = Array.from({ length: intervals + 1 }, (_, i) => {
+    const u = intervals ? i / intervals : 0;
+    const at = ordered[0].contentMs + (ordered.at(-1).contentMs - ordered[0].contentMs) * u;
+    let hi = ordered.findIndex((s) => s.contentMs >= at);
+    if (hi < 0) hi = ordered.length - 1;
+    const lo = Math.max(0, hi - 1), left = ordered[lo], right = ordered[hi];
+    const fraction = right.contentMs > left.contentMs ? (at - left.contentMs) / (right.contentMs - left.contentMs) : 0;
+    const routePoint = route(u);
+    return { u, x: routePoint.x, y: routePoint.y, contentMs: at, left, right, fraction };
+  });
+  for (const sample of samples) {
+    const own = keyframePathAt(sample.left, sample.right, sample.fraction);
     for (const other of (show.cast || [])) {
       if (other.id === draft.dancerId || !(other.keys || []).length) continue;
-      const p = posOfContent(show, other, station.contentMs);
+function keyframePathAt(left, right, fraction) {
+  if (!left || !right || left === right) return { x: left?.x ?? right?.x ?? 0, y: left?.y ?? right?.y ?? 0 };
+  const shaped = countShape(right.keyframe || {}, fraction);
+  return curveAt(
+    { x: left.x, y: left.y },
+    { x: right.x, y: right.y, bend: right.keyframe?.bend },
+    shaped,
+  );
+}
+
+      const p = posOfContent(show, other, sample.contentMs);
       if (!p) continue;
-      const gap = Math.hypot(p.x - station.x, p.y - station.y);
-      if (gap < CLEARANCE) results.push({ station, name: other.name || 'Dancer', gap });
+      const gap = Math.hypot(p.x - own.x, p.y - own.y);
+      if (gap < CLEARANCE) results.push({ sample, name: other.name || 'Dancer', gap, kind: 'dancer' });
     }
     for (const obstacle of [...draft.obstacles, ...(show.scenery || []).filter((s) => s.kind === 'prop')]) {
       if (obstacle.kind !== 'prop') continue;
-      const dx = Math.max(Math.abs(station.x - obstacle.x) - obstacle.w / 2, 0);
-      const dy = Math.max(Math.abs(station.y - obstacle.y) - obstacle.d / 2, 0);
-      if (Math.hypot(dx, dy) < 0.35) results.push({ station, name: obstacle.name || 'prop', gap: null });
+      const propPoint = propPosOfContent(show, obstacle, sample.contentMs);
+      if (!propPoint) continue;
+      const dx = Math.max(Math.abs(own.x - propPoint.x) - obstacle.w / 2, 0);
+      const dy = Math.max(Math.abs(own.y - propPoint.y) - obstacle.d / 2, 0);
+      const gap = Math.hypot(dx, dy);
+      if (gap < CLEARANCE) results.push({ sample, name: obstacle.name || 'prop', gap, kind: 'prop' });
     }
   }
-  const unique = [...new Map(results.map((r) => [`${r.station.id}:${r.name}`, r])).values()];
-  draftReviewEl.innerHTML = '<p class="hint">Draft station checks · sampled points only</p>' + (unique.map((r) => `<div class="studio-row warn" data-warn="draft-${r.station.id}" role="button" tabindex="0" data-draft-warning="1" data-station="${r.station.id}"><span class="studio-name">Station ${draft.stations.indexOf(r.station) + 1} near ${escapeHtml(r.name)}</span><span class="studio-count">${r.gap == null ? 'review clearance' : `${r.gap.toFixed(2)} m`}</span></div>`).join('') || '<p class="hint">No sampled station conflicts with dancers or props. Route segments and flown scenery still need review.</p>');
+  const unique = [...new Map(results.map((r) => [`${r.name}:${Math.round(r.sample.contentMs / 100)}`, r])).values()];
+  const review = `<p class="hint">Advisory route sample: ${samples.length} points checked against dancer tracks and floor props. Time sampling is approximate; timed/flown scenery, body/limb clearance, movement quality, and ballet technique are not validated.</p>`;
+  draftReviewEl.innerHTML = review + (unique.map((r) => {
+    const closest = draft.stations.reduce((a, b) => Math.abs(b.contentMs-r.sample.contentMs) < Math.abs(a.contentMs-r.sample.contentMs) ? b : a);
+    return `<div class="studio-row warn" data-draft-warning="1" data-station="${closest.id}" role="button" tabindex="0"><span class="studio-name">Route near ${escapeHtml(r.name)} · ${fmtTime(r.sample.contentMs)}</span><span class="studio-count">${r.gap.toFixed(2)} m</span></div>`;
+  }).join('') || '<p class="hint">No sampled route conflicts found. This advisory check does not assess timed/flown scenery or ballet technique.</p>');
 }
 
 function addDraftObstacle(point = null) {
@@ -335,40 +457,37 @@ function sendDraftToShow() {
   const dancer = (state.show.cast || []).find((d) => d.id === draft.dancerId);
   if (!dancer || !draft.stations.length) return;
   const occupied = (dancer.keys || []).length > 0;
-  const oldKeys = (dancer.keys || []).map((key) => ({ ...key }));
-  const oldLocalData = {
-    footTrajectory: dancer.footTrajectory ? structuredClone(dancer.footTrajectory) : null,
-    holds: holdsFor(state.show, dancer.id).length,
-  };
   if (occupied) {
-    const preview = oldKeys.length > 3 ? `${oldKeys.length} existing keys` : 'existing choreography';
-    const choice = window.prompt(`${dancer.name || 'This dancer'} has ${preview}. Type REPLACE to replace this dancer’s full routine, or enter another dancer’s name/number/ID to assign the draft instead.`);
+    const choice = window.prompt(`${dancer.name || 'This dancer'} already has choreography. Type REPLACE to replace this dancer’s full routine, or enter another dancer’s name/number/ID to assign this draft instead.`);
     if (choice !== 'REPLACE') {
       const alternate = state.show.cast.find((d) => d.id === choice || String(d.number) === choice || String(d.name || '').toLowerCase() === String(choice || '').toLowerCase());
       if (alternate && alternate.id !== dancer.id) {
         draft.dancerId = alternate.id; saveDraft(); renderPathStudio();
         draftStatusEl.textContent = `Draft assigned to ${alternate.name || 'another dancer'}. Send again to stage.`;
-      } else draftStatusEl.textContent = 'Send canceled. Type REPLACE exactly to confirm replacing choreography, or choose a different dancer.';
+      } else draftStatusEl.textContent = 'Send canceled. Type REPLACE exactly to confirm replacing the full routine, or choose a different dancer.';
+      return;
+    }
+    const ownsLocal = dancer.footTrajectory || dancer.holds || holdsFor(state.show, dancer.id).length;
+    if (!window.confirm(`Replace ${dancer.name || 'this dancer'}’s full routine${ownsLocal ? ', including dancer-owned foot choreography and holds' : ''}? Their identity and settings will be preserved.`)) {
+      draftStatusEl.textContent = 'Send canceled. Draft and show remain unchanged.';
       return;
     }
   }
-  const start = draft.stations[0].contentMs;
-  const end = draft.stations.at(-1).contentMs;
-  if (occupied && (oldLocalData.footTrajectory || oldLocalData.holds) && !window.confirm('This routine also owns local foot choreography or holds. Replace the dancer’s full routine, including those items?')) {
-    draftStatusEl.textContent = 'Send canceled. Draft and show were left unchanged.';
-    return;
-  }
   commit();
   const liveDancer = state.show.cast.find((d) => d.id === dancer.id);
-  const newKeys = draft.stations.map((s, i) => {
+  const localKeys = draft.stations.map((s, i) => {
     const local = Math.max(0, localOfContent(state.show, liveDancer.id, s.contentMs));
+    const keyframe = { ...(s.keyframe || {}) };
+    if (keyframe.transitionMs) keyframe.dur = keyframe.transitionMs;
+    delete keyframe.transitionMs;
     return {
       t: local, x: s.x, y: s.y,
-      ...(s.keyframe || {}),
+      ...keyframe,
       ...(i === draft.stations.length - 1 ? { phraseEnd: true } : {}),
     };
   });
-  liveDancer.keys = newKeys.sort((a, b) => a.t - b.t);
+  const newKeys = localKeys.map((k) => ({ ...k }));
+  liveDancer.keys = newKeys;
   if (occupied) {
     delete liveDancer.footTrajectory;
     delete liveDancer.footTrajectoryRange;
@@ -385,7 +504,10 @@ function sendDraftToShow() {
   saveDraft();
   closePathStudio();
   draftStatusEl.textContent = 'Routine and draft scenery sent to the show. Undo restores the previous routine and scenery.';
+  state.ui.hint = draftStatusEl.textContent;
+  state.ui.dirtyPanels = true;
   ui.deps.rebuild();
+
 }
 
 
@@ -394,10 +516,27 @@ function onPlanPointerDown(event) {
   const point = stagePointFromEvent(event);
   if (!point) return;
   if (ui.activeTool === 'route') {
+    const near = ui.draft.route.map((p, i) => ({ i, d: Math.hypot(point.x - p.x, point.y - p.y) })).sort((a, b) => a.d - b.d)[0];
+    if (near && near.d <= Math.max(0.22, 12 / planTransform.s)) {
+      ui.selectedRouteIndex = near.i; ui.routeDragIndex = near.i;
+      canvas.setPointerCapture(event.pointerId); renderPathStudio(); return;
+    }
+    if (event.detail >= 2 && ui.draft.route.length >= 2) {
+      let best = { index: -1, distance: Infinity };
+      for (let i = 0; i < ui.draft.route.length - 1; i++) {
+        const a = ui.draft.route[i], b = ui.draft.route[i + 1], dx = b.x-a.x, dy = b.y-a.y;
+        const u = clamp(((point.x-a.x)*dx+(point.y-a.y)*dy)/(dx*dx+dy*dy || 1),0,1);
+        const d = Math.hypot(point.x-(a.x+dx*u),point.y-(a.y+dy*u));
+        if (d < best.distance) best = { index:i, distance:d };
+      }
+      if (best.distance <= Math.max(0.35, 18 / planTransform.s)) { insertRoutePointBetween(best.index, point); return; }
+    }
     if (!ui.routeDraw) { ui.routeDraw = []; ensureDraft().stations = []; }
     if (ui.routeDraw.length >= 512) return;
     ui.routeDraw.push(point);
     ensureDraft().route = ui.routeDraw.map((p, i, a) => ({ ...p, u: a.length > 1 ? i / (a.length - 1) : 0 }));
+    ui.draft.stations = [];
+    ui.selectedRouteIndex = ui.draft.route.length - 1;
     saveDraft();
     renderPathStudio();
   } else if (ui.activeTool === 'obstacle') {
@@ -420,6 +559,14 @@ function onPlanPointerDown(event) {
 }
 
 function onPlanPointerMove(event) {
+  if (ui.routeDragIndex != null) {
+    const p = stagePointFromEvent(event);
+    if (!p || !ui.draft.route[ui.routeDragIndex]) return;
+    ui.draft.route[ui.routeDragIndex] = { ...p, u: ui.routeDragIndex / Math.max(1, ui.draft.route.length - 1) };
+    ui.draft.stations = [];
+    drawPlan(state.show);
+    return;
+  }
   if (!ui.drag) return;
   const p = stagePointFromEvent(event);
   const obstacle = ensureDraft().obstacles.find((o) => o.id === ui.drag.id);
@@ -430,6 +577,9 @@ function onPlanPointerMove(event) {
 }
 
 function onPlanPointerUp() {
+  if (ui.routeDragIndex != null) {
+    ui.routeDragIndex = null; ui.routeDraw = null; saveDraft(); renderPathStudio(); return;
+  }
   if (!ui.drag) return;
   ui.drag = null;
   saveDraft();
@@ -609,8 +759,11 @@ function drawPlan(show) {
       if (i) ctx.lineTo(toX(p.x), toY(p.y)); else ctx.moveTo(toX(p.x), toY(p.y));
     }
     ctx.strokeStyle = '#61c5a5'; ctx.lineWidth = 2.5; ctx.setLineDash([7, 5]); ctx.stroke(); ctx.setLineDash([]);
-    for (const p of draft.route) {
-      ctx.fillStyle = '#61c5a5'; ctx.beginPath(); ctx.arc(toX(p.x), toY(p.y), 3.5, 0, Math.PI * 2); ctx.fill();
+    for (const [i, p] of draft.route.entries()) {
+      const selected = ui.selectedRouteIndex === i;
+      ctx.fillStyle = selected ? '#f07f42' : '#61c5a5'; ctx.strokeStyle = '#10151d'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(toX(p.x), toY(p.y), selected ? 6 : 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#d8e0ea'; ctx.font = '10px system-ui, sans-serif'; ctx.fillText(`P${i + 1}`, toX(p.x) + 7, toY(p.y) + 12);
     }
     for (const [i, p] of draft.stations.entries()) {
       const selected = p.id === ui.selectedStationId;

@@ -588,6 +588,15 @@ body.watch #stage { cursor: default; }
 .studio-row.on { background: var(--panel2); box-shadow: inset 2px 0 0 var(--accent); }
 .studio-row.off .studio-name, .studio-row.off .studio-count { opacity: .45; }
 .studio-row .swatch { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.studio-keyframe, .studio-route-editor { display: grid; gap: 7px; }
+.studio-keyframe > label { display: grid; grid-template-columns: minmax(75px, .8fr) minmax(0, 1fr); align-items: center; gap: 6px; color: var(--dim); font-size: 11px; }
+.studio-keyframe .field-inline { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.studio-keyframe .field-inline input { width: 100%; min-width: 0; }
+.studio-keyframe .field-inline input[type="checkbox"] { width: auto; }
+.route-point-list { display: grid; grid-template-columns: minmax(0, 1fr) 30px 30px; gap: 4px; }
+.route-point-list button { min-width: 0; padding: 4px 7px; font-size: 10px; }
+.route-point-list button.on { border-color: var(--accent); }
+
 .studio-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .studio-count { color: var(--dim); font-size: 11px; white-space: nowrap; }
 .studio-row .eye { flex: none; min-width: 28px; padding: 2px 0; }

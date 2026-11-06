@@ -40,7 +40,7 @@ export function normalizeRoutineDraft(value) {
       count: Math.max(0, finite(s.count, i)),
       contentMs: Math.max(0, Math.round(Number(s.contentMs))),
       x: clamp(Number(s.x), -100, 100), y: clamp(Number(s.y), -100, 100),
-      keyframe: copyJsonObject(s.keyframe),
+      keyframe: normalizeKeyframe(s.keyframe),
     }))
     .sort((a, b) => a.contentMs - b.contentMs);
   return {
@@ -57,6 +57,17 @@ export function normalizeRoutineDraft(value) {
 function copyJsonObject(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   try { return JSON.parse(JSON.stringify(value)); } catch { return {}; }
+}
+
+const KEY_STRING_FIELDS = new Set(['pose','step','level','plant','ease','port','notes']);
+const KEY_BOOLEAN_FIELDS = new Set(['phraseEnd','pass']);
+const KEY_NUMBER_FIELDS = new Set(['turn','turnMs','bend','lift','absorb','dur']);
+function normalizeKeyframe(value) {
+  const raw = copyJsonObject(value), out = {};
+  for (const key of KEY_STRING_FIELDS) if (typeof raw[key] === 'string' && raw[key].length <= 240) out[key] = raw[key];
+  for (const key of KEY_BOOLEAN_FIELDS) if (raw[key] === true) out[key] = true;
+  for (const key of KEY_NUMBER_FIELDS) if (raw[key] !== '' && Number.isFinite(Number(raw[key]))) out[key] = Number(raw[key]);
+  return out;
 }
 
 // Catmull-Rom interpolation gives a smooth, endpoint-pinned route through authored points.
