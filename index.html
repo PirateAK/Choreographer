@@ -5,9 +5,32 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Choreographer</title>
 <link rel="icon" type="image/png" href="favicon.png" />
-<link rel="stylesheet" href="styles.css?v=scroll37" />
+<link rel="stylesheet" href="styles.css?v=studio1" />
 </head>
 <body>
+<section id="studio" class="studio" role="dialog" aria-label="Path studio" hidden>
+  <header class="studio-head">
+    <strong class="studio-title">Path studio</strong>
+    <span id="studioSub" class="hint"></span>
+    <div class="studio-tools">
+      <button id="studioMirror" class="view-btn" title="Mirror the selected dancer's path left to right across centre stage">⇄ Mirror path</button>
+      <button id="studioZoomOut" class="view-btn" title="Zoom out">−</button>
+      <button id="studioZoomIn" class="view-btn" title="Zoom in">+</button>
+    </div>
+    <button id="studioClose" class="view-btn" title="Back to the show (Esc)">Done</button>
+  </header>
+  <div class="studio-body">
+    <aside class="studio-side" aria-label="Dancers">
+      <h3>Dancers</h3>
+      <div id="studioCast" class="list"></div>
+    </aside>
+    <div class="studio-plan"><canvas id="studioCanvas" aria-label="Stage plan with dancers' paths"></canvas></div>
+    <aside class="studio-side" aria-label="Collisions">
+      <h3>Collisions <span id="studioWarnCount" class="count">—</span></h3>
+      <div id="studioWarn" class="list"></div>
+    </aside>
+  </div>
+</section>
 <header>
   <h1>Choreographer</h1>
   <input id="showName" class="show-name" value="Untitled show" aria-label="Show name" />
@@ -116,6 +139,7 @@
         <button id="btnFillElev" class="view-tab" role="tab" aria-selected="false" title="Side elevation: heights, levels and flying">Elevation</button>
       </div>
       <div class="stage-tools" aria-label="Overhead stage controls">
+        <button id="btnStudio" class="view-btn" aria-pressed="false" title="Path studio: a full-screen plan to draw, hide and check each dancer's path">Path studio</button>
         <button id="btnPaths" class="view-btn on" aria-pressed="true" title="Show or hide movement lines">Paths</button>
         <button id="btnStations" class="view-btn on" aria-pressed="true" title="Show or hide station points">Stations</button>
         <button id="btnCostumes" class="view-btn" aria-pressed="false" title="Show or hide overhead costume shapes">Costumes</button>
@@ -301,7 +325,8 @@
 
 <script type="importmap">
 {"imports": {
-  "./src/app.js": "./src/app.js?v=autoplace1",
+  "./src/app.js": "./src/app.js?v=studio1",
+  "./src/path-studio.js": "./src/path-studio.js?v=studio1",
   "./src/music.js": "./src/music.js?v=beat1",
   "./src/stage.js": "./src/stage.js?v=autoplace1",
   "./src/cheatsheet.js": "./src/cheatsheet.js?v=guide24",

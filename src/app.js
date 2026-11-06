@@ -23,6 +23,7 @@ import {
   phraseShape, addPhrase, countGrid, tempoFromTaps, phraseRuns, localAtCount, phrasePlan, timelineScrollRange,
 } from './model.js';
 import { StageView } from './stage.js';
+import { initPathStudio, renderPathStudio } from './path-studio.js';
 import { MoveSheet } from './cheatsheet.js';
 import { conventionRows, setConvention, resetConvention, getApprover, setApprover, approveConvention, revokeApproval, previewSummary } from './conventions.js';
 import { specOf } from './pose.js';
@@ -968,6 +969,7 @@ function renderSlides() {
 }
 
 function rebuildPanels() {
+  renderPathStudio();
   $('showName').value = state.show.name;
   $('stWidth').value = state.show.stage.width;
   $('stDepth').value = state.show.stage.depth;
@@ -4876,6 +4878,7 @@ function boot() {
     app.rebuild();
   });
   $('btnHold').addEventListener('click', addHold);
+  initPathStudio({ rebuild: () => app.rebuild() });
   $('btnPause').addEventListener('click', addPause);
   $('btnEnd').addEventListener('click', addEnd);
   $('zoomIn').addEventListener('click', () => {
