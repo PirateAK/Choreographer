@@ -3749,28 +3749,31 @@ export function scanOverlaps(show) {
     .map((o, i) => ({ ...o, id: 'ov' + i, at: Math.round(o.at) }));
 }
 
-// Where a curtain's cloth covers the stage at a moment: the legs hang at the outer edges
-// of its span, so a point is covered when its distance from the centre lies within the
-// leg. Shut, the legs reach the centre and cover the whole span; open, only the stack at
-// the edges is left. Taken from the same leg width the stage draws, so the warning and the
-// picture agree without a threshold of our own.
-export function curtainCovers(item, ct, x) {
-  if (!item || item.kind !== 'curtain') return false;
+// Where a piece of cloth covers the stage at a moment. A curtain's legs hang at the outer
+// edges of its span: a point is covered when its distance from the centre lies within the
+// leg. Shut, the legs reach the centre and cover the whole span; open, only the stack at the
+// edges is left. A drop covers its whole span while it is drawn on the plan (flown fully
+// out, it is not), using the same 0.02 cutoff the stage draws it with. A screen is a drop.
+export function clothCovers(item, ct, x) {
+  if (!item) return false;
   const span = clothSpan(item);
   const half = Math.max(0.3, span / 2);
-  const open = sceneryStateAt(item, ct).open;
-  const legW = curtainLegW(span, open);
   const d = Math.abs(x - clothX(item));
+  if (item.kind === 'drop') {
+    return sceneryStateAt(item, ct).fly > 0.02 && d <= half;
+  }
+  if (item.kind !== 'curtain') return false;
+  const legW = curtainLegW(span, sceneryStateAt(item, ct).open);
   return d >= half - legW && d <= half;
 }
 
-// Every moment a performer crosses a curtain's line at a point the cloth covers. The
-// crossing is sampled on the same clock as the overlap scan, so a crossing is reported at
-// the first sample on the far side of the line. Props are not checked.
-export function scanCurtainCrossings(show) {
-  const curtains = (show.scenery || []).filter((s) => s.kind === 'curtain');
+// Every moment a performer crosses a piece of cloth's line at a point it covers: curtains,
+// drops and screens. The crossing is sampled on the same clock as the overlap scan, so it is
+// reported at the first sample on the far side of the line. Props are not checked.
+export function scanClothCrossings(show) {
+  const cloth = (show.scenery || []).filter((s) => s.kind === 'curtain' || s.kind === 'drop');
   const dancers = (show.cast || []).filter((d) => !isProp(d) && (d.keys || []).length);
-  if (!curtains.length || !dancers.length) return [];
+  if (!cloth.length || !dancers.length) return [];
   const end = Math.max(1000, endContent(show) + 500);
   const step = Math.max(80, Math.round(end / 5000));
   const out = [];
@@ -3780,15 +3783,15 @@ export function scanCurtainCrossings(show) {
       const p = posOfContent(show, d, ct);
       if (!p) { prev = null; continue; }
       if (prev) {
-        for (const c of curtains) {
+        for (const c of cloth) {
           const depth = clothDepth(c);
           const was = prev.p.y - depth;
           const now = p.y - depth;
           if (was === 0 || now === 0 || (was < 0) === (now < 0)) continue;
           const f = was / (was - now);
           const x = prev.p.x + (p.x - prev.p.x) * f;
-          if (!curtainCovers(c, ct, x)) continue;
-          out.push({ kind: 'curtain', dancerId: d.id, sceneryId: c.id, ids: [d.id], name: c.name || 'Curtain', at: ct, x, y: depth });
+          if (!clothCovers(c, ct, x)) continue;
+          out.push({ kind: c.kind === 'drop' ? (c.screen ? 'screen' : 'drop') : 'curtain', dancerId: d.id, sceneryId: c.id, ids: [d.id], name: c.name || 'Cloth', at: ct, x, y: depth });
         }
       }
       prev = { p, ct };

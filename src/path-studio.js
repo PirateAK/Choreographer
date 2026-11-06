@@ -4,7 +4,7 @@
 
 import {
   state, commit, findObject, mirrorPathLeftRight, scanOverlaps,
-  posOfContent, pathsKey, CLEARANCE, scanCurtainCrossings, curtainCovers, clothDepth,
+  posOfContent, pathsKey, CLEARANCE, scanClothCrossings, clothCovers, clothDepth,
 } from './model.js';
 
 const ZOOM_MIN = 0.6;
@@ -147,17 +147,18 @@ function currentScan(show) {
 
 function renderWarnings(show) {
   const scan = currentScan(show);
-  const curtains = scanCurtainCrossings(show);
+  const curtains = scanClothCrossings(show);
   const all = [...scan, ...curtains].sort((a, b) => a.at - b.at);
   ui.warnings = all;
   warnCount.textContent = all.length ? String(all.length) : 'none';
   warnEl.innerHTML = all.map((o) => {
-    if (o.kind === 'curtain') {
+    if (o.sceneryId) {
       const d = findObject(show, o.dancerId);
       const who = escapeHtml((d && d.name) || 'Dancer');
+      const what = o.kind === 'curtain' ? 'curtain closed' : (o.kind === 'screen' ? 'screen hanging' : 'drop hanging');
       return `<div class="studio-row warn curtain" data-warn="${o.id}" role="button" tabindex="0">
         <span class="studio-name">${who} through ${escapeHtml(o.name)}</span>
-        <span class="studio-count">${(o.at / 1000).toFixed(2)} s · curtain closed</span>
+        <span class="studio-count">${(o.at / 1000).toFixed(2)} s · ${what}</span>
       </div>`;
     }
     const names = o.ids.map((id) => {
@@ -234,16 +235,16 @@ function drawPlan(show) {
     ctx.globalAlpha = 1;
   }
 
-  // Curtains: the cloth that covers the stage at the playhead, drawn as a bar at its depth,
-  // and each crossing that the list reports as a cross.
+  // Cloth: the parts that cover the stage at the playhead, drawn as bars at their depth, and
+  // each crossing the list reports as a cross.
   const now = state.ui.playhead || 0;
   ctx.strokeStyle = '#ffb703';
   ctx.lineWidth = 3;
-  for (const c of (show.scenery || []).filter((s) => s.kind === 'curtain')) {
+  for (const c of (show.scenery || []).filter((s) => s.kind === 'curtain' || s.kind === 'drop')) {
     const y = clothDepth(c);
     let run = null;
     for (let x = -sw; x <= sw + 1e-6; x += 0.1) {
-      const on = curtainCovers(c, now, x);
+      const on = clothCovers(c, now, x);
       if (on && run === null) run = x;
       if (!on && run !== null) {
         ctx.beginPath(); ctx.moveTo(toX(run), toY(y)); ctx.lineTo(toX(x - 0.1), toY(y)); ctx.stroke();
@@ -255,7 +256,7 @@ function drawPlan(show) {
   ctx.strokeStyle = '#ffb703';
   ctx.lineWidth = 2;
   for (const o of ui.warnings) {
-    if (o.kind !== 'curtain') continue;
+    if (!o.sceneryId) continue;
     const r = 5;
     ctx.beginPath();
     ctx.moveTo(toX(o.x) - r, toY(o.y) - r); ctx.lineTo(toX(o.x) + r, toY(o.y) + r);
