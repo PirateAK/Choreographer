@@ -16,7 +16,7 @@ import {
   addLight, removeLight, addLightCue, updateLightCue, removeLightCue, lightLevelAt,
   LIGHT_TYPES, LIGHT_GOBOS, LIGHT_GELS, LIGHT_SPREAD_BY_TYPE,
   scenesOf, sceneAt, sceneRanges, addScene, removeScene, clampSceneOffsets, updateCue,
-  addCostume, removeCostume, COSTUME_STYLES, BEND_LIMIT, LEVELS, AIR_LIFT, LIFT_MAX, levelOf, ABSORB_MAX,
+  addCostume, removeCostume, COSTUME_STYLES, BEND_LIMIT, LEVELS, AIR_LIFT, LIFT_MAX, levelOf, ABSORB_MAX, DANCER_HEIGHT_MIN, DANCER_HEIGHT_MAX,
   POSE_LABEL, STEP_LABEL, LEVEL_LABEL, EASES, EASE_LABEL,
   plantsOf, plantProblem, footSkate, legOverreach, PLANT_LABEL, rolesOf, setRole,
   scanOverlaps, overlapFix, applyOverlapFix, pathsKey, CLEARANCE,
@@ -1565,6 +1565,11 @@ function inspectorHTML() {
         <select data-f="fill">${FILLS.map((f) => `<option value="${f}" ${f === d.fill ? 'selected' : ''}>${f}</option>`).join('')}</select>
       </div>
       <div class="row">
+        <span class="label">Height</span>
+        <input type="number" data-f="heightM" min="1" max="2.4" step="0.01" value="${Number.isFinite(Number(d.heightM)) && Number(d.heightM) > 0 ? Number(d.heightM) : ''}" placeholder="${state.show.stage.dancerH.toFixed(2)}" style="max-width:72px" aria-label="Dancer height in metres" title="Height in metres. Blank uses the show's dancer height (${state.show.stage.dancerH.toFixed(2)} m)" />
+        <span class="label">m</span>
+      </div>
+      <div class="row">
         <span class="label">${d.keys.length} keyframes</span>
         <button class="del" data-act="del-dancer">remove</button>
       </div>
@@ -2645,6 +2650,17 @@ function bindPanelEvents() {
     // A field carrying a station index belongs to that station: a select here fires
     // `input` as well as `change`, and the station's own handler writes it.
     if (e.target.dataset.i != null) return;
+    if (f === 'heightM') {
+      // Blank hands the dancer back to the show's height; a number is clamped to the
+      // range the body model is drawn and measured in.
+      const raw = String(e.target.value).trim();
+      const v = Number(raw);
+      if (raw === '') delete d.heightM;
+      else if (Number.isFinite(v) && v > 0) d.heightM = Math.max(DANCER_HEIGHT_MIN, Math.min(DANCER_HEIGHT_MAX, v));
+      else return;
+      persist();
+      return;
+    }
     if (f === 'w' || f === 'd') d[f] = Math.max(0.2, Number(e.target.value) || 0.2);
     else if (f === 'h') d.h = Math.max(0.1, Math.min(6, Number(e.target.value) || 0.8));
     else d[f] = e.target.value;

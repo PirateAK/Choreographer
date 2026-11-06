@@ -3111,7 +3111,16 @@ const FOOT_SKATE = 0.05;
 // A leg shorter than this did not travel, so it is a change of position rather than a step.
 const STANDING_LEG = 0.15;
 
-export function dancerHeight(show) {
+// A dancer may carry their own height in metres (`heightM`). Left blank, the dancer is the
+// show's default, so every existing show draws and measures exactly as before.
+export const DANCER_HEIGHT_MIN = 1.0;
+export const DANCER_HEIGHT_MAX = 2.4;
+
+export function dancerHeight(show, dancer) {
+  const own = Number(dancer && dancer.heightM);
+  if (dancer && Number.isFinite(own) && own > 0) {
+    return Math.max(DANCER_HEIGHT_MIN, Math.min(DANCER_HEIGHT_MAX, own));
+  }
   const h = Number(show && show.stage && show.stage.dancerH);
   return Number.isFinite(h) ? h : 1.7;
 }
@@ -3154,7 +3163,7 @@ export function plantsOf(dancer) {
 export function footAtLocal(show, dancer, lt, side = 'left') {
   const p = posAtLocal(dancer, lt);
   if (!p) return null;
-  const h = dancerHeight(show);
+  const h = dancerHeight(show, dancer);
   const at = poseAtLocal(dancer, lt);
   const spec = blendSpecs(specOf(at.pose), specOf(at.next), at.t);
   const i = side === 'right' ? 1 : 0;
@@ -3209,7 +3218,7 @@ export function footPinsFromTrajectory(show, dancer, lt, trajectory) {
   if (!body || !trajectory || typeof trajectory !== 'object') return null;
   const sample = sampleFootTrajectory(trajectory, lt);
   if (!sample) return null;
-  const h = dancerHeight(show), at = poseAtLocal(dancer, lt);
+  const h = dancerHeight(show, dancer), at = poseAtLocal(dancer, lt);
   const frame = contactFrame(body, h, at.facing, at.turn), out = {};
   for (const side of ['left', 'right']) {
     const target = sample[side];
@@ -3229,7 +3238,7 @@ function legacyFootPins(show, dancer, lt) {
   const a = keys[idx];
   const b = keys[idx + 1] || null;
   const body = posAtLocal(dancer, lt) || { x: a.x, y: a.y };
-  const h = dancerHeight(show);
+  const h = dancerHeight(show, dancer);
   const plants = plantsOf(dancer);
   const u = b ? Math.max(0, Math.min(1, (lt - a.t) / (b.t - a.t || 1))) : 1;
   // Weight is on the departure foot for the first third of the leg and on the arrival foot for the
@@ -3403,7 +3412,7 @@ export function withGeneratedWalk(show, dancer, destinationIndex, opts = {}) {
 // carrying her. With no pin — no path, or the whole dancer in the air — this is the position's own
 // feet, so nothing that does not step changes.
 export function feetOnFloor(show, dancer, lt) {
-  const h = dancerHeight(show);
+  const h = dancerHeight(show, dancer);
   const pins = footPins(show, dancer, lt);
   const out = {};
   for (const side of ['left', 'right']) {
@@ -3434,7 +3443,7 @@ export function feetOnFloor(show, dancer, lt) {
 // off the deck in metres (a jump), not the start level's.
 export function evaluateMovement(show, dancer, lt) {
   const at = poseAtLocal(dancer, lt);
-  const h = dancerHeight(show);
+  const h = dancerHeight(show, dancer);
   const lvl = levelBlend(at.level, at.nextLevel, at.levelT);
   const posed = blendSpecs(specOf(at.pose), specOf(at.next), at.t);
   const spec = { ...posed, rise: (posed.rise || 0) + lvl.rise - lvl.absorb / h };
@@ -3505,7 +3514,7 @@ export function legOverreach(show, dancer, i) {
   const a = keys[i - 1];
   const b = keys[i];
   if (!a || !b) return null;
-  const h = dancerHeight(show);
+  const h = dancerHeight(show, dancer);
   let worst = null;
   const steps = 16;
   for (let s = 0; s <= steps; s++) {

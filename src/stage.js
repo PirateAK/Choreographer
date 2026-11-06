@@ -497,7 +497,7 @@ export class StageView {
     const dancer = findObject(state.show, guide.id);
     const origin = dancer && dancer.keys[dancer.keys.length - 1];
     if (!origin) return;
-    const range = placementRange({ ...guide, height: dancerHeight(state.show) });
+    const range = placementRange({ ...guide, height: dancerHeight(state.show, dancer) });
     const ctx = this.ctx;
     ctx.save();
     if (range) {
@@ -528,7 +528,7 @@ export class StageView {
     const text = range
       ? `Draft · ${range.label} · teal ${range.comfortableMin.toFixed(2)}–${range.comfortableMax.toFixed(2)} m · amber to ${range.stretchMax.toFixed(2)} m`
       : 'Draft · no distance estimate for this move';
-    const sub = `${(guide.durationMs / 1000).toFixed(2)} s · ${dancerHeight(state.show).toFixed(2)} m show height · not a technique limit · Esc cancels`;
+    const sub = `${(guide.durationMs / 1000).toFixed(2)} s · ${dancerHeight(state.show, dancer).toFixed(2)} m show height · not a technique limit · Esc cancels`;
     const boxW = Math.max(ctx.measureText(text).width, ctx.measureText(sub).width) + 20;
     ctx.fillStyle = 'rgba(12,20,29,.94)'; ctx.fillRect(12, 12, boxW, 47);
     ctx.fillStyle = '#b9eadd'; ctx.fillText(text, 22, 31);
@@ -737,7 +737,7 @@ export class StageView {
     if (!solved) return;
     const ctx = this.ctx;
     const { at, figure, frame } = solved;
-    const h = dancerHeight(state.show);
+    const h = dancerHeight(state.show, d);
     const angle = (Number(at.turn) || 0) * Math.PI / 180;
     const mirror = at.facing < 0 ? -1 : 1;
     const project = (x, z, height = 0) => {
@@ -943,7 +943,7 @@ export class StageView {
       const p = posOfContent(show, d, state.ui.playhead);
       if (!p) continue;
       const sp = this.w2s(p.x, p.y);
-      const top = this.w2s(p.x, p.y, dancerHeight(show));
+      const top = this.w2s(p.x, p.y, dancerHeight(show, d));
       if (distToSegment(px, py, sp.x, sp.y, top.x, top.y) < Math.max(11, 0.3 * this.scale)) return d;
     }
     return null;
