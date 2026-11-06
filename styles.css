@@ -742,7 +742,7 @@ body.watch #stage { cursor: default; }
 /* A reference laid over the stage: the point being edited stays behind it, so a move can be
    tried, looked at and changed without losing the place in the path. */
 .moves-sheet {
-  position: fixed; inset: 0; z-index: 40;
+  position: fixed; inset: 0; z-index: 950;
   display: flex; align-items: center; justify-content: center;
   background: rgba(4, 7, 11, 0.72);
 }

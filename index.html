@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Choreographer</title>
 <link rel="icon" type="image/png" href="favicon.png" />
-<link rel="stylesheet" href="styles.css?v=studio1" />
+<link rel="stylesheet" href="styles.css?v=studio2" />
 </head>
 <body>
 <section id="studio" class="studio" role="dialog" aria-label="Path studio" hidden>
@@ -13,6 +13,7 @@
     <strong class="studio-title">Path studio</strong>
     <span id="studioSub" class="hint"></span>
     <div class="studio-tools">
+      <button id="studioMoves" class="view-btn" title="The movement cheat sheet: click a position, step or level to put it on the point being edited">Moves</button>
       <button id="studioMirror" class="view-btn" title="Mirror the selected dancer's path left to right across centre stage">⇄ Mirror path</button>
       <button id="studioZoomOut" class="view-btn" title="Zoom out">−</button>
       <button id="studioZoomIn" class="view-btn" title="Zoom in">+</button>
@@ -325,7 +326,7 @@
 
 <script type="importmap">
 {"imports": {
-  "./src/app.js": "./src/app.js?v=studio1",
+  "./src/app.js": "./src/app.js?v=studio2",
   "./src/path-studio.js": "./src/path-studio.js?v=studio1",
   "./src/music.js": "./src/music.js?v=beat1",
   "./src/stage.js": "./src/stage.js?v=autoplace1",

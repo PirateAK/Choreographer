@@ -4896,6 +4896,7 @@ function boot() {
   });
 
   $('btnMoves').addEventListener('click', () => app.openMoves());
+  $('studioMoves').addEventListener('click', () => app.openMoves());
   $('btnMovesClose').addEventListener('click', () => moves && moves.close());
   const aboutSheet = $('aboutSheet');
   const closeAbout = () => { aboutSheet.hidden = true; $('btnAbout').focus(); };
