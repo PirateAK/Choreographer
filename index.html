@@ -28,6 +28,8 @@
     <div class="studio-plan"><canvas id="studioCanvas" aria-label="Stage plan with dancers' paths"></canvas></div>
     <aside class="studio-side" aria-label="Collisions">
       <h3>Collisions <span id="studioWarnCount" class="count">—</span></h3>
+      <div class="btn-row studio-overlap-tools"><button id="btnScanOverlaps" class="view-btn" title="Scan the whole running order for dancer-to-dancer overlaps">Find overlaps</button></div>
+      <p class="hint studio-overlap-hint">A whole-show scan finds moments when two dancers come within 0.55 m. Click a warning to go to that moment; Fix applies the suggested path change, and Undo restores it.</p>
       <div id="studioWarn" class="list"></div>
     </aside>
   </div>
@@ -192,15 +194,6 @@
       <p class="hint">Dancers are movement tracks. Groups (such as Audience) are organizational cast entries for now, not stage objects. Ctrl-click an eye to keep more than one dancer on stage.</p>
     </section>
 
-    <section class="overlap-section">
-      <h2>Overlaps <span id="overlapCount" class="count">—</span></h2>
-      <div class="btn-row">
-        <button id="btnScanOverlaps" title="Look through the whole running order for two performers inside the clearance">Find overlaps</button>
-      </div>
-      <div id="overlapList" class="list"></div>
-      <p class="hint">Two bodies closer than 0.55 m — the same test the run-through stops on, but read across the whole show instead of only where the clock happens to run. A fix moves the least it can and re-checks the feet it might pull: it is a normal edit, so <b>Undo</b> puts the path back exactly as it was.</p>
-    </section>
-
     <section class="green-room">
       <h2>Green room <span id="costumeCount" class="count">0</span></h2>
       <div class="btn-row"><button id="btnAddCostume">+ Costume</button></div>
@@ -327,7 +320,7 @@
 <script type="importmap">
 {"imports": {
   "./src/app.js": "./src/app.js?v=studio5",
-  "./src/path-studio.js": "./src/path-studio.js?v=studio5",
+  "./src/path-studio.js": "./src/path-studio.js?v=studio6",
   "./src/music.js": "./src/music.js?v=beat1",
   "./src/stage.js": "./src/stage.js?v=studio5",
   "./src/cheatsheet.js": "./src/cheatsheet.js?v=guide24",

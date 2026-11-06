@@ -585,8 +585,14 @@ body.watch #stage { cursor: default; }
 .studio-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .studio-count { color: var(--dim); font-size: 11px; white-space: nowrap; }
 .studio-row .eye { flex: none; min-width: 28px; padding: 2px 0; }
+.studio-side .studio-overlap-tools { margin: 0 0 8px; }
+.studio-side .studio-overlap-hint { margin: 0 0 10px; }
 .studio-row.warn { align-items: flex-start; flex-wrap: wrap; }
 .studio-row.warn .studio-name { flex-basis: 100%; }
+.studio-row.warn.overlap { cursor: default; }
+.studio-row.warn.overlap .studio-count { margin-right: auto; }
+.studio-fix-label { flex: 1 1 100%; min-width: 0; color: var(--dim); font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studio-row .studio-fix { flex: none; min-width: auto; padding: 3px 9px; font-size: 10px; }
 
 
 .stage-hint {

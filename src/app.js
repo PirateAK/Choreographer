@@ -19,7 +19,6 @@ import {
   addCostume, removeCostume, COSTUME_STYLES, BEND_LIMIT, LEVELS, AIR_LIFT, LIFT_MAX, levelOf, ABSORB_MAX, DANCER_HEIGHT_MIN, DANCER_HEIGHT_MAX, autoPlaceKey, autoPlaceEnabled,
   POSE_LABEL, STEP_LABEL, LEVEL_LABEL, EASES, EASE_LABEL,
   plantsOf, plantProblem, footSkate, legOverreach, PLANT_LABEL, rolesOf, setRole,
-  scanOverlaps, overlapFix, applyOverlapFix, pathsKey, CLEARANCE,
   phraseShape, addPhrase, countGrid, tempoFromTaps, phraseRuns, localAtCount, phrasePlan, timelineScrollRange,
 } from './model.js';
 import { StageView } from './stage.js';
@@ -1339,21 +1338,7 @@ function rebuildPanels() {
     </div>
   </div>`).join('');
 
-  // The overlaps: what the whole-show scan found, each with the one fix worth offering. A scan is
-  // only good for the show it was read from — a fix names stations by their place in a path, so a
-  // list left over from before an edit could move the wrong point. Once the show has changed the
-  // list stands down and says so, rather than offering a fix that no longer means anything.
-  const scan = state.ui.overlaps;
-  const stale = scan && scan.key !== pathsKey(state.show);
-  const fresh = stale ? null : scan;
-  $('overlapCount').textContent = fresh ? String(fresh.list.length) : '\u2014';
-  $('overlapList').innerHTML = stale
-    ? '<p class="hint">The show has changed since the last look. Look again to run the fixes over what is there now.</p>'
-    : !fresh
-      ? '<p class="hint">Not looked yet.</p>'
-      : fresh.list.length
-        ? fresh.list.map((o) => overlapRow(o)).join('')
-        : '<p class="hint">No two performers come inside the clearance anywhere in this show.</p>';
+  // Scan results are now presented in Path Studio alongside cloth and prop warnings.
 
   // The wardrobe. A costume says how many are wearing it, because a costume nobody
   // wears is a note to self rather than part of the show.
@@ -2389,43 +2374,7 @@ function bindPanelEvents() {
     }
   });
 
-  // ---- the overlaps. A scan of the whole running order, then one ranked fix per overlap.
-  // The stamp of the show it was read from travels with it, so a list cannot outlive the paths it
-  // describes. `say` replaces the count for a moment, which is how a fix reports itself.
-  const scanNow = (say) => {
-    const list = scanOverlaps(state.show).map((o) => ({ ...o, fix: overlapFix(state.show, o) }));
-    state.ui.overlaps = { list, key: pathsKey(state.show) };
-    state.ui.hint = say || (list.length
-      ? `${list.length} overlap${list.length === 1 ? '' : 's'} in this show`
-      : `No two performers come inside ${CLEARANCE.toFixed(2)} m anywhere in this show`);
-    app.rebuild();
-  };
-  $('btnScanOverlaps').addEventListener('click', () => scanNow());
-
-  const overlapList = $('overlapList');
-  overlapList.addEventListener('click', (e) => {
-    const scan = state.ui.overlaps;
-    if (!scan || scan.key !== pathsKey(state.show)) return;
-    const host = e.target.closest('[data-overlap]');
-    if (!host) return;
-    const o = scan.list.find((x) => x.id === host.dataset.overlap);
-    if (!o) return;
-    if (e.target.closest('[data-act="fix"]')) {
-      if (!o.fix) return;
-      const label = o.fix.label;
-      commit();
-      applyOverlapFix(state.show, o.fix);
-      persist();
-      // The floor has changed around her, so the list is looked at again rather than patched: the
-      // fix may have moved a station that other overlaps were counted against, and a fix that only
-      // tidy one collision into another is not one.
-      scanNow('Fixed: ' + label + ' — Undo puts it back');
-      return;
-    }
-    // The row itself is a way into the moment, so the stage can be judged before changing it.
-    gotoTimes(o.at);
-    app.rebuild();
-  });
+  // ---- the overlaps. The studio owns the whole-show scan and its fix controls.
 
   // The green room. A costume is edited in place, and every view redraws from it, so
   // a colour is changed by watching the plan rather than by pressing apply.

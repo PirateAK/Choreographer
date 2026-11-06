@@ -3,9 +3,11 @@
 // warnings are the whole-show scan, so a clash stays listed whether or not its path is shown.
 
 import {
-  state, commit, findObject, mirrorPathLeftRight, scanOverlaps,
-  posOfContent, pathsKey, CLEARANCE, scanClothCrossings, clothCovers, clothDepth, scanPropClashes,
+  state, commit, persist, findObject, mirrorPathLeftRight,
+  scanOverlaps, overlapFix, applyOverlapFix, pathsKey, CLEARANCE, displayOfContent,
+  posOfContent, scanClothCrossings, clothCovers, clothDepth, scanPropClashes,
 } from './model.js';
+import { fmtTime } from './draw.js';
 
 const ZOOM_MIN = 0.6;
 const ZOOM_MAX = 4;
@@ -18,10 +20,11 @@ const ui = {
   deps: { rebuild: () => {} },
   scanKey: null,
   scan: [],
+  reviewed: null,
   warnings: [],
 };
 
-let root, canvas, ctx, castEl, warnEl, warnCount, subEl;
+let root, canvas, ctx, castEl, warnEl, warnCount, subEl, scanButton;
 
 export function initPathStudio(deps) {
   ui.deps = { ...ui.deps, ...deps };
@@ -30,6 +33,7 @@ export function initPathStudio(deps) {
   castEl = document.getElementById('studioCast');
   warnEl = document.getElementById('studioWarn');
   warnCount = document.getElementById('studioWarnCount');
+  scanButton = document.getElementById('btnScanOverlaps');
   subEl = document.getElementById('studioSub');
   ctx = canvas.getContext('2d');
 
@@ -38,6 +42,7 @@ export function initPathStudio(deps) {
   document.getElementById('studioZoomIn').addEventListener('click', () => setZoom(ui.zoom * 1.3));
   document.getElementById('studioZoomOut').addEventListener('click', () => setZoom(ui.zoom / 1.3));
   document.getElementById('studioMirror').addEventListener('click', mirrorSelected);
+  scanButton.addEventListener('click', scanNow);
 
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
@@ -61,14 +66,20 @@ export function initPathStudio(deps) {
   });
 
   warnEl.addEventListener('click', (e) => {
+    const fix = e.target.closest('[data-fix]');
+    if (fix) {
+      applyStudioFix(fix.dataset.fix);
+      return;
+    }
+    const row = e.target.closest('[data-warn]');
+    if (row) focusWarning(row.dataset.warn);
+  });
+  warnEl.addEventListener('keydown', (e) => {
+    if ((e.key !== 'Enter' && e.key !== ' ') || e.target.closest('[data-fix]')) return;
     const row = e.target.closest('[data-warn]');
     if (!row) return;
-    const o = ui.warnings.find((x) => x.id === row.dataset.warn);
-    if (!o) return;
-    state.ui.playhead = o.at;
-    state.ui.selectedId = o.ids[0];
-    state.ui.dirtyPanels = true;
-    ui.deps.rebuild();
+    e.preventDefault();
+    focusWarning(row.dataset.warn);
   });
 
   document.addEventListener('keydown', (e) => {
@@ -141,8 +152,48 @@ function currentScan(show) {
   if (key !== ui.scanKey) {
     ui.scan = scanOverlaps(show);
     ui.scanKey = key;
+    if (ui.reviewed && ui.reviewed.key !== key) ui.reviewed.stale = true;
   }
   return ui.scan;
+}
+
+function currentOverlapScan() {
+  const reviewed = ui.reviewed;
+  if (!reviewed || reviewed.stale || reviewed.key !== pathsKey(state.show)) return null;
+  return reviewed.list;
+}
+
+function scanNow() {
+  const show = state.show;
+  const key = pathsKey(show);
+  const list = scanOverlaps(show).map((o) => ({ ...o, fix: overlapFix(show, o) }));
+  ui.scan = list;
+  ui.scanKey = key;
+  ui.reviewed = { list, key, stale: false };
+  renderPathStudio();
+}
+
+function applyStudioFix(id) {
+  const list = currentOverlapScan();
+  const overlap = list && list.find((o) => o.id === id);
+  if (!overlap || !overlap.fix) return;
+  const label = overlap.fix.label;
+  commit();
+  applyOverlapFix(state.show, overlap.fix);
+  persist();
+  scanNow();
+  state.ui.hint = `Fixed: ${label} · Undo puts the path back`;
+  ui.deps.rebuild();
+}
+
+function focusWarning(id) {
+  const o = ui.warnings.find((x) => x.id === id);
+  if (!o) return;
+  state.ui.playhead = o.at;
+  const dancerId = o.ids?.[0] || o.dancerId;
+  if (dancerId) state.ui.selectedId = dancerId;
+  state.ui.dirtyPanels = true;
+  ui.deps.rebuild();
 }
 
 function renderWarnings(show) {
@@ -151,29 +202,43 @@ function renderWarnings(show) {
   const props = (show.scenery || []).filter((s) => s.kind === 'prop').flatMap((p) => scanPropClashes(show, p));
   const all = [...scan, ...curtains, ...props].sort((a, b) => a.at - b.at);
   ui.warnings = all;
-  warnCount.textContent = all.length ? String(all.length) : 'none';
+  const reviewed = currentOverlapScan();
+  const fresh = !ui.reviewed || !!reviewed;
+  scanButton.textContent = ui.reviewed ? (reviewed ? 'Rescan overlaps' : 'Scan again') : 'Find overlaps';
+  scanButton.title = ui.reviewed && !reviewed ? 'Paths changed since the last scan; run a fresh scan before applying a fix' : 'Scan the whole running order for dancer-to-dancer overlaps';
+  warnCount.textContent = `${all.length}${ui.reviewed && !fresh ? ' · stale' : ''}`;
   warnEl.innerHTML = all.map((o) => {
     if (o.sceneryId) {
       const d = findObject(show, o.dancerId);
       const who = escapeHtml((d && d.name) || 'Dancer');
       const isProp = o.kind === 'prop';
       const what = isProp ? 'on path' : (o.kind === 'curtain' ? 'curtain closed' : (o.kind === 'screen' ? 'screen hanging' : 'drop hanging'));
-      return `<div class="studio-row warn curtain" data-warn="${o.id}" role="button" tabindex="0">
-        <span class="studio-name">${who} ${isProp ? 'at' : 'through'} ${escapeHtml(o.name)}</span>
-        <span class="studio-count">${(o.at / 1000).toFixed(2)} s · ${what}</span>
-      </div>`;
-    }
-
-    const names = o.ids.map((id) => {
-      const d = findObject(show, id);
-      return escapeHtml((d && d.name) || 'Dancer');
-    }).join(' & ');
-    const gap = (o.gap || 0).toFixed(2);
-    return `<div class="studio-row warn" data-warn="${o.id}" role="button" tabindex="0">
-      <span class="studio-name">${names}</span>
-      <span class="studio-count">${(o.at / 1000).toFixed(2)} s · ${gap} m</span>
+    return `<div class="studio-row warn curtain" data-warn="${o.id}" role="button" tabindex="0">
+      <span class="studio-name">${who} ${isProp ? 'at' : 'through'} ${escapeHtml(o.name)}</span>
+      <span class="studio-count">${(o.at / 1000).toFixed(2)} s · ${what}</span>
     </div>`;
-  }).join('') || '<p class="hint">No two dancers come within ' + CLEARANCE + ' m, and no path crosses a closed curtain.</p>';
+    }
+    const fix = reviewed && reviewed.find((x) => x.id === o.id)?.fix;
+    return renderOverlapWarning(o, fix);
+  }).join('') || '<p class="hint">No path conflicts found. Run Find overlaps for a whole-show dancer scan.</p>';
+}
+
+function renderOverlapWarning(o, fix) {
+  const show = state.show;
+  const names = o.ids.map((id) => {
+    const d = (show.cast || []).find((x) => x.id === id);
+    return d ? d.name : '?';
+  });
+  const at = fmtTime(displayOfContent(show, o.at));
+  return `<div class="studio-row warn curtain" data-warn="${o.id}" role="button" tabindex="0" aria-label="${escapeStudioHtml(names.join(' and '))}, ${escapeStudioHtml(at)}, ${o.gap.toFixed(2)} metres apart">
+    <span class="studio-name">${names.map(escapeStudioHtml).join(' &amp; ')}</span>
+    <span class="studio-count">${escapeStudioHtml(at)} · ${o.gap.toFixed(2)} m</span>
+    ${fix ? `<span class="studio-fix-label">${escapeStudioHtml(fix.label)}</span><button class="view-btn studio-fix" data-fix="${o.id}" title="Apply this fix — Undo restores the path">Fix</button>` : '<span class="studio-fix-label">Run Find overlaps to see fixes</span>'}
+  </div>`;
+}
+
+function escapeStudioHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 
