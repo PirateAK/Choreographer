@@ -4,7 +4,7 @@
 
 import {
   state, commit, findObject, mirrorPathLeftRight, scanOverlaps,
-  posOfContent, pathsKey, CLEARANCE,
+  posOfContent, pathsKey, CLEARANCE, scanCurtainCrossings, curtainCovers, clothDepth,
 } from './model.js';
 
 const ZOOM_MIN = 0.6;
@@ -18,6 +18,7 @@ const ui = {
   deps: { rebuild: () => {} },
   scanKey: null,
   scan: [],
+  warnings: [],
 };
 
 let root, canvas, ctx, castEl, warnEl, warnCount, subEl;
@@ -62,7 +63,7 @@ export function initPathStudio(deps) {
   warnEl.addEventListener('click', (e) => {
     const row = e.target.closest('[data-warn]');
     if (!row) return;
-    const o = ui.scan.find((x) => x.id === row.dataset.warn);
+    const o = ui.warnings.find((x) => x.id === row.dataset.warn);
     if (!o) return;
     state.ui.playhead = o.at;
     state.ui.selectedId = o.ids[0];
@@ -146,8 +147,19 @@ function currentScan(show) {
 
 function renderWarnings(show) {
   const scan = currentScan(show);
-  warnCount.textContent = scan.length ? String(scan.length) : 'none';
-  warnEl.innerHTML = scan.map((o) => {
+  const curtains = scanCurtainCrossings(show);
+  const all = [...scan, ...curtains].sort((a, b) => a.at - b.at);
+  ui.warnings = all;
+  warnCount.textContent = all.length ? String(all.length) : 'none';
+  warnEl.innerHTML = all.map((o) => {
+    if (o.kind === 'curtain') {
+      const d = findObject(show, o.dancerId);
+      const who = escapeHtml((d && d.name) || 'Dancer');
+      return `<div class="studio-row warn curtain" data-warn="${o.id}" role="button" tabindex="0">
+        <span class="studio-name">${who} through ${escapeHtml(o.name)}</span>
+        <span class="studio-count">${(o.at / 1000).toFixed(2)} s · curtain closed</span>
+      </div>`;
+    }
     const names = o.ids.map((id) => {
       const d = findObject(show, id);
       return escapeHtml((d && d.name) || 'Dancer');
@@ -157,8 +169,9 @@ function renderWarnings(show) {
       <span class="studio-name">${names}</span>
       <span class="studio-count">${(o.at / 1000).toFixed(2)} s · ${gap} m</span>
     </div>`;
-  }).join('') || '<p class="hint">No two dancers come within ' + CLEARANCE + ' m.</p>';
+  }).join('') || '<p class="hint">No two dancers come within ' + CLEARANCE + ' m, and no path crosses a closed curtain.</p>';
 }
+
 
 // Plan coordinates: x across the stage (centre at 0), y upstage from the proscenium at 0.
 // The canvas draws the audience at the bottom, so y grows upward on screen.
@@ -219,6 +232,35 @@ function drawPlan(show) {
       ctx.beginPath(); ctx.arc(toX(k.x), toY(k.y), selected ? 4 : 3, 0, Math.PI * 2); ctx.fill();
     }
     ctx.globalAlpha = 1;
+  }
+
+  // Curtains: the cloth that covers the stage at the playhead, drawn as a bar at its depth,
+  // and each crossing that the list reports as a cross.
+  const now = state.ui.playhead || 0;
+  ctx.strokeStyle = '#ffb703';
+  ctx.lineWidth = 3;
+  for (const c of (show.scenery || []).filter((s) => s.kind === 'curtain')) {
+    const y = clothDepth(c);
+    let run = null;
+    for (let x = -sw; x <= sw + 1e-6; x += 0.1) {
+      const on = curtainCovers(c, now, x);
+      if (on && run === null) run = x;
+      if (!on && run !== null) {
+        ctx.beginPath(); ctx.moveTo(toX(run), toY(y)); ctx.lineTo(toX(x - 0.1), toY(y)); ctx.stroke();
+        run = null;
+      }
+    }
+    if (run !== null) { ctx.beginPath(); ctx.moveTo(toX(run), toY(y)); ctx.lineTo(toX(sw), toY(y)); ctx.stroke(); }
+  }
+  ctx.strokeStyle = '#ffb703';
+  ctx.lineWidth = 2;
+  for (const o of ui.warnings) {
+    if (o.kind !== 'curtain') continue;
+    const r = 5;
+    ctx.beginPath();
+    ctx.moveTo(toX(o.x) - r, toY(o.y) - r); ctx.lineTo(toX(o.x) + r, toY(o.y) + r);
+    ctx.moveTo(toX(o.x) + r, toY(o.y) - r); ctx.lineTo(toX(o.x) - r, toY(o.y) + r);
+    ctx.stroke();
   }
 
   // Clashes: a dashed ring at each performer's place at the moment of closest approach.

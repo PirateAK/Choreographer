@@ -3749,7 +3749,55 @@ export function scanOverlaps(show) {
     .map((o, i) => ({ ...o, id: 'ov' + i, at: Math.round(o.at) }));
 }
 
-// Where everybody but one dancer stands, sampled once across the running order at a fixed set of
+// Where a curtain's cloth covers the stage at a moment: the legs hang at the outer edges
+// of its span, so a point is covered when its distance from the centre lies within the
+// leg. Shut, the legs reach the centre and cover the whole span; open, only the stack at
+// the edges is left. Taken from the same leg width the stage draws, so the warning and the
+// picture agree without a threshold of our own.
+export function curtainCovers(item, ct, x) {
+  if (!item || item.kind !== 'curtain') return false;
+  const span = clothSpan(item);
+  const half = Math.max(0.3, span / 2);
+  const open = sceneryStateAt(item, ct).open;
+  const legW = curtainLegW(span, open);
+  const d = Math.abs(x - clothX(item));
+  return d >= half - legW && d <= half;
+}
+
+// Every moment a performer crosses a curtain's line at a point the cloth covers. The
+// crossing is sampled on the same clock as the overlap scan, so a crossing is reported at
+// the first sample on the far side of the line. Props are not checked.
+export function scanCurtainCrossings(show) {
+  const curtains = (show.scenery || []).filter((s) => s.kind === 'curtain');
+  const dancers = (show.cast || []).filter((d) => !isProp(d) && (d.keys || []).length);
+  if (!curtains.length || !dancers.length) return [];
+  const end = Math.max(1000, endContent(show) + 500);
+  const step = Math.max(80, Math.round(end / 5000));
+  const out = [];
+  for (const d of dancers) {
+    let prev = null;
+    for (let ct = 0; ct <= end; ct += step) {
+      const p = posOfContent(show, d, ct);
+      if (!p) { prev = null; continue; }
+      if (prev) {
+        for (const c of curtains) {
+          const depth = clothDepth(c);
+          const was = prev.p.y - depth;
+          const now = p.y - depth;
+          if (was === 0 || now === 0 || (was < 0) === (now < 0)) continue;
+          const f = was / (was - now);
+          const x = prev.p.x + (p.x - prev.p.x) * f;
+          if (!curtainCovers(c, ct, x)) continue;
+          out.push({ kind: 'curtain', dancerId: d.id, sceneryId: c.id, ids: [d.id], name: c.name || 'Curtain', at: ct, x, y: depth });
+        }
+      }
+      prev = { p, ct };
+    }
+  }
+  return out.sort((a, b) => a.at - b.at).map((o, i) => ({ ...o, id: 'cu' + i }));
+}
+
+
 // moments. A candidate fix changes one path and puts it back; the other bodies do not move, so their
 // floor is measured once and the candidate costs one walk of her own path rather than of the whole
 // show. It is dropped whenever the show changes (the revision counter in `persist`), because a
