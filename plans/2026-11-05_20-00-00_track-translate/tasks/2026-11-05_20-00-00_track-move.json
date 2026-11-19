@@ -1,0 +1,32 @@
+[
+  {
+    "content": "[track-1] Inspect track/path data, mirror path behavior, stage drag, undo and tests",
+    "id": "track-1",
+    "status": "completed"
+  },
+  {
+    "content": "[track-2] Implement whole-track arrow-key translation with undo and safe view semantics",
+    "status": "completed",
+    "id": "2"
+  },
+  {
+    "content": "[track-3] Add focused tests, run regressions and inspect diff",
+    "id": "track-3",
+    "status": "completed"
+  },
+  {
+    "content": "[station-1] Inspect selected station semantics and generated foot path linkage",
+    "id": "station-1",
+    "status": "in_progress"
+  },
+  {
+    "content": "[station-2] Add single-station nudge with boundary limits and undo grouping",
+    "id": "station-2",
+    "status": "pending"
+  },
+  {
+    "content": "[station-3] Test selected-point and whole-track nudge behaviors",
+    "id": "station-3",
+    "status": "pending"
+  }
+]

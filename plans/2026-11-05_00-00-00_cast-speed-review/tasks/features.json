@@ -1,0 +1,22 @@
+[
+  {
+    "content": "[feat-1] Inspect show/dancer schema, creation and rendering paths; locate timings tab playback and media clock control points (self)",
+    "id": "feat-1",
+    "status": "completed"
+  },
+  {
+    "content": "[feat-2] Design cast member/group types without changing existing dancer behavior; implement group model/UI and safe normalization (self)",
+    "id": "feat-2",
+    "status": "in_progress"
+  },
+  {
+    "content": "[feat-3] Implement review playback speed control that leaves authored show timing unchanged and coordinates audio/video/playhead (self)",
+    "id": "feat-3",
+    "status": "pending"
+  },
+  {
+    "content": "[feat-4] Add tests for cast migration/group semantics and playback rate; run regression suite, browser smoke and commit (self)",
+    "id": "feat-4",
+    "status": "pending"
+  }
+]

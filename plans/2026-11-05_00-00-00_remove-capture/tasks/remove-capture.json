@@ -1,0 +1,17 @@
+[
+  {
+    "content": "[remove-1] Trace capture UI/module links and identify minimal safe removal scope — self",
+    "id": "capture-1",
+    "status": "completed"
+  },
+  {
+    "content": "[remove-2] Remove recording controls, wiring, and capture-only assets without disturbing playback — self",
+    "id": "capture-2",
+    "status": "completed"
+  },
+  {
+    "content": "[remove-3] Run focused syntax/smoke checks and inspect diff — self",
+    "id": "capture-3",
+    "status": "completed"
+  }
+]

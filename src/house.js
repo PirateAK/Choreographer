@@ -50,7 +50,6 @@ export class HouseView {
     const stageW = Math.max(1, num(st.width, 12));
     const stageD = Math.max(1, num(st.depth, 8));
     const openingH = Math.max(2, num(st.openingH, 7.5));
-    const dancerH = Math.max(0.4, num(st.dancerH, 1.7));
     const padX = Math.min(28, w * 0.06);
     const floorBand = Math.min(h * 0.29, Math.max(38, h * 0.24));
     const scale = Math.max(0.1, Math.min((w - padX * 2) / stageW, (h - floorBand - 22) / openingH));
@@ -152,14 +151,14 @@ export class HouseView {
       const air = ev.lift;
       ctx.fillStyle = 'rgba(0,0,0,.28)';
       ctx.beginPath();
-      ctx.ellipse(groundX, groundY, Math.max(3, dancerH * s * 0.16), Math.max(1.5, s * 0.035), 0, 0, Math.PI * 2);
+      ctx.ellipse(groundX, groundY, Math.max(3, Math.max(0.4, dancerHeight(show, d)) * s * 0.16), Math.max(1.5, s * 0.035), 0, 0, Math.PI * 2);
       ctx.fill();
       const costume = costumeOf(show, d);
       const body = costume && costume.body || d.color || '#f0d4b8';
       const hair = costume && costume.hair || darker(body, 0.42);
       const skirt = costume && costume.style ? { style: costume.style, color: costume.skirt || body } : null;
       drawPose(ctx, {
-        spec: ev.spec, x: xAt(p.x, p.y), y: groundY - (Number.isFinite(air) ? air : 0) * s, h: dancerH * s,
+        spec: ev.spec, x: xAt(p.x, p.y), y: groundY - (Number.isFinite(air) ? air : 0) * s, h: Math.max(0.4, dancerHeight(show, d)) * s,
         facing: at.facing || 1, turn: at.turn || 0, headTurn: at.headTurn || at.turn || 0,
         body, hair, skirt, pins: ev.pins,
       });

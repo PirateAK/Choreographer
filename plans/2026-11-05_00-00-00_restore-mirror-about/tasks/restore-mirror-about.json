@@ -1,0 +1,17 @@
+[
+  {
+    "content": "[feature-1] Inspect stable checkout UI, Mirror commit, and version metadata patterns — self",
+    "id": "f1",
+    "status": "completed"
+  },
+  {
+    "content": "[feature-2] Port only left-right path mirroring into stable checkout and add an About tab with version identifier — self",
+    "id": "f2",
+    "status": "completed"
+  },
+  {
+    "content": "[feature-3] Run path tests, browser smoke checks, and review diff without disturbing saved show data — self",
+    "id": "f3",
+    "status": "completed"
+  }
+]

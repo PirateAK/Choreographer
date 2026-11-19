@@ -9,11 +9,12 @@
 import {
   state, restore, displayOfContent, contentOfDisplay, contentOfLocal, localOfContent, posOfContent, endDisplay, endContent,
   clothX, clothSpan, clothDepth, clothThick, curtainLegW, wingBays, sceneryStateAt, musicSpan,
-  propPosOfContent, POSE_LABEL, STEP_LABEL, LEVEL_LABEL, EASE_LABEL, levelOf, levelBlend, actRanges, actAt, sceneRanges, sceneAt, legPoints,
+  propPosOfContent, POSE_LABEL, STEP_LABEL, LEVEL_LABEL, EASE_LABEL, levelOf, levelBlend, actRanges, actAt, sceneRanges, sceneAt, legPoints, dancerHeight,
   endMarker, activeMusicAt, LIGHT_TYPES, LIGHT_GOBOS, GEL_NAMES, costumeOf, poseOfContent, plantsOf,
   footAtLocal, footPins, feetOnFloor, rolesOf, roleOf,
 } from './model.js';
 import { specOf, blendSpecs, poseSvg } from './pose.js';
+import { notationHTML } from './notation.js';
 
 const esc = (s) =>
   String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -367,7 +368,7 @@ function walk(show, dancer, f) {
 // The opening and the dancer height are stage settings; each piece of cloth
 // carries its own height, so a border can hang at 3 m beside an 8 m backdrop.
 const openingOf = (show) => (Number.isFinite(show.stage.openingH) ? show.stage.openingH : 7.5);
-const dancerHeightOf = (show) => (Number.isFinite(show.stage.dancerH) ? show.stage.dancerH : 1.7);
+
 
 // Falls back to a house-plausible height only for a show that predates item heights.
 function clothHeight(show, item) {
@@ -515,7 +516,7 @@ function elevCloth(show, f, item, tag, marks, ct) {
 // shows a fifth while the dancer is in arabesque is a sheet the crew cannot trust.
 function elevDancer(show, f, d, p, marks, ct) {
   const k = f.k;
-  const height = dancerHeightOf(show);
+  const height = dancerHeight(show, d);
   const x = f.X(p.x);
   const feet = f.Y(0);
   // On paper the costume keeps its colour but is darkened enough to print, because the
@@ -1786,7 +1787,11 @@ function render(show) {
   const bar = document.getElementById('docName');
   if (bar) bar.textContent = show.name;
   document.getElementById('doc').innerHTML =
-    plotPage(show) + castPage(show) + callSheetPage(show) + elevationPage(show, moment) + tableauPage(show) + pathsPage(show) + cuePage(show) + lightingPage(show);
+    plotPage(show) + castPage(show) + callSheetPage(show) + elevationPage(show, moment) + tableauPage(show) + pathsPage(show) + cuePage(show) + lightingPage(show) + notationPage(show);
+}
+
+function notationPage(show) {
+  return `<section class="sheet"><header class="doc-head"><div class="doc-title"><h1>Paper plan</h1></div></header>${notationHTML(show)}</section>`;
 }
 
 function fillMomentPicker(show) {

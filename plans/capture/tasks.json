@@ -1,0 +1,27 @@
+[
+  {
+    "id": "cap-1",
+    "content": "[cap-1] Route music and narration through a shared bus with a capture tap (self)",
+    "status": "in_progress"
+  },
+  {
+    "id": "cap-2",
+    "content": "[cap-2] Add src/capture.js recorder: House canvas stream and whole-app screen share, WebM output (self)",
+    "status": "pending"
+  },
+  {
+    "id": "cap-3",
+    "content": "[cap-3] Header Capture control: mode choice, record/stop, status (self)",
+    "status": "pending"
+  },
+  {
+    "id": "cap-4",
+    "content": "[cap-4] Import map versions, syntax checks, browser test of House recording (self)",
+    "status": "pending"
+  },
+  {
+    "id": "cap-5",
+    "content": "[cap-5] Regression run, diff review, commit on feature/capture (self)",
+    "status": "pending"
+  }
+]

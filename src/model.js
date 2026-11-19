@@ -2,11 +2,12 @@
 
 // The positions' geometry lives in pose.js — the angles, and therefore where the feet are — so
 // that a contact is measured from the same table the figures are drawn from.
-import { PLANT_BY_POSE, feetPlaceOf, joints, specOf, blendSpecs, toeDirection, TOE_LENGTH } from './pose.js';
+import { PLANT_BY_POSE, feetPlaceOf, joints, specOf, blendSpecs, footGeometry } from './pose.js';
 import { contactFrame } from './contact-frame.js';
 import { conventionValue } from './conventions.js';
 import { sampleFootTrajectory, validateFootTrajectory } from './foot-trajectory.js';
 import { compileFootSchedule } from './foot-scheduler.js';
+import { placementRange } from './placement-guide.js';
 
 // The four things a station can stand on. Kept here rather than beside the contact code so a
 // show read from a file can be tidied before anything else in the module has been evaluated.
@@ -214,11 +215,33 @@ export function countGrid(show) {
   const perBar = Number.isFinite(bpb) ? Math.max(1, Math.min(16, Math.round(bpb))) : DEFAULT_BEATS;
   // Bars are counted from where the band starts, which is where the first music track begins:
   // a show whose music enters after the house lights still has its bar one at the entry.
+  // A downbeat set by hand (or by tapping) is the moment of count one, and it wins over the track.
+  const downbeat = Number(prefs.downbeat);
   const tracks = (show && show.musicTracks) || [];
   const first = tracks.length ? Number(tracks[0].start) : 0;
-  const origin = Number.isFinite(first) ? Math.max(0, first) : 0;
+  const origin = Number.isFinite(downbeat) && prefs.downbeat !== null
+    ? Math.max(0, downbeat)
+    : Number.isFinite(first) ? Math.max(0, first) : 0;
   const count = 60000 / tempo;
   return { tempo, perBar, count, bar: count * perBar, origin };
+}
+
+// The tempo a run of taps asks for. Taps are the moments the performer pressed (ms on the same
+// clock); the tempo is the median of the recent gaps, so one late tap does not move it much.
+// Gaps outside the 20–300 bpm range are not beats and are ignored. Returns null until there are
+// two usable taps.
+export function tempoFromTaps(taps) {
+  const list = (Array.isArray(taps) ? taps : []).map(Number).filter(Number.isFinite).slice(-9);
+  const gaps = [];
+  for (let i = 1; i < list.length; i++) {
+    const gap = list[i] - list[i - 1];
+    if (gap >= 60000 / 300 && gap <= 60000 / 20) gaps.push(gap);
+  }
+  if (!gaps.length) return null;
+  gaps.sort((a, b) => a - b);
+  const mid = gaps.length >> 1;
+  const median = gaps.length % 2 ? gaps[mid] : (gaps[mid - 1] + gaps[mid]) / 2;
+  return Math.max(20, Math.min(300, Math.round(60000 / median)));
 }
 
 // Where a moment falls in the music: which bar, and which count of that bar. Read from the show's
@@ -653,6 +676,25 @@ export function phrasePlan(show, dancer, opts = {}) {
   };
 }
 
+// The phrases on a dancer's path, as runs of station indices. A phrase is the stations from one
+// addPhrase call: it starts after the previous run's last station (or at the first point after the
+// start) and ends at its own phraseEnd, or at the last station. addPhrase closes the run before it,
+// so a hand-placed station is a run boundary once a phrase follows it. Station 0 is the starting
+// position, not a step.
+export function phraseRuns(dancer) {
+  const keys = (dancer && dancer.keys) || [];
+  const runs = [];
+  let start = null;
+  for (let i = 1; i < keys.length; i++) {
+    if (start === null) start = i;
+    if (keys[i].phraseEnd === true || i === keys.length - 1) {
+      runs.push({ start, end: i });
+      start = null;
+    }
+  }
+  return runs;
+}
+
 // Place a phrase on a dancer's path: the stations its step needs, appended after the last one,
 // and — when the last one is where a phrase arrived — the junction between the two made into
 // one movement rather than two. Returns the stations added, whether they were linked and how
@@ -664,9 +706,15 @@ export function addPhrase(show, dancer, opts = {}) {
   // Where it begins, decided once here and handed down: a phrase put on a bar of the music may
   // begin well after her path ends, and then the leg into it is a long one rather than a join.
   const start = phraseStart(show, dancer, opts);
-  const linked = last.phraseEnd === true && start.t <= last.t + 1;
+  // Every station after the starting position is the end of a run, whether a phrase placed it or
+  // it was put down by hand. A hand-placed station is a boundary like any other, so a phrase that
+  // follows it links on the same rule. Station 0 is the starting position, not a step, so it is
+  // never treated as a phrase end.
+  const boundary = last.phraseEnd === true || keys.length > 1;
+  const linked = boundary && start.t <= last.t + 1;
   const added = phraseStations(show, dancer, { ...opts, startLocal: start.t });
   if (!added.length) return { added, linked: false, counts: 0, ms: 0, start };
+  if (keys.length > 1) last.phraseEnd = true;
   if (linked) {
     // The station is passed through: the position is reached exactly at it and left straight
     // away, instead of arriving a third of a leg early and holding.
@@ -677,6 +725,10 @@ export function addPhrase(show, dancer, opts = {}) {
     if (added[0].ease === 'accel' || added[0].ease === 'both') added[0].ease = 'even';
   }
   added[added.length - 1].phraseEnd = true;
+  // The arms and the notes belong to the phrase, so they sit on its first station, where the
+  // paper plan and the station inspector read them.
+  if (opts.port) added[0].port = String(opts.port).trim();
+  if (opts.notes) added[0].notes = String(opts.notes).trim();
   keys.push(...added);
   const ms = added.reduce((n, k) => n + (Number(k.dur) || 0), 0);
   const grid = countGrid(show);
@@ -791,6 +843,7 @@ export const state = {
     playing: false,
     lastFrame: 0,
     activePause: null,
+    playbackRate: 1,
     pxPerSec: 30,
     scrollT: 0,
     vscroll: 0,
@@ -1104,6 +1157,9 @@ export function createShow() {
     showId: uid('show'),
     stage,
     cast: [],
+    // Non-dancer entries used to organize the production cast; these are not
+    // movement tracks and are intentionally excluded from dancer/render logic.
+    castGroups: [],
     // The wardrobe: costumes are named here and worn by performers, so a show with
     // none is simply undressed rather than broken.
     costumes: [],
@@ -1238,6 +1294,10 @@ export function normalise(show) {
         // to the end and a trimmed one keeps the trim across a reload.
         play: Number.isFinite(Number(t.play)) ? Math.max(0, Math.round(Number(t.play))) : undefined,
         level: Number.isFinite(Number(t.level)) ? Math.max(0, Math.min(1, Number(t.level))) : 1,
+        beatMarkers: Array.isArray(t.beatMarkers)
+          ? t.beatMarkers.map(Number).filter(Number.isFinite).map((v) => Math.max(0, Math.min(Number.isFinite(length) && length > 0 ? length : Infinity, Math.round(v)))).sort((a, b) => a - b)
+          : [],
+        beatOne: Math.max(0, Math.round(finiteModel(t.beatOne, 0))),
         visible: t.visible !== false,
         cues: (Array.isArray(t.cues) ? t.cues : [])
           .filter((c) => c && Number.isFinite(Number(c.level)))
@@ -1253,6 +1313,20 @@ export function normalise(show) {
     .sort((a, b) => a.start - b.start);
   delete out.music;
   out.cast = Array.isArray(out.cast) ? out.cast : [];
+  const groups = (Array.isArray(show && show.castGroups) ? show.castGroups : [])
+    .filter((group) => group && typeof group === 'object');
+  const usedGroupIds = new Set();
+  out.castGroups = groups.map((group) => {
+    let id = typeof group.id === 'string' && group.id ? group.id : uid('group');
+    while (usedGroupIds.has(id)) id = uid('group');
+    usedGroupIds.add(id);
+    return {
+      id,
+      name: String(group.name || 'Group').slice(0, 80),
+      type: ['audience', 'chorus', 'crew', 'extras', 'other'].includes(group.type) ? group.type : 'other',
+      role: String(group.role || '').slice(0, 80),
+    };
+  });
   out.cast.forEach((d) => {
     if (!d) return;
     if (d.footTrajectory) {
@@ -1280,6 +1354,9 @@ export function normalise(show) {
   };
   out.prefs = {
     cueDur: dur(prefs.cueDur, 1500),
+    // New stations and keys are placed on the beat and a stride from the last one unless
+    // the choreographer turns this off; a show from before this existed gets it on.
+    autoPlace: prefs.autoPlace !== false,
     fadeDur: dur(prefs.fadeDur, 2000),
     lightDur: dur(prefs.lightDur, 2000),
     // A hold or a pause of nothing would be a marker that does nothing, so these
@@ -2012,6 +2089,7 @@ export function addMusicTrack(show, data) {
     : last
       ? last.start + (last.length || 0)
       : 0;
+  const beatMarkers = Array.isArray(data && data.beatMarkers) ? data.beatMarkers.map(Number).filter(Number.isFinite).map((v) => Math.max(0, Math.round(v))).sort((a, b) => a - b) : [];
   const track = {
     id: uid('trk'),
     key: String((data && data.key) || uid('audio')),
@@ -2020,6 +2098,8 @@ export function addMusicTrack(show, data) {
     length: Math.max(0, Math.round(Number(data && data.length) || 0)),
     play: Math.max(0, Math.round(Number(data && data.length) || 0)),
     level: 1,
+    beatMarkers,
+    beatOne: Math.max(0, Math.min(Math.max(0, beatMarkers.length - 1), Math.round(Number(data && data.beatOne) || 0))),
     visible: true,
     cues: [],
   };
@@ -2354,6 +2434,20 @@ export function toggleVisibility(dancer, additive) {
   }
 }
 
+export function addCastGroup(show, name = 'Audience', type = 'audience', role = '') {
+  const group = { id: uid('group'), name: String(name).trim() || 'Group', type, role: String(role || '') };
+  show.castGroups = Array.isArray(show.castGroups) ? show.castGroups : [];
+  show.castGroups.push(group);
+  return group;
+}
+
+export function removeCastGroup(show, id) {
+  if (!show || !Array.isArray(show.castGroups)) return false;
+  const length = show.castGroups.length;
+  show.castGroups = show.castGroups.filter((group) => group.id !== id);
+  return show.castGroups.length !== length;
+}
+
 export function addCast(show, over) {
   const number = show.nextNumber++;
   const i = number - 1;
@@ -2427,6 +2521,99 @@ export function removeCostume(show, id) {
 
 /* -------------------------------------------------------- path stations */
 
+// Move one authored station only; generated foot knots remain untouched. The station is
+// clamped to the stage and wing bounds independently of its neighbours.
+export function pathStationTranslationDelta(dancer, index, dx, dy, show = null) {
+  const key = dancer && Array.isArray(dancer.keys) && dancer.keys[index];
+  const x = Number(dx);
+  const y = Number(dy);
+  if (!key || !Number.isInteger(index) || !Number.isFinite(x) || !Number.isFinite(y) || (!x && !y)) return null;
+  let moveX = x;
+  let moveY = y;
+  if (show && show.stage) {
+    const stage = show.stage;
+    const minX = -(stage.width / 2 + (Number(stage.wingDepth) || 0));
+    const maxX = -minX;
+    const minY = -0.5;
+    const maxY = stage.depth + 0.5;
+    moveX = x > 0 ? Math.min(x, Math.max(0, maxX - key.x))
+      : x < 0 ? Math.max(x, Math.min(0, minX - key.x)) : 0;
+    moveY = y > 0 ? Math.min(y, Math.max(0, maxY - key.y))
+      : y < 0 ? Math.max(y, Math.min(0, minY - key.y)) : 0;
+  }
+  return moveX || moveY ? { x: moveX, y: moveY } : null;
+}
+
+export function translatePathStation(dancer, index, dx, dy, show = null) {
+  const key = dancer && dancer.keys && dancer.keys[index];
+  const delta = pathStationTranslationDelta(dancer, index, dx, dy, show);
+  if (!key || !delta) return false;
+  key.x += delta.x;
+  key.y += delta.y;
+  return true;
+}
+
+export function pathTranslationDelta(dancer, dx, dy, show = null) {
+  if (!dancer || !Array.isArray(dancer.keys) || dancer.keys.length === 0) return null;
+  const x = Number(dx);
+  const y = Number(dy);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || (!x && !y)) return null;
+  const coordinates = [
+    ...dancer.keys,
+    ...Object.values(dancer.footTrajectory || {}).flatMap((track) => Array.isArray(track) ? track : []),
+  ];
+  let moveX = x;
+  let moveY = y;
+  if (show && show.stage) {
+    const stage = show.stage;
+    const minX = -(stage.width / 2 + (Number(stage.wingDepth) || 0));
+    const maxX = -minX;
+    const minY = -0.5;
+    const maxY = stage.depth + 0.5;
+    const xs = coordinates.map((p) => Number(p.x) || 0);
+    const ys = coordinates.map((p) => Number(p.y) || 0);
+    const positiveRoomX = maxX - Math.max(...xs);
+    const negativeRoomX = minX - Math.min(...xs);
+    const positiveRoomY = maxY - Math.max(...ys);
+    const negativeRoomY = minY - Math.min(...ys);
+    moveX = x > 0
+      ? (positiveRoomX < 0 ? 0 : Math.min(x, positiveRoomX))
+      : x < 0 ? (negativeRoomX > 0 ? 0 : Math.max(x, negativeRoomX)) : 0;
+    moveY = y > 0
+      ? (positiveRoomY < 0 ? 0 : Math.min(y, positiveRoomY))
+      : y < 0 ? (negativeRoomY > 0 ? 0 : Math.max(y, negativeRoomY)) : 0;
+  }
+  return moveX || moveY ? { x: moveX, y: moveY } : null;
+}
+
+export function translatePathTrack(dancer, dx, dy, show = null) {
+  const delta = pathTranslationDelta(dancer, dx, dy, show);
+  if (!delta) return false;
+  const coordinates = [
+    ...dancer.keys,
+    ...Object.values(dancer.footTrajectory || {}).flatMap((track) => Array.isArray(track) ? track : []),
+  ];
+  for (const point of coordinates) {
+    point.x = (Number(point.x) || 0) + delta.x;
+    point.y = (Number(point.y) || 0) + delta.y;
+  }
+  return true;
+}
+
+// Mirror authored path geometry around the stage centre line without changing its
+// sequence, timing, pose, turn, or movement metadata.
+export function mirrorPathLeftRight(dancer) {
+  if (!dancer || !Array.isArray(dancer.keys) || dancer.keys.length === 0) return false;
+  for (const key of dancer.keys) key.x = round2(-Number(key.x || 0));
+  if (dancer.footTrajectory && typeof dancer.footTrajectory === 'object') {
+    for (const track of Object.values(dancer.footTrajectory)) {
+      if (!Array.isArray(track)) continue;
+      for (const knot of track) knot.x = round2(-Number(knot.x || 0));
+    }
+  }
+  return true;
+}
+
 export function addStation(dancer, x, y, opts = {}) {
   const keys = dancer.keys;
   const last = keys.length ? keys[keys.length - 1] : null;
@@ -2452,6 +2639,68 @@ export function addStation(dancer, x, y, opts = {}) {
   keys.push(key);
   keys.sort((a, b) => a.t - b.t);
   return key;
+}
+
+// The next beat marker after a content time, over every music track, or null when no track
+// has beats yet. Beat markers are track-relative, so each is `track.start + marker`.
+export function nextBeatContent(show, afterContent) {
+  let best = null;
+  for (const track of (show && show.musicTracks) || []) {
+    const markers = Array.isArray(track.beatMarkers) ? track.beatMarkers : [];
+    const start = Number(track.start) || 0;
+    for (const m of markers) {
+      const at = start + Number(m);
+      if (Number.isFinite(at) && at > afterContent && (best === null || at < best)) best = at;
+    }
+  }
+  return best;
+}
+
+export function autoPlaceEnabled(show) {
+  return !(show && show.prefs && show.prefs.autoPlace === false);
+}
+
+// Where a new station goes when the choreographer does not place it by hand: the next beat
+// after the dancer's last station (or exactly `opts.durMs` later when a duration is given),
+// and a comfortable mid-stride from that station. The stride comes from the draft walk band
+// for this dancer's height and the time available, so a short dancer and a quick count both
+// take shorter steps. Direction is the way she was already travelling; with no travel yet, or
+// when that way is blocked by the stage edge, it is downstage (y falls towards 0). Returns null
+// when there is no station to start from, or no beat to land on and no duration given.
+const STAGE_EDGE = 0.35;
+export function autoPlaceKey(show, dancer, opts = {}) {
+  const keys = dancer.keys || [];
+  const last = keys[keys.length - 1];
+  if (!last) return null;
+  const prev = keys.length > 1 ? keys[keys.length - 2] : null;
+  const lastCt = contentOfLocal(show, dancer.id, last.t);
+  let ct;
+  if (Number.isFinite(opts.durMs) && opts.durMs > 0) ct = lastCt + opts.durMs;
+  else {
+    ct = nextBeatContent(show, lastCt);
+    if (ct === null) return null;
+  }
+  const durMs = ct - lastCt;
+  const t = Math.round(localOfContent(show, dancer.id, ct));
+  const band = placementRange({ step: 'walk', height: dancerHeight(show, dancer), durationMs: durMs });
+  const stride = band ? (band.comfortableMin + band.comfortableMax) / 2 : 0.5;
+  const st = show.stage;
+  const mx = st.width / 2 + st.wingDepth - 0.4;
+  const maxY = st.depth - STAGE_EDGE;
+  const travel = [];
+  if (prev) {
+    const vx = last.x - prev.x;
+    const vy = last.y - prev.y;
+    const n = Math.hypot(vx, vy);
+    if (n > 0.05) travel.push([vx / n, vy / n]);
+  }
+  travel.push([0, -1]);
+  for (const [dx, dy] of travel) {
+    const x = Math.max(-mx, Math.min(mx, last.x + dx * stride));
+    const y = Math.max(STAGE_EDGE, Math.min(maxY, last.y + dy * stride));
+    if (Math.hypot(x - last.x, y - last.y) > 0.05) return { t, x, y, dur: t - last.t, durMs };
+  }
+  return { t, x: last.x, y: last.y, dur: t - last.t, durMs };
 }
 
 // Give every key after the first a concrete transition duration, so editing
@@ -2928,7 +3177,16 @@ const FOOT_SKATE = 0.05;
 // A leg shorter than this did not travel, so it is a change of position rather than a step.
 const STANDING_LEG = 0.15;
 
-export function dancerHeight(show) {
+// A dancer may carry their own height in metres (`heightM`). Left blank, the dancer is the
+// show's default, so every existing show draws and measures exactly as before.
+export const DANCER_HEIGHT_MIN = 1.0;
+export const DANCER_HEIGHT_MAX = 2.4;
+
+export function dancerHeight(show, dancer) {
+  const own = Number(dancer && dancer.heightM);
+  if (dancer && Number.isFinite(own) && own > 0) {
+    return Math.max(DANCER_HEIGHT_MIN, Math.min(DANCER_HEIGHT_MAX, own));
+  }
   const h = Number(show && show.stage && show.stage.dancerH);
   return Number.isFinite(h) ? h : 1.7;
 }
@@ -2971,7 +3229,7 @@ export function plantsOf(dancer) {
 export function footAtLocal(show, dancer, lt, side = 'left') {
   const p = posAtLocal(dancer, lt);
   if (!p) return null;
-  const h = dancerHeight(show);
+  const h = dancerHeight(show, dancer);
   const at = poseAtLocal(dancer, lt);
   const spec = blendSpecs(specOf(at.pose), specOf(at.next), at.t);
   const i = side === 'right' ? 1 : 0;
@@ -3026,7 +3284,7 @@ export function footPinsFromTrajectory(show, dancer, lt, trajectory) {
   if (!body || !trajectory || typeof trajectory !== 'object') return null;
   const sample = sampleFootTrajectory(trajectory, lt);
   if (!sample) return null;
-  const h = dancerHeight(show), at = poseAtLocal(dancer, lt);
+  const h = dancerHeight(show, dancer), at = poseAtLocal(dancer, lt);
   const frame = contactFrame(body, h, at.facing, at.turn), out = {};
   for (const side of ['left', 'right']) {
     const target = sample[side];
@@ -3046,7 +3304,7 @@ function legacyFootPins(show, dancer, lt) {
   const a = keys[idx];
   const b = keys[idx + 1] || null;
   const body = posAtLocal(dancer, lt) || { x: a.x, y: a.y };
-  const h = dancerHeight(show);
+  const h = dancerHeight(show, dancer);
   const plants = plantsOf(dancer);
   const u = b ? Math.max(0, Math.min(1, (lt - a.t) / (b.t - a.t || 1))) : 1;
   // Weight is on the departure foot for the first third of the leg and on the arrival foot for the
@@ -3220,7 +3478,7 @@ export function withGeneratedWalk(show, dancer, destinationIndex, opts = {}) {
 // carrying her. With no pin — no path, or the whole dancer in the air — this is the position's own
 // feet, so nothing that does not step changes.
 export function feetOnFloor(show, dancer, lt) {
-  const h = dancerHeight(show);
+  const h = dancerHeight(show, dancer);
   const pins = footPins(show, dancer, lt);
   const out = {};
   for (const side of ['left', 'right']) {
@@ -3251,7 +3509,7 @@ export function feetOnFloor(show, dancer, lt) {
 // off the deck in metres (a jump), not the start level's.
 export function evaluateMovement(show, dancer, lt) {
   const at = poseAtLocal(dancer, lt);
-  const h = dancerHeight(show);
+  const h = dancerHeight(show, dancer);
   const lvl = levelBlend(at.level, at.nextLevel, at.levelT);
   const posed = blendSpecs(specOf(at.pose), specOf(at.next), at.t);
   const spec = { ...posed, rise: (posed.rise || 0) + lvl.rise - lvl.absorb / h };
@@ -3272,14 +3530,12 @@ export function overheadPoseAtLocal(show, dancer, lt) {
   const figure = joints(spec, 1, 0, pins);
   const legs = figure.legs3.map(leg => leg.map(frame.toStage));
   const feet = {};
+  const shoes = footGeometry(spec, figure);
   for (const [i, side] of ['left', 'right'].entries()) {
     const pin = pins && pins[side];
     const short = figure.shortfall[i];
-    // The toe is the ankle carried along the foot's own direction, through the same frame, so the plan
-    // turns the foot exactly as the solver turned the leg.
-    const [dx, dz] = toeDirection(spec, i);
-    const [ax, ay, az] = figure.legs3[i][2];
-    const toe = frame.toStage([ax + dx * TOE_LENGTH, ay, az + dz * TOE_LENGTH]);
+    // Shoe geometry follows the solved ankle in every view, including its roll onto the toe.
+    const toe = frame.toStage(shoes[i].toe);
     feet[side] = { ...legs[i][2], toe, held: !!(pin && pin.w > 0.5 && !short),
       unreachable: !!(short && pin), target: short && pin ? frame.toStage(short.target) : null,
       shortfall: short && pin ? short.over * h : 0 };
@@ -3324,7 +3580,7 @@ export function legOverreach(show, dancer, i) {
   const a = keys[i - 1];
   const b = keys[i];
   if (!a || !b) return null;
-  const h = dancerHeight(show);
+  const h = dancerHeight(show, dancer);
   let worst = null;
   const steps = 16;
   for (let s = 0; s <= steps; s++) {
@@ -3491,6 +3747,103 @@ export function scanOverlaps(show) {
   return out
     .sort((a, b) => a.at - b.at)
     .map((o, i) => ({ ...o, id: 'ov' + i, at: Math.round(o.at) }));
+}
+
+// Where a piece of cloth covers the stage at a moment. A curtain's legs hang at the outer
+// edges of its span: a point is covered when its distance from the centre lies within the
+// leg. Shut, the legs reach the centre and cover the whole span; open, only the stack at the
+// edges is left. A drop covers its whole span while it is drawn on the plan (flown fully
+// out, it is not), using the same 0.02 cutoff the stage draws it with. A screen is a drop.
+export function clothCovers(item, ct, x) {
+  if (!item) return false;
+  const span = clothSpan(item);
+  const half = Math.max(0.3, span / 2);
+  const d = Math.abs(x - clothX(item));
+  if (item.kind === 'drop') {
+    return sceneryStateAt(item, ct).fly > 0.02 && d <= half;
+  }
+  if (item.kind !== 'curtain') return false;
+  const legW = curtainLegW(span, sceneryStateAt(item, ct).open);
+  return d >= half - legW && d <= half;
+}
+
+// Every moment a performer crosses a piece of cloth's line at a point it covers: curtains,
+// drops and screens. The crossing is sampled on the same clock as the overlap scan, so it is
+// reported at the first sample on the far side of the line. Props are not checked.
+export function scanClothCrossings(show) {
+  const cloth = (show.scenery || []).filter((s) => s.kind === 'curtain' || s.kind === 'drop');
+  const dancers = (show.cast || []).filter((d) => !isProp(d) && (d.keys || []).length);
+  if (!cloth.length || !dancers.length) return [];
+  const end = Math.max(1000, endContent(show) + 500);
+  const step = Math.max(80, Math.round(end / 5000));
+  const out = [];
+  for (const d of dancers) {
+    let prev = null;
+    for (let ct = 0; ct <= end; ct += step) {
+      const p = posOfContent(show, d, ct);
+      if (!p) { prev = null; continue; }
+      if (prev) {
+        for (const c of cloth) {
+          const depth = clothDepth(c);
+          const was = prev.p.y - depth;
+          const now = p.y - depth;
+          if (was === 0 || now === 0 || (was < 0) === (now < 0)) continue;
+          const f = was / (was - now);
+          const x = prev.p.x + (p.x - prev.p.x) * f;
+          if (!clothCovers(c, ct, x)) continue;
+          out.push({ kind: c.kind === 'drop' ? (c.screen ? 'screen' : 'drop') : 'curtain', dancerId: d.id, sceneryId: c.id, ids: [d.id], name: c.name || 'Cloth', at: ct, x, y: depth });
+        }
+      }
+      prev = { p, ct };
+    }
+  }
+  return out.sort((a, b) => a.at - b.at).map((o, i) => ({ ...o, id: 'cu' + i }));
+}
+
+// Every stretch of the running order in which a dancer comes within the clearance of a prop.
+// A prop is a point on the floor, or one that moves on its own stations or with a carrier.
+// The dancer carrying it is not checked against it. Each stretch is reported once, at the
+// moment of closest approach, the same way the overlap scan reports a pass.
+export function scanPropClashes(show, prop) {
+  if (!isProp(prop)) return [];
+  const dancers = (show.cast || []).filter((d) => !isProp(d) && (d.keys || []).length);
+  if (!dancers.length) return [];
+  const end = Math.max(1000, endContent(show) + 500);
+  const step = Math.max(80, Math.round(end / 5000));
+  const out = [];
+  for (const d of dancers) {
+    let run = null;
+    for (let ct = 0; ct <= end; ct += step) {
+      const p = posOfContent(show, d, ct);
+      const q = propPosOfContent(show, prop, ct);
+      const carrying = carrierIdOf(prop, ct) === d.id;
+      const gap = p && q && !carrying ? Math.hypot(p.x - q.x, p.y - q.y) : Infinity;
+      if (gap < CLEARANCE) {
+        if (!run) run = { dancerId: d.id, at: ct, gap, x: p.x, y: p.y };
+        else if (gap < run.gap) Object.assign(run, { at: ct, gap, x: p.x, y: p.y });
+      } else if (run) {
+        out.push(run);
+        run = null;
+      }
+    }
+    if (run) out.push(run);
+  }
+  return out
+    .sort((a, b) => a.at - b.at)
+    .map((r, i) => ({ ...r, kind: 'prop', id: 'pc' + i, sceneryId: prop.id, ids: [r.dancerId], name: prop.name || 'Prop' }));
+}
+
+// A line for the hint bar after a prop is placed or moved: where it sits, and whether any
+// dancer's path comes within the clearance of it.
+export function propPlacementHint(show, prop) {
+  const name = (prop && prop.name) || 'Prop';
+  const hits = scanPropClashes(show, prop);
+  if (!hits.length) return `${name} is clear of every dancer's path`;
+  const first = hits[0];
+  const d = (show.cast || []).find((x) => x.id === first.dancerId);
+  const who = (d && d.name) || 'a dancer';
+  const more = hits.length > 1 ? ` · ${hits.length} clashes in all` : '';
+  return `${name} is on ${who}'s path at ${(first.at / 1000).toFixed(2)} s, ${first.gap.toFixed(2)} m away${more}`;
 }
 
 // Where everybody but one dancer stands, sampled once across the running order at a fixed set of

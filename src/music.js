@@ -11,6 +11,16 @@
 // under a different key prefix.
 
 import { storeAudio, readAudio, dropAudio, peaksOf } from './audiostore.js';
+import { estimateBeatMarkers } from './beat-map.js';
+
+
+export function clampReviewRate(rate) {
+  return Math.max(1, Math.min(4, Number(rate) || 1));
+}
+
+export function reviewPauseWallDuration(authoredMs, playbackRate = 1) {
+  return Math.max(0, Number(authoredMs) || 0) / clampReviewRate(playbackRate);
+}
 
 export class MusicEngine {
   constructor() {
@@ -23,6 +33,7 @@ export class MusicEngine {
     this.track = null;
     this.running = false;
     this.onClock = true;
+    this.playbackRate = 1;
     this.anchorShow = 0;
     this.anchorAt = 0;
     this.wallShow = 0;
@@ -85,10 +96,32 @@ export class MusicEngine {
     const Ctor = window.AudioContext || window.webkitAudioContext;
     if (!Ctor) return null;
     this.ctx = new Ctor();
+    // Every piece of show sound (music, narration) goes through this bus, so a recording
+    // can take the whole mix from one place without re-routing the speakers.
+    this.bus = this.ctx.createGain();
+    this.bus.connect(this.ctx.destination);
     this.gain = this.ctx.createGain();
     this.gain.gain.value = this.effectiveGain();
-    this.gain.connect(this.ctx.destination);
+    this.gain.connect(this.bus);
     return this.ctx;
+  }
+
+  // A MediaStream audio track carrying exactly what the speakers hear. Calling it again
+  // returns the same track; stopCaptureAudio() detaches the tap so nothing is kept open.
+  captureAudio() {
+    if (!this.ensure() || typeof this.ctx.createMediaStreamDestination !== 'function') return null;
+    if (!this.captureNode) {
+      this.captureNode = this.ctx.createMediaStreamDestination();
+      this.bus.connect(this.captureNode);
+    }
+    const tracks = this.captureNode.stream.getAudioTracks();
+    return tracks[0] || null;
+  }
+
+  stopCaptureAudio() {
+    if (!this.captureNode) return;
+    try { this.bus.disconnect(this.captureNode); } catch (_) { /* already detached */ }
+    this.captureNode = null;
   }
 
   // Decode from the store, or take it from the cache. Resolves true only when
@@ -171,6 +204,17 @@ export class MusicEngine {
     return !!this.buffer;
   }
 
+  // Analyze a stored track without changing the currently playing buffer/source.
+  async analyze(track) {
+    if (!track) return [];
+    const ctx = this.ensure();
+    if (!ctx) throw new Error('This browser cannot analyze audio');
+    const record = await readAudio(track.key);
+    if (!record || !record.bytes) throw new Error('Audio is missing in this browser');
+    const buffer = await ctx.decodeAudioData(record.bytes.slice(0));
+    return estimateBeatMarkers(buffer);
+  }
+
   // Take a file from disk: decode it, keep the peaks for the row, and store the
   // bytes so the track survives a reload without asking for the file again.
   async attach(file) {
@@ -180,16 +224,17 @@ export class MusicEngine {
     const buffer = await ctx.decodeAudioData(bytes.slice(0));
     const key = 'music-' + Date.now().toString(36);
     const peaks = peaksOf(buffer);
+    const beatMarkers = estimateBeatMarkers(buffer);
     try {
-      await storeAudio(key, { name: file.name, bytes, peaks: Array.from(peaks) });
+      await storeAudio(key, { name: file.name, bytes, peaks: Array.from(peaks), beatMarkers });
     } catch (e) {
       // Storage blocked: the track still plays this session, it just will not
       // come back on reload. Not fatal.
     }
-    this.cache.set(key, { buffer, peaks });
+    this.cache.set(key, { buffer, peaks, beatMarkers });
     this.peaksByKey.set(key, peaks);
     this.status.set(key, 'ready');
-    return { key, name: file.name, length: Math.round(buffer.duration * 1000) };
+    return { key, name: file.name, length: Math.round(buffer.duration * 1000), beatMarkers };
   }
 
   async forget(track) {
@@ -234,6 +279,18 @@ export class MusicEngine {
     if (this.gain) this.gain.gain.value = this.effectiveGain();
   }
 
+  setPlaybackRate(rate) {
+    const next = Math.max(1, Math.min(4, Number(rate) || 1));
+    const now = this.now();
+    const wasRunning = this.running;
+    const showMs = now == null ? this.anchorShow : now;
+    this.playbackRate = next;
+    if (wasRunning) {
+      this.anchor(showMs);
+      this.startSource(showMs);
+    }
+  }
+
   anchor(showMs) {
     this.anchorShow = showMs;
     if (this.ctx) this.anchorAt = this.ctx.currentTime;
@@ -251,14 +308,18 @@ export class MusicEngine {
     // rule as musicSpan() in the model), otherwise all of it. Passing the duration to
     // start() makes the trim sample-accurate instead of waiting for a frame to notice.
     const span = Number.isFinite(Number(t.play)) ? Math.min(Number(t.play) / 1000, file) : file;
+    // start()'s duration is in buffer seconds; playbackRate already governs how fast
+    // the buffer is consumed, so this stays unscaled. Only the wall-clock delay below
+    // is divided by the rate.
     const playFor = span - Math.max(0, into);
     if (playFor <= 0.01) return; // the track is over, or over its trim, by here
     const src = this.ctx.createBufferSource();
     src.buffer = this.buffer;
     src.connect(this.gain);
+    src.playbackRate.value = this.playbackRate;
     // Before its entry point the source waits, sample-accurate, rather than
     // starting late when the playhead reaches the cue.
-    const when = this.ctx.currentTime + Math.max(0, -into);
+    const when = this.ctx.currentTime + Math.max(0, -into) / this.playbackRate;
     src.start(when, Math.max(0, into), playFor);
     this.source = src;
   }
@@ -320,8 +381,8 @@ export class MusicEngine {
   // Show time in ms, or null when the show is not running.
   now() {
     if (!this.running) return null;
-    if (this.onClock && this.ctx) return this.anchorShow + (this.ctx.currentTime - this.anchorAt) * 1000;
-    return this.wallShow + (performance.now() - this.wallAt);
+    if (this.onClock && this.ctx) return this.anchorShow + (this.ctx.currentTime - this.anchorAt) * 1000 * this.playbackRate;
+    return this.wallShow + (performance.now() - this.wallAt) * this.playbackRate;
   }
 }
 
@@ -335,4 +396,3 @@ export function dropStored(key) {
 // One player for the app: the timeline draws its waveform and the transport
 // drives it, so they have to be the same engine.
 export const music = new MusicEngine();
-

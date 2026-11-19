@@ -3,7 +3,7 @@
 import {
   THEME, state, posOfContent, propPosOfContent, objectShown, sceneryStateAt,
   clothSpan, clothX, clothDepth, curtainLegW, lightLevelAt, lightSpot, costumeOf, evaluateMovement,
-  localOfContent,
+  localOfContent, dancerHeight,
 } from './model.js';
 import { drawPose, darker } from './pose.js';
 
@@ -429,7 +429,7 @@ export class ElevationView {
     ctx.ellipse(feet.x, feet.y, 0.22 * s * (0.6 + 0.4 * near), 0.07 * s * (0.6 + 0.4 * near), 0, 0, Math.PI * 2);
     ctx.fill();
 
-    const height = taller().dancer;
+    const height = dancerHeight(state.show, d);
 
     // Dressed, the figure is the costume; undressed, it is the performer's own colour,
     // exactly as it always was.

@@ -1,0 +1,27 @@
+[
+  {
+    "content": "[legs-1] Inspect current joints, rise and view contracts; set bounded geometry scope — self",
+    "id": "lf1",
+    "status": "completed"
+  },
+  {
+    "content": "[legs-2] Add dependency-free tapered limb contour helper and deterministic geometry tests — delegate",
+    "id": "lf2",
+    "status": "completed"
+  },
+  {
+    "content": "[legs-3] Add shared foot roll geometry and shaped leg canvas/SVG rendering; share toe geometry with overhead — self",
+    "id": "lf3",
+    "status": "completed"
+  },
+  {
+    "content": "[legs-4] Run 32 engine tests, browser render/transport checks and independent review; cover knee seams — self/delegate",
+    "id": "lf4",
+    "status": "completed"
+  },
+  {
+    "content": "[legs-5] Update release/cache identifiers and commit verified checkpoint — self",
+    "id": "lf5",
+    "status": "completed"
+  }
+]

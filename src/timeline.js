@@ -16,9 +16,9 @@ import { fmtTime } from './draw.js';
 import { music } from './music.js';
 
 const ROW_H = 24;
-// The top of the ruler holds a band for the running order, so acts stay visible
-// at every zoom level rather than only in the tabs.
-const RULER_H = 40;
+// The fixed top ruler keeps the show clock and beat map visible while track rows scroll.
+const RULER_H = 64;
+const BEAT_LANE_TOP = 40;
 // The width of the track list down the left edge. The company strip below the tracks
 // shares it, so a count lines up with the row it is counting.
 export const GUTTER = 176;
@@ -300,7 +300,7 @@ export class Timeline {
     if (b > a) {
       ctx.globalAlpha = 0.18;
       ctx.fillStyle = THEME.accent;
-      ctx.fillRect(a, RULER_H - 8, b - a, 7);
+      ctx.fillRect(a, BEAT_LANE_TOP - 8, b - a, 7);
       ctx.globalAlpha = 1;
     }
     // The start: where the leg into the first station would begin.
@@ -310,7 +310,7 @@ export class Timeline {
       ctx.setLineDash([3, 3]);
       ctx.beginPath();
       ctx.moveTo(Math.round(x0) + 0.5, 18);
-      ctx.lineTo(Math.round(x0) + 0.5, RULER_H - 1);
+      ctx.lineTo(Math.round(x0) + 0.5, BEAT_LANE_TOP - 1);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.globalAlpha = 1;
@@ -322,10 +322,10 @@ export class Timeline {
       const x = xs[i];
       if (!inside(x)) continue;
       ctx.beginPath();
-      ctx.moveTo(x, RULER_H - 12);
-      ctx.lineTo(x + 3.5, RULER_H - 8);
-      ctx.lineTo(x, RULER_H - 4);
-      ctx.lineTo(x - 3.5, RULER_H - 8);
+      ctx.moveTo(x, BEAT_LANE_TOP - 12);
+      ctx.lineTo(x + 3.5, BEAT_LANE_TOP - 8);
+      ctx.lineTo(x, BEAT_LANE_TOP - 4);
+      ctx.lineTo(x - 3.5, BEAT_LANE_TOP - 8);
       ctx.closePath();
       if (plan.steps[i] && plan.steps[i].off === 0) {
         ctx.fillStyle = THEME.accent;
@@ -371,6 +371,52 @@ export class Timeline {
     ctx.restore();
   }
 
+  // Beat ticks live in the fixed ruler, not only on the music row, so they stay
+  // visible while dancer and cue rows scroll vertically. x follows the shared timeline transform.
+  drawBeatRuler(ctx, w) {
+    const show = state.show;
+    ctx.fillStyle = '#0a1119';
+    ctx.fillRect(GUTTER, BEAT_LANE_TOP, w - GUTTER, RULER_H - BEAT_LANE_TOP);
+    ctx.strokeStyle = '#243040';
+    ctx.beginPath();
+    ctx.moveTo(GUTTER, BEAT_LANE_TOP + 0.5);
+    ctx.lineTo(w, BEAT_LANE_TOP + 0.5);
+    ctx.stroke();
+    ctx.font = '8px "Segoe UI", system-ui, sans-serif';
+    // Beats belong to every music track's clock, whether or not its eye is on. The
+    // eye only mutes playback; hiding its waveform must not erase the timing guide.
+    const tracks = show.musicTracks || [];
+    if (!tracks.some((track) => (track.beatMarkers || []).length)) {
+      ctx.fillStyle = 'rgba(170,190,212,.48)';
+      ctx.fillText('Analyze beats to add a timing guide', GUTTER + 8, BEAT_LANE_TOP + 11);
+      return;
+    }
+    for (const track of tracks) {
+      for (let i = 0; i < (track.beatMarkers || []).length; i++) {
+        const x = this.xOfDisplay(displayOfContent(show, track.start + track.beatMarkers[i]));
+        if (x < GUTTER || x > w) continue;
+        const active = this.drag && this.drag.type === 'beat' && this.drag.trackId === track.id && this.drag.index === i;
+        const downbeat = i === (Number(track.beatOne) || 0);
+        ctx.strokeStyle = downbeat ? '#ffbf47' : active ? '#fff1c2' : 'rgba(255,127,112,.82)';
+        ctx.lineWidth = active ? 2 : downbeat ? 1.6 : 1;
+        ctx.beginPath();
+        ctx.moveTo(Math.round(x) + 0.5, BEAT_LANE_TOP + (downbeat ? 2 : 4));
+        ctx.lineTo(Math.round(x) + 0.5, RULER_H - 14);
+        ctx.stroke();
+        ctx.lineWidth = 1;
+        if (downbeat) {
+          ctx.fillStyle = '#ffbf47';
+          ctx.beginPath();
+          ctx.moveTo(x - 2.5, BEAT_LANE_TOP + 1);
+          ctx.lineTo(x + 2.5, BEAT_LANE_TOP + 1);
+          ctx.lineTo(x, BEAT_LANE_TOP + 4.5);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+    }
+  }
+
   draw() {
     const show = state.show;
     const ctx = this.ctx;
@@ -399,19 +445,20 @@ export class Timeline {
       else if (px < GUTTER + 20) state.ui.scrollT = Math.max(0, (displayOfContent(show, state.ui.playhead) / 1000) - 1);
     }
 
-    // ---- ruler
+    const step = this.tickStep();
     ctx.fillStyle = '#0e131b';
     ctx.fillRect(0, 0, w, RULER_H);
+    ctx.fillStyle = '#0a1119';
+    ctx.fillRect(GUTTER, BEAT_LANE_TOP, w - GUTTER, RULER_H - BEAT_LANE_TOP);
     ctx.strokeStyle = '#1d2634';
     ctx.beginPath();
     ctx.moveTo(0, RULER_H + 0.5);
     ctx.lineTo(w, RULER_H + 0.5);
     ctx.stroke();
 
-    // ---- acts: the running order as a band across the top, with a notch for
-    // every scene start inside its act
     const acts = actRanges(show);
     const scenes = sceneRanges(show);
+    // Place ruler labels/ticks on its upper band; the beat lane below remains legible.
     for (let i = 0; i < acts.length; i++) {
       const x0 = this.xOfDisplay(displayOfContent(show, acts[i].start));
       const x1 = this.xOfDisplay(displayOfContent(show, acts[i].end));
@@ -461,7 +508,6 @@ export class Timeline {
       ctx.fillText(label, lx, 26);
     }
 
-    const step = this.tickStep();
     const t0 = this.timeAtX(GUTTER);
     const t1 = this.timeAtX(w);
     ctx.font = '10px Consolas, "SF Mono", monospace';
@@ -471,12 +517,13 @@ export class Timeline {
       if (x < GUTTER) continue;
       ctx.strokeStyle = '#28323f';
       ctx.beginPath();
-      ctx.moveTo(Math.round(x) + 0.5, RULER_H - 7);
-      ctx.lineTo(Math.round(x) + 0.5, RULER_H);
+      ctx.moveTo(Math.round(x) + 0.5, RULER_H - 33);
+      ctx.lineTo(Math.round(x) + 0.5, RULER_H - 25);
       ctx.stroke();
       ctx.fillStyle = THEME.dim;
-      ctx.fillText(fmtShort(t), x + 4, RULER_H - 10);
+      ctx.fillText(fmtShort(t), x + 4, RULER_H - 34);
     }
+    this.drawBeatRuler(ctx, w);
 
     // The phrase armed for the ruler, shown where it would fall before the click is made.
     this.drawPhrasePreview(ctx, w);
@@ -687,17 +734,22 @@ export class Timeline {
     ctx.fillStyle = '#11161f';
     ctx.fillRect(0, 0, GUTTER, h);
     ctx.fillStyle = '#0e131b';
-    ctx.fillRect(0, 0, GUTTER, RULER_H);
+    ctx.fillRect(0, 0, GUTTER, BEAT_LANE_TOP);
+    ctx.fillStyle = '#0a1119';
+    ctx.fillRect(0, BEAT_LANE_TOP, GUTTER, RULER_H - BEAT_LANE_TOP);
     ctx.strokeStyle = '#1d2634';
     ctx.beginPath();
     ctx.moveTo(GUTTER + 0.5, 0);
     ctx.lineTo(GUTTER + 0.5, h);
     ctx.stroke();
     // master eye: hide everything except the performer being edited
-    this.drawEye(11, RULER_H / 2, state.ui.onlyFocused);
     ctx.fillStyle = state.ui.onlyFocused ? THEME.accent : '#55637a';
     ctx.font = '9px "Segoe UI", system-ui, sans-serif';
-    ctx.fillText('ONLY FOCUSED', 28, RULER_H / 2 + 3);
+    ctx.fillText('ONLY FOCUSED', 28, BEAT_LANE_TOP / 2 + 3);
+    this.drawEye(11, BEAT_LANE_TOP + (RULER_H - BEAT_LANE_TOP) / 2, state.ui.onlyFocused);
+    ctx.fillStyle = '#7d91a8';
+    ctx.font = '8px "Segoe UI", system-ui, sans-serif';
+    ctx.fillText('BEATS', 28, BEAT_LANE_TOP + 11);
 
     ctx.save();
     ctx.beginPath();
@@ -754,7 +806,7 @@ export class Timeline {
         let boxX = px + 5;
         if (boxX + boxW > w - 3) boxX = px - 5 - boxW;
         boxX = Math.max(GUTTER + 2, Math.min(boxX, w - 3 - boxW));
-        const boxY = RULER_H + 1;
+        const boxY = 18;
         ctx.fillStyle = 'rgba(8,11,16,.92)';
         ctx.fillRect(boxX, boxY, boxW, 14);
         ctx.strokeStyle = 'rgba(255,183,3,.4)';
@@ -946,6 +998,19 @@ export class Timeline {
           }
           ctx.strokeStyle = 'rgba(76,201,240,' + 0.65 * a + ')';
           ctx.strokeRect(left + 0.5, mid - 10.5, Math.max(2, right - left - 1), 21);
+          // Estimated/editable beats are thin coral ticks, with count one called out in gold.
+          for (let bi = 0; bi < (m.beatMarkers || []).length; bi++) {
+            const beatX = this.xOfDisplay(displayOfContent(show, m.start + m.beatMarkers[bi]));
+            if (beatX < left || beatX > right) continue;
+            const activeDrag = this.drag && this.drag.type === 'beat' && this.drag.trackId === m.id && this.drag.index === bi;
+            ctx.strokeStyle = bi === (Number(m.beatOne) || 0) ? '#ffb703' : activeDrag ? '#fff1c2' : 'rgba(255,127,112,.95)';
+            ctx.lineWidth = activeDrag ? 2 : 1;
+            ctx.beginPath();
+            ctx.moveTo(Math.round(beatX) + 0.5, mid - 11);
+            ctx.lineTo(Math.round(beatX) + 0.5, mid + 11);
+            ctx.stroke();
+            ctx.lineWidth = 1;
+          }
         }
         if (x0 >= GUTTER && right > x0) {
           ctx.fillStyle = 'rgba(226,236,248,.8)';
@@ -2035,11 +2100,33 @@ export class Timeline {
     const y = e.clientY - r.top;
     const show = state.show;
 
+    // The fixed beat lane remains editable even when the corresponding music row
+    // has scrolled out of view. Keep marker ordering and constraints identical.
+    if (y >= BEAT_LANE_TOP && y < RULER_H && x >= GUTTER) {
+      let closest = null;
+      for (const track of show.musicTracks || []) {
+        if (track.visible === false) continue;
+        for (let bi = 0; bi < (track.beatMarkers || []).length; bi++) {
+          const beatX = this.xOfDisplay(displayOfContent(show, track.start + track.beatMarkers[bi]));
+          const dist = Math.abs(beatX - x);
+          if (dist <= 7 && (!closest || dist < closest.dist)) closest = { track, index: bi, dist };
+        }
+      }
+      if (closest) {
+        commit();
+        this.drag = { type: 'beat', trackId: closest.track.id, index: closest.index };
+        return;
+      }
+    }
+    // The fixed ruler lane is not also an implicit track row when vertically scrolled.
+    if (y >= BEAT_LANE_TOP && y < RULER_H) return;
+
     if (x < GUTTER) {
-      if (y < RULER_H && x < 120) {
+      if (y < BEAT_LANE_TOP && x < 120) {
         state.ui.onlyFocused = !state.ui.onlyFocused;
         return;
       }
+      if (y < RULER_H) return;
       const i = this.rowIndexAt(y);
       if (i == null) return;
       const tr = this.tracks()[i];
@@ -2270,6 +2357,22 @@ export class Timeline {
       }
     }
 
+    // Beat ticks are editable independently of track trims and fade cues.
+    if (tr.kind === 'music' && tr.track) {
+      const m = tr.track;
+      let closest = null;
+      for (let bi = 0; bi < (m.beatMarkers || []).length; bi++) {
+        const beatX = this.xOfDisplay(displayOfContent(show, m.start + m.beatMarkers[bi]));
+        const dist = Math.abs(beatX - x);
+        if (dist <= 7 && (!closest || dist < closest.dist)) closest = { index: bi, dist };
+      }
+      if (closest) {
+        commit();
+        this.drag = { type: 'beat', trackId: m.id, index: closest.index };
+        return;
+      }
+    }
+
     // A fade's band is a cue, and takes precedence over sliding the track.
     if (tr.kind === 'music' && tr.track) {
       const hit = this.fadeAt(x, tr.track);
@@ -2341,14 +2444,15 @@ export class Timeline {
         const y = e.clientY - r.top;
         // An armed phrase is judged on the ruler before it is placed, so the ruler remembers
         // where the pointer is and the drawing says where its stations would land.
-        const onRuler = y > 16 && y < RULER_H && x >= GUTTER;
-        this.hover =
-          onRuler && state.ui.phraseArmed
-            ? { at: this.contentAtX(x), bar: e.shiftKey || this.shiftHeld }
-            : null;
+        const onRuler = y > 16 && y < BEAT_LANE_TOP && x >= GUTTER;
+        this.hover = onRuler && state.ui.phraseArmed
+          ? { at: this.contentAtX(x), bar: e.shiftKey || this.shiftHeld }
+          : null;
+        const beatHit = y >= BEAT_LANE_TOP && y < RULER_H && x >= GUTTER && (state.show.musicTracks || []).some((track) => track.visible !== false && (track.beatMarkers || []).some((at) => Math.abs(this.xOfDisplay(displayOfContent(state.show, track.start + at)) - x) <= 7));
         const cue = y > RULER_H ? this.cueCursor(x, y) : '';
         const video = y > RULER_H ? this.videoHit(x, y) : null;
         if (onRuler && state.ui.phraseArmed) this.canvas.style.cursor = 'copy';
+        else if (beatHit) this.canvas.style.cursor = 'ew-resize';
         else if (y < RULER_H && x < GUTTER && this.rowIndexAt(y) != null) this.canvas.style.cursor = 'pointer';
         else if (y < 15 && this.sceneHandleAt(x)) this.canvas.style.cursor = 'ew-resize';
         else if (y > RULER_H && this.endAt(x)) this.canvas.style.cursor = 'ew-resize';
@@ -2374,6 +2478,14 @@ export class Timeline {
       for (let i = 1; i < keys.length; i++) {
         if (Number.isFinite(keys[i].dur)) keys[i].dur = Math.max(0, keys[i].t - keys[i - 1].t);
       }
+    } else if (this.drag.type === 'beat') {
+      const m = (show.musicTracks || []).find((t) => t.id === this.drag.trackId);
+      if (!m || !Array.isArray(m.beatMarkers)) return;
+      const markerX = this.contentAtX(x) - m.start;
+      const minGap = 30;
+      const prev = this.drag.index > 0 ? m.beatMarkers[this.drag.index - 1] + minGap : 0;
+      const next = this.drag.index < m.beatMarkers.length - 1 ? m.beatMarkers[this.drag.index + 1] - minGap : m.length || Infinity;
+      m.beatMarkers[this.drag.index] = Math.round(Math.max(prev, Math.min(next, markerX)));
     } else if (this.drag.type === 'hold' || this.drag.type === 'pause') {
       const t = Math.max(0, this.contentAtX(x));
       this.drag.marker.t = Math.round(t);
@@ -2520,9 +2632,11 @@ export class Timeline {
     }
     if (this.drag) {
       const moved = this.drag.type === 'music' || this.drag.type === 'musicEnd';
+      const beatMoved = this.drag.type === 'beat';
       this.drag = null;
       persist();
       this.app.rebuild();
+      if (beatMoved && state.ui.playing) music.seek(state.ui.playhead);
       // The cue moved under a running track: restart it from the right place.
       if (moved && state.ui.playing) music.seek(state.ui.playhead);
     }
@@ -2544,7 +2658,7 @@ export class Timeline {
     // puts it on the bar instead. A phrase armed from the movement sheet takes the same click:
     // its stations divide the counts from here rather than one point landing on the count. The
     // band at the very top is left alone — that is where scenes are dragged.
-    if (y > 16 && y < RULER_H && x >= GUTTER) {
+    if (y > 16 && y < BEAT_LANE_TOP && x >= GUTTER) {
       const at = Math.max(0, contentOfDisplay(show, this.timeAtX(x)));
       if (state.ui.phraseArmed) this.app.placePhraseOnCount(at, e.shiftKey);
       else this.app.addPointOnCount(at, e.shiftKey);
