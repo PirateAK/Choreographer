@@ -3121,6 +3121,16 @@ function paintView() {
     b.classList.toggle('on', on);
     b.setAttribute('aria-selected', on ? 'true' : 'false');
   }
+  // The header button names the view it will take you to: Top-down while the plan is
+  // not filling, Elevation while it is.
+  const headerTopDown = $('btnTopDown');
+  if (headerTopDown) {
+    const plan = filling === 'plan';
+    headerTopDown.textContent = plan ? 'Elevation' : 'Top-down';
+    headerTopDown.title = plan ? 'Fill the centre with the elevation' : 'Open the overhead stage plan';
+    headerTopDown.classList.toggle('on', plan);
+    headerTopDown.setAttribute('aria-pressed', String(plan));
+  }
   for (const [id, key] of [['btnPaths', 'showPaths'], ['btnStations', 'showStations']]) {
     const on = state.ui[key] !== false;
     $(id).classList.toggle('on', on);
